@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RCA Management System - โรงพยาบาลมหาวิทยาลัยพะเยา</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--primary:#1a5276;--primary-light:#2980b9;--primary-dark:#0e2f44;--accent:#e74c3c;--accent-warm:#f39c12;--success:#27ae60;--bg:#f0f3f7;--card:#fff;--text:#2c3e50;--text-light:#7f8c8d;--border:#dce1e8;--sidebar-bg:#0e2f44;--tier1:#e8f5e9;--tier2:#e3f2fd;--tier3:#fff8e1;--tier4:#fce4ec;--tier5:#f3e5f5;--shadow:0 2px 12px rgba(0,0,0,0.08);--radius:8px}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Sarabun','Noto Sans Thai',sans-serif;background:var(--bg);color:var(--text);font-size:14px}
+.app{display:flex;height:100vh;overflow:hidden}
+.sb{width:280px;min-width:280px;background:var(--sidebar-bg);color:#ecf0f1;display:flex;flex-direction:column;z-index:100}
+.sb-h{padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.1)}
+.sb-h h1{font-size:15px;font-weight:700;color:#fff;line-height:1.4}
+.sb-h .st{font-size:11px;color:rgba(255,255,255,0.6);margin-top:4px}
+.sb-n{flex:1;overflow-y:auto;padding:8px 0}
+.ns{padding:8px 20px 4px;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,0.4);font-weight:600}
+.ni{display:flex;align-items:center;gap:10px;padding:10px 20px;cursor:pointer;transition:all 0.2s;font-size:13px;border-left:3px solid transparent}
+.ni:hover{background:rgba(255,255,255,0.08)}
+.ni.ac{background:rgba(255,255,255,0.12);border-left-color:var(--accent-warm);color:#fff;font-weight:600}
+.ni-i{width:20px;text-align:center;font-size:16px}
+.ni-b{margin-left:auto;background:var(--accent);color:#fff;font-size:10px;padding:2px 7px;border-radius:10px;font-weight:600}
+.mc{flex:1;overflow-y:auto;display:flex;flex-direction:column}
+.ch{background:#fff;border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.ch h2{font-size:18px;font-weight:700;color:var(--primary-dark)}
+.ha{display:flex;gap:8px}
+.cb{flex:1;padding:20px 24px;overflow-y:auto}
+.btn{padding:8px 16px;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;transition:all 0.2s;display:inline-flex;align-items:center;gap:6px;font-family:inherit}
+.btn-p{background:var(--primary);color:#fff}.btn-p:hover{background:var(--primary-light)}
+.btn-s{background:var(--success);color:#fff}.btn-s:hover{background:#219a52}
+.btn-w{background:var(--accent-warm);color:#fff}.btn-w:hover{background:#e67e22}
+.btn-d{background:var(--accent);color:#fff}.btn-d:hover{background:#c0392b}
+.btn-o{background:transparent;border:1.5px solid var(--border);color:var(--text)}.btn-o:hover{border-color:var(--primary);color:var(--primary)}
+.btn-sm{padding:5px 12px;font-size:12px}
+.btn:disabled{opacity:0.5;cursor:not-allowed}
+.fc{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:16px;overflow:hidden}
+.fch{padding:14px 20px;background:var(--primary);color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px}
+.fcb{padding:20px}
+.fg{margin-bottom:14px}
+.fl{display:block;font-size:13px;font-weight:600;color:var(--text);margin-bottom:5px}
+.fl .rq{color:var(--accent)}
+.fi,.ft,.fs{width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;transition:border 0.2s;background:#fff}
+.fi:focus,.ft:focus,.fs:focus{outline:none;border-color:var(--primary-light);box-shadow:0 0 0 3px rgba(41,128,185,0.1)}
+.ft{min-height:80px;resize:vertical}
+.fr{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.fr3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+.cg{display:flex;flex-wrap:wrap;gap:10px}
+.ci{display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer}
+.ci input[type="checkbox"]{accent-color:var(--primary);width:16px;height:16px}
+.sg{display:flex;flex-wrap:wrap;gap:6px}
+.sb2{padding:4px 12px;border:2px solid var(--border);border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;transition:all 0.2s;user-select:none}
+.sb2.sel{border-color:var(--primary);background:var(--primary);color:#fff}
+.sb2:hover:not(.sel){border-color:var(--primary-light)}
+/* Flow steps */
+.fse{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:10px 0}
+.fsb{background:#fff;border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;min-width:110px;font-size:12px;font-family:inherit;text-align:center;transition:all 0.2s}
+.fsb:focus{border-color:var(--primary-light);box-shadow:0 0 0 3px rgba(41,128,185,0.12);outline:none}
+.fsb.sv{border-color:var(--success);background:#e8f8f0}
+.fa{color:var(--text-light);font-size:18px;font-weight:700;user-select:none}
+/* Tier */
+.tc{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:10px;overflow:hidden;border-left:4px solid transparent;transition:border-color 0.2s}
+.tc.hd{border-left-color:var(--success)}
+.tch{padding:11px 16px;display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;transition:background 0.15s}
+.tch:hover{background:#f8f9fa}
+.tch .tk{width:18px;height:18px;accent-color:var(--primary);cursor:pointer;flex-shrink:0}
+.tch .tt{flex:1;font-weight:700;font-size:13px}
+.tch .tg{padding:2px 10px;border-radius:12px;font-size:10px;font-weight:700;color:#fff}
+.tch .tw{font-size:13px;color:var(--text-light);transition:transform 0.2s;padding:4px 8px;border-radius:4px}
+.tch .tw:hover{background:#eee}
+.tch .tw.op{transform:rotate(180deg)}
+.tcb{padding:0 20px 20px}
+.tcb.cl{display:none}
+/* Tabs */
+.ftb{display:flex;border-bottom:2px solid var(--border);margin-bottom:16px;gap:2px}
+.ft2{padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all 0.2s;color:var(--text-light);border-radius:6px 6px 0 0}
+.ft2.ac{color:var(--primary);border-bottom-color:var(--primary);background:#fff}
+.ft2:hover:not(.ac){color:var(--text);background:#f8f9fa}
+/* People */
+.pg{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.pb{background:#f8f9fa;border:1px solid var(--border);border-radius:var(--radius);padding:14px}
+.pb .rl{font-size:12px;font-weight:700;color:var(--primary);margin-bottom:6px}
+/* Other */
+.oir{display:flex;align-items:center;gap:6px;margin-top:8px}
+.oir input[type="text"]{flex:1;padding:6px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit}
+.oir input[type="text"]:focus{outline:none;border-color:var(--primary-light)}
+/* HRMS */
+.hb{background:linear-gradient(135deg,#fff3cd,#ffeeba);border:1px solid #ffc107;border-radius:var(--radius);padding:12px 16px;display:flex;align-items:center;gap:10px;margin-bottom:16px}
+/* Knowledge */
+.kc{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;margin-bottom:12px}
+.kch{padding:12px 16px;background:linear-gradient(135deg,var(--primary),var(--primary-light));color:#fff;font-weight:700;font-size:13px;cursor:pointer;display:flex;justify-content:space-between;align-items:center}
+.kcb{padding:16px;font-size:13px;line-height:1.7}
+.kcb.cl{display:none}
+/* AI */
+.aiu{border:2px dashed var(--border);border-radius:var(--radius);padding:28px 20px;text-align:center;cursor:pointer;transition:all 0.2s;margin-bottom:16px}
+.aiu:hover{border-color:var(--primary-light);background:rgba(41,128,185,0.03)}
+.air{background:#f8f9fa;border-radius:6px;padding:14px;margin-top:12px;font-size:13px;line-height:1.7;white-space:pre-wrap;max-height:400px;overflow-y:auto}
+/* Dashboard */
+.ssg{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:20px}
+.sc{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);padding:20px;text-align:center}
+.sv2{font-size:32px;font-weight:700;color:var(--primary)}
+.sl{font-size:12px;color:var(--text-light);margin-top:4px;font-weight:500}
+.sc.su .sv2{color:var(--success)}.sc.wa .sv2{color:var(--accent-warm)}.sc.da .sv2{color:var(--accent)}
+.cc{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);padding:20px;margin-bottom:16px}
+.ct{font-size:14px;font-weight:700;margin-bottom:12px;color:var(--primary-dark)}
+/* Table */
+.rlt{width:100%;border-collapse:collapse}
+.rlt th{background:var(--primary);color:#fff;padding:10px 12px;font-size:12px;text-align:left}
+.rlt td{padding:10px 12px;border-bottom:1px solid var(--border);font-size:13px}
+.rlt tr:hover td{background:rgba(41,128,185,0.04)}
+.stb{padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;display:inline-block}
+.std{background:#ffeaa7;color:#856404}.stc{background:#d4edda;color:#155724}.sth{background:#cce5ff;color:#004085}
+.toast{position:fixed;bottom:20px;right:20px;background:#333;color:#fff;padding:12px 20px;border-radius:8px;font-size:13px;z-index:1000;animation:slu 0.3s ease}
+@keyframes slu{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+.lsp{display:inline-block;width:18px;height:18px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:sp 0.6s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useRef}=React;
+
+const SEV_L=['A','B','C','D','E','F','G','H','I'], SEV_N=['1','2','3','4','5'];
+const DAYS=[{v:'3',l:'3 วัน'},{v:'7',l:'7 วัน'},{v:'14',l:'14 วัน'},{v:'30',l:'1 เดือน'},{v:'30+',l:'มากกว่า 1 เดือน'}];
+
+const TD=[
+  {id:'t1p',tier:1,label:'Tier 1: ผู้ป่วย',tag:'Tier 1',tc:'#27ae60',bg:'var(--tier1)',items:['สภาวะทางคลินิก (พยาธิสภาพ/ความซับซ้อน/ความรุนแรง)','ความรู้ความเข้าใจด้านสุขภาพ','ยาที่ใช้อยู่','ภาษา, สังคม-วัฒนธรรม-ความเชื่อ']},
+  {id:'t1s',tier:1,label:'Tier 1: ผู้ปฏิบัติงาน',tag:'Tier 1',tc:'#27ae60',bg:'var(--tier1)',items:['เหนื่อยล้า','เครียด กดดัน','ละเลย ไม่เอาใจใส่','ขาดความรู้ / ขาดทักษะ','เอนเอียง/มีอคติในกระบวนการคิด','ขาดสมรรถนะ / ประสบการณ์','ประเด็นเรื่องสุขภาพ','ทัศนคติ, ความสามารถในการปรับตัว','ไม่กล้าทักท้วงเพื่อความปลอดภัย']},
+  {id:'t2t',tier:2,label:'Tier 2: ทีมและการสื่อสารในทีม',tag:'Tier 2',tc:'#2980b9',bg:'var(--tier2)',items:['หน้าที่ไม่ชัดเจน/ขาดความรับผิดชอบ','ไม่ได้แจ้ง-ส่งต่อข้อมูล/ขาดความตระหนัก','ขาดการสื่อสารระหว่างหัวหน้ากับผู้ปฏิบัติงาน','ขาดการสื่อสารระหว่างสมาชิกในทีม','ขาดการสื่อสารระหว่างเจ้าหน้าที่กับผู้ป่วย/ญาติ']},
+  {id:'t2w',tier:2,label:'Tier 2: ลักษณะงาน',tag:'Tier 2',tc:'#2980b9',bg:'var(--tier2)',items:['ความซับซ้อนของกระบวนการทำงาน','ต้องทำงานหลายอย่างด้วยความเร่งรีบ','ถูกรบกวนขณะทำงาน','ต้องใช้ความสามารถเฉพาะบุคคล']},
+  {id:'t3e',tier:3,label:'Tier 3: สิ่งแวดล้อม',tag:'Tier 3',tc:'#e67e22',bg:'var(--tier3)',items:['สิ่งแวดล้อมเชิงกายภาพ เช่น แสง เสียง การถ่ายเทอากาศ','สถานที่คับแคบ/ผังบริเวณไม่เหมาะสม']},
+  {id:'t3q',tier:3,label:'Tier 3: เครื่องมือ / อุปกรณ์',tag:'Tier 3',tc:'#e67e22',bg:'var(--tier3)',items:['หน้าที่(Function)ไม่เหมาะสม','การออกแบบ(Design)ไม่เหมาะสม','มีไม่พอ / ไม่พร้อมใช้งาน','ขาดการบำรุงรักษา']},
+  {id:'t3s',tier:3,label:'Tier 3: การออกแบบระบบงาน',tag:'Tier 3',tc:'#e67e22',bg:'var(--tier3)',items:['ไม่มีแนวปฏิบัติ / มาตรฐานการปฏิบัติ','แนวปฏิบัติไม่ชัดเจน / ไม่สามารถปฏิบัติได้จริง']},
+  {id:'t3i',tier:3,label:'Tier 3: ข้อมูลและสารสนเทศ',tag:'Tier 3',tc:'#e67e22',bg:'var(--tier3)',items:['ไม่มีข้อมูล เข้าถึงข้อมูลยาก','ข้อมูลไม่ชัดเจน อ่านยาก','ข้อมูลไม่ถูกต้อง']},
+  {id:'t4p',tier:4,label:'Tier 4: นโยบาย',tag:'Tier 4',tc:'#c0392b',bg:'var(--tier4)',items:['ไม่มีนโยบาย','นโยบายไม่ชัดเจน','ไม่ทำตามนโยบาย/แนวทาง/ระเบียบปฏิบัติ']},
+  {id:'t4m',tier:4,label:'Tier 4: การควบคุม กำกับ สนับสนุน',tag:'Tier 4',tc:'#c0392b',bg:'var(--tier4)',items:['ขาดการควบคุม กำกับ สนับสนุนด้านคลินิก','ขาดการควบคุม กำกับ สนับสนุนด้านการจัดการ']},
+  {id:'t4c',tier:4,label:'Tier 4: บรรยากาศองค์กร',tag:'Tier 4',tc:'#c0392b',bg:'var(--tier4)',items:['วัฒนธรรมความปลอดภัยไม่เหมาะสม','การจัดการ/การควบคุมเชิงวิศวกรรมไม่เหมาะสม']},
+  {id:'t5',tier:5,label:'Tier 5: สังคม / นอกองค์กร',tag:'Tier 5',tc:'#8e44ad',bg:'var(--tier5)',items:['นโยบาย กฎหมาย ระเบียบข้อบังคับระดับชาติ','อิทธิพลของสังคม','เทคโนโลยีใหม่ / การออกแบบอุปกรณ์']},
+];
+
+const KS=[
+  {t:'Root Cause คืออะไร',c:'Root Cause คือสาเหตุพื้นฐานที่สุดที่สามารถระบุได้อย่างมีเหตุผล ซึ่งผู้บริหารมีอำนาจจัดการแก้ไขได้ และเมื่อจัดการแก้ไขแล้ว จะป้องกันหรือลดโอกาสที่จะเกิดปัญหาซ้ำ'},
+  {t:'2-Axis Swiss Cheese Model',c:'ตัวแบบนี้เสนอว่ารูโหว่ใน Swiss Cheese สามารถเกิดขึ้นตาม:\n\nแกนนอน: Chronology of Events → Care Management Problem\nแกนตั้ง: Tier 1 (บุคคล) → Tier 2 (ทีม/งาน) → Tier 3 (สิ่งแวดล้อม) → Tier 4 (การบริหาร) → Tier 5 (ภายนอก)\n\nแต่ละ CMP มี Root Causes เฉพาะ สาเหตุต่อกันเป็นลำดับ อาจจบที่ชั้นไหนก็ได้'},
+  {t:'5 Tiers of Contributing Factors',c:'Tier 1 - บุคคล: ความรู้ ทักษะ ประสบการณ์ ความเหนื่อยล้า\nTier 2 - ลักษณะงาน/ทีม: ความซับซ้อน การสื่อสาร บทบาท\nTier 3 - สิ่งแวดล้อม/ระบบ: สิ่งแวดล้อม เครื่องมือ ข้อมูล แนวปฏิบัติ\nTier 4 - การบริหาร/นโยบาย: โครงสร้าง วัฒนธรรม ทรัพยากร\nTier 5 - ภายนอกองค์กร: กฎหมาย สังคม เทคโนโลยี'},
+  {t:'Care Management Problem (CMP)',c:'ตัวอย่าง CMPs:\n1. ไม่มีการเฝ้าระวัง/สังเกต\n2. ล่าช้าในการวินิจฉัย\n3. ประเมินความเสี่ยงผิดพลาด\n4. ส่งต่อข้อมูลไม่เพียงพอ\n5. ไม่ปฏิบัติตาม protocol\n6. ไม่ขอความช่วยเหลือเมื่อจำเป็น\n7. การตัดสินใจที่ไม่ถูกต้อง'},
+  {t:'ขั้นตอนการทำ RCA',c:'1. Map story & timeline\n2. Identify potential change/unsafe act\n3. Proactive fact finding\n4. Identify root causes\n5. Test creative solution with PDSA'},
+  {t:'Mindfulness in RCA',c:'❑ คาดการณ์ (Preoccupy with failure)\n❑ เตรียมพร้อม (Commitment to resilience)\n❑ ตาดู (Sensitivity to operation)\n❑ หูฟัง (Deference to expertise)\n❑ ใคร่ครวญ (Reluctance to simplify)'},
+];
+
+function mkTD(){return TD.map(t=>({id:t.id,en:false,ck:[],oc:false,ot:'',desc:'',strat:'',ind:'',tl:'',resp:''}))}
+const DF={department:'',date:'',title:'',incidentCode:'',sevL:'',sevN:'',whatHappened:'',where:'',when:'',eventDate:'',professions:'',relatedDepts:'',mainFixDept:'',subFixDept:'',flowSteps:['','','','',''],fsSaved:false,cmps:[{step:'',problem:'',unsafeAct:''}],ta:mkTD(),summaryDate:'',daysToSubmit:'',followUpMonth:'',followUpStatus:'',ownerName:'',headName:'',secretaryName:'',chairName:'',hrms:false};
+
+function loadL(){try{return JSON.parse(localStorage.getItem('rca_list')||'[]')}catch{return[]}}
+function saveL(l){localStorage.setItem('rca_list',JSON.stringify(l))}
+function gid(){return'RCA-'+Date.now().toString(36).toUpperCase()}
+
+function bExp(fd,fmt){
+  const ss=(fd.flowSteps||[]).filter(s=>s.trim());
+  const at=(fd.ta||[]).filter(t=>t.en&&(t.desc||(t.ck||[]).length>0||(t.oc&&t.ot)));
+  const cmps=(fd.cmps||[]).filter(c=>c.step||c.problem||c.unsafeAct);
+  const aws=at.filter(t=>t.strat);
+  return`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>RCA - ${fd.title||''}</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>body{font-family:'Sarabun',sans-serif;padding:40px;font-size:13px;color:#333;line-height:1.6;max-width:900px;margin:auto}h1{font-size:18px;text-align:center;margin-bottom:2px}.sub{text-align:center;font-size:14px;color:#666;margin-bottom:16px}h2{font-size:14px;background:#1a5276;color:#fff;padding:8px 14px;margin:18px 0 10px;border-radius:4px}h3{font-size:13px;color:#1a5276;margin:12px 0 6px}table{width:100%;border-collapse:collapse;margin:8px 0}th,td{border:1px solid #ccc;padding:7px 10px;text-align:left;font-size:12px;vertical-align:top}th{background:#e8edf2;font-weight:700}.fc{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin:8px 0}.fb{background:#2980b9;color:#fff;padding:5px 14px;border-radius:16px;font-size:12px;font-weight:600}.far{color:#999;font-size:14px}.sg{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:30px}.sb{border:1px solid #ccc;padding:16px;text-align:center;min-height:110px;border-radius:6px}.sl{border-bottom:1px solid #333;width:80%;margin:40px auto 8px}.slb{font-size:11px;color:#666}.sn{font-size:12px;margin-top:4px;font-weight:600}.chk{display:inline-block;width:13px;height:13px;border:1.5px solid #333;margin-right:5px;vertical-align:middle;text-align:center;font-size:9px;line-height:13px}.chk.y{background:#1a5276;color:#fff}.tag{display:inline-block;background:#2980b9;color:#fff;padding:1px 8px;border-radius:10px;font-size:10px;font-weight:700;margin-right:4px}.sum-box{background:#f8f9fa;border:1px solid #ddd;border-radius:6px;padding:10px 12px;margin:6px 0;font-size:12px}@media print{body{padding:20px}}</style></head><body>
+<h1>บันทึกข้อมูลการทำ Root Cause Analysis (RCA)</h1>
+<div class="sub">โรงพยาบาลมหาวิทยาลัยพะเยา</div>
+<table><tr><td style="width:50%"><b>หน่วยงาน/ทีมนำ:</b> ${fd.department||'-'}</td><td><b>วันที่:</b> ${fd.date||'-'}</td></tr>
+<tr><td><b>เรื่อง:</b> ${fd.title||'-'}</td><td><b>รหัสอุบัติการณ์:</b> ${fd.incidentCode||'-'}</td></tr>
+<tr><td colspan="2"><b>ระดับความรุนแรง:</b> ${fd.sevL||'-'} / ${fd.sevN||'-'}</td></tr></table>
+<h2>ตอนที่ 1: การเตรียมข้อมูลเพื่อทำ RCA</h2>
+<p><b>1.1 เกิดอะไรขึ้น:</b><br>${(fd.whatHappened||'').replace(/\n/g,'<br>')}</p>
+<p><b>1.2 เกิดที่:</b> ${fd.where||'-'} &nbsp; <b>1.3 เวลา:</b> ${fd.when||'-'} &nbsp; <b>วันที่:</b> ${fd.eventDate||'-'}</p>
+<table><tr><th>วิชาชีพที่เกี่ยวข้อง</th><th>หน่วยงานที่เกี่ยวข้อง</th></tr><tr><td>${fd.professions||'-'}</td><td>${fd.relatedDepts||'-'}</td></tr></table>
+<table><tr><th>กลุ่ม/หน่วยงานหลักที่แก้ไข</th><th>กลุ่ม/หน่วยงานร่วมที่แก้ไข</th></tr><tr><td>${fd.mainFixDept||'-'}</td><td>${fd.subFixDept||'-'}</td></tr></table>
+<h2>ตอนที่ 2: วิเคราะห์ขั้นตอน/กิจกรรมที่เป็นจุดเปลี่ยน</h2>
+<p><b>Flow of Steps:</b></p>
+<div class="fc">${ss.map((s,i)=>`${i>0?'<span class="far">→</span>':''}<span class="fb">${s}</span>`).join('')}</div>
+<table><tr><th>ขั้นตอน</th><th>Care Management Problem</th><th>Unsafe Act / Potential Change</th></tr>
+${(fd.cmps||[]).map(c=>`<tr><td>${c.step||'-'}</td><td>${c.problem||'-'}</td><td>${c.unsafeAct||'-'}</td></tr>`).join('')}</table>
+<h2>ตอนที่ 3: วิเคราะห์หาสาเหตุ/ปัจจัยเบื้องหลัง</h2>
+${at.length===0?'<p style="color:#999">ไม่มีข้อมูลปัจจัยสาเหตุที่ระบุ</p>':`<table><tr><th style="width:22%">สาเหตุ/ความเกี่ยวข้อง</th><th>บรรยายสรุป</th><th>กลยุทธ์/มาตรการป้องกัน</th><th>เป้าหมาย/ตัวชี้วัด</th><th>เวลา</th><th>ผู้รับผิดชอบ</th></tr>
+${at.map(t=>{const info=TD.find(d=>d.id===t.id);const items=[...(t.ck||[])];if(t.oc&&t.ot)items.push('อื่นๆ: '+t.ot);return`<tr><td><b>${info?.label||t.id}</b><br><span style="font-size:11px;color:#555">${items.join(', ')}</span></td><td>${t.desc||'-'}</td><td>${t.strat||'-'}</td><td>${t.ind||'-'}</td><td>${t.tl||'-'}</td><td>${t.resp||'-'}</td></tr>`}).join('')}</table>`}
+
+<h2>สรุปรายละเอียดจากการวิเคราะห์</h2>
+<h3>1. สรุปมีการแก้ไขปัญหาอย่างไร</h3>
+${cmps.length===0?'<p style="color:#999">ไม่มีข้อมูล</p>':`<table><tr><th>ขั้นตอน</th><th>ปัญหา (CMP)</th><th>Unsafe Act / จุดเปลี่ยน</th></tr>${cmps.map(c=>`<tr><td>${c.step||'-'}</td><td>${c.problem||'-'}</td><td>${c.unsafeAct||'-'}</td></tr>`).join('')}</table>`}
+
+<h3>2. สรุป Contributing Factors / RCA</h3>
+${at.length===0?'<p style="color:#999">ไม่มีข้อมูล</p>':at.map(t=>{const info=TD.find(d=>d.id===t.id);const items=[...(t.ck||[])];if(t.oc&&t.ot)items.push('อื่นๆ: '+t.ot);return`<div class="sum-box"><span class="tag">${info?.tag}</span><b>${info?.label}</b>${items.length>0?`<br><span style="color:#555">ปัจจัย: ${items.join(', ')}</span>`:''}${t.desc?`<br>รายละเอียด: ${t.desc}`:''}</div>`}).join('')}
+
+<h3>3. มีการปรับ/พัฒนาระบบอะไร อย่างไร</h3>
+${aws.length===0?'<p style="color:#999">ไม่มีข้อมูลกลยุทธ์/มาตรการ</p>':`<table><tr><th>Tier / ปัจจัย</th><th>กลยุทธ์/มาตรการป้องกัน</th><th>เป้าหมาย/ตัวชี้วัด</th><th>ผู้รับผิดชอบ</th></tr>${aws.map(t=>{const info=TD.find(d=>d.id===t.id);return`<tr><td><b>${info?.label||'-'}</b></td><td>${t.strat}</td><td>${t.ind||'-'}</td><td>${t.resp||'-'}</td></tr>`}).join('')}</table>`}
+
+<h2>สรุปผลการดำเนินงาน</h2>
+<table><tr><td><b>ส่งข้อมูลกลับวันที่:</b> ${fd.summaryDate||'-'}</td><td><b>จำนวนวัน:</b> ${fd.daysToSubmit||'-'}</td></tr>
+<tr><td><b>เดือนที่ติดตาม:</b> ${fd.followUpMonth||'-'}</td><td><b>สถานะ:</b> ${fd.followUpStatus==='completed'?'ติดตามเสร็จสิ้น':fd.followUpStatus==='in_progress'?'กำลังดำเนินการ':'ยังไม่ได้ติดตาม'}</td></tr>
+<tr><td colspan="2"><span class="chk ${fd.hrms?'y':''}"></span> ${fd.hrms?'ลงในระบบ HRMS แล้ว':'ยังไม่ได้ลงระบบ HRMS'}</td></tr></table>
+<div class="sg">
+<div class="sb"><b>เจ้าของอุบัติการณ์</b><div class="sl"></div><div class="slb">ลงชื่อ</div>${fd.ownerName?`<div class="sn">(${fd.ownerName})</div>`:''}</div>
+<div class="sb"><b>หัวหน้าหน่วยงานที่เกี่ยวข้อง</b><div class="sl"></div><div class="slb">ลงชื่อ</div>${fd.headName?`<div class="sn">(${fd.headName})</div>`:''}</div>
+<div class="sb"><b>เลขาความเสี่ยง</b><div class="sl"></div><div class="slb">ลงชื่อ</div>${fd.secretaryName?`<div class="sn">(${fd.secretaryName})</div>`:''}</div>
+<div class="sb"><b>ประธานความเสี่ยง</b><div class="sl"></div><div class="slb">ลงชื่อ</div>${fd.chairName?`<div class="sn">(${fd.chairName})</div>`:''}</div>
+</div>
+${fmt==='pdf'?'<script>setTimeout(()=>window.print(),600)<\/script>':''}
+</body></html>`
+}
+
+// APP
+function App(){
+  const[nav,sN]=useState('form'),[rl,sRL]=useState(loadL),[ci,sCI]=useState(null),[fd,sFD]=useState({...DF,ta:mkTD()}),[toast,sT]=useState(null),[aiL,sAL]=useState(false),[aiR,sAR]=useState(''),[it,sIT]=useState('');
+  useEffect(()=>{saveL(rl)},[rl]);
+  const st=m=>{sT(m);setTimeout(()=>sT(null),3000)};
+  const uf=(f,v)=>sFD(p=>({...p,[f]:v}));
+  const hNew=()=>{sCI(gid());sFD({...DF,ta:mkTD()});sN('form')};
+  const hSave=()=>{const e={id:ci||gid(),...fd,savedAt:new Date().toISOString(),status:'draft'};if(!ci)sCI(e.id);sRL(p=>{const i=p.findIndex(r=>r.id===e.id);if(i>=0){const n=[...p];n[i]=e;return n}return[...p,e]});st('✅ บันทึก RCA เรียบร้อย')};
+  const hLoad=r=>{sCI(r.id);sFD({...DF,...r,ta:r.ta||mkTD()});sN('form')};
+  const hExp=f=>{const w=window.open('','_blank');w.document.write(bExp(fd,f));w.document.close();st(f==='pdf'?'📄 เปิดหน้า PDF':'📝 เปิด Word')};
+  const hAI=async()=>{if(!it.trim())return st('⚠️ กรุณาใส่ข้อมูลก่อน');sAL(true);sAR('');try{const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:4000,messages:[{role:"user",content:`คุณเป็นผู้เชี่ยวชาญ RCA ในรพ. วิเคราะห์อุบัติการณ์ตาม 2-Axis Swiss Cheese Model & 5-Tier RCA ตอบ JSON ภาษาไทย:\n\nอุบัติการณ์: ${it}\n\n{"whatHappened":"สรุป","flowSteps":["ขั้นตอน"],"cmps":[{"step":"","problem":"","unsafeAct":""}],"tierAnalysis":{"tier1":"","tier2":"","tier3":"","tier4":""},"recommendations":[""]}`}]})});const d=await r.json();const txt=d.content?.map(i=>i.text||'').join('\n')||'ไม่สามารถวิเคราะห์ได้';sAR(txt);try{const p=JSON.parse(txt.replace(/```json|```/g,'').trim());if(p.whatHappened)uf('whatHappened',p.whatHappened);if(p.flowSteps){const s=[...p.flowSteps];while(s.length<5)s.push('');uf('flowSteps',s);uf('fsSaved',true)}if(p.cmps)uf('cmps',p.cmps);st('✅ วิเคราะห์เสร็จ เติมข้อมูลแล้ว')}catch{}}catch(e){sAR('เกิดข้อผิดพลาด: '+e.message)}sAL(false)};
+  const stats={total:rl.length,hrms:rl.filter(r=>r.hrms).length,fu:rl.filter(r=>r.followUpStatus==='completed').length};
+
+  return(
+    <div className="app">
+      <div className="sb">
+        <div className="sb-h"><h1>🏥 RCA Management System</h1><div className="st">โรงพยาบาลมหาวิทยาลัยพะเยา</div></div>
+        <div className="sb-n">
+          <div className="ns">แบบฟอร์ม</div>
+          <div className={`ni ${nav==='form'?'ac':''}`} onClick={()=>sN('form')}><span className="ni-i">📋</span>แบบฟอร์ม RCA</div>
+          <div className={`ni ${nav==='list'?'ac':''}`} onClick={()=>sN('list')}><span className="ni-i">📁</span>รายการ RCA{rl.length>0&&<span className="ni-b">{rl.length}</span>}</div>
+          <div className="ns">เครื่องมือ</div>
+          <div className={`ni ${nav==='ai'?'ac':''}`} onClick={()=>sN('ai')}><span className="ni-i">🤖</span>AI วิเคราะห์</div>
+          <div className={`ni ${nav==='kb'?'ac':''}`} onClick={()=>sN('kb')}><span className="ni-i">📚</span>ความรู้ RCA</div>
+          <div className="ns">รายงาน</div>
+          <div className={`ni ${nav==='db'?'ac':''}`} onClick={()=>sN('db')}><span className="ni-i">📊</span>Dashboard</div>
+        </div>
+      </div>
+      <div className="mc">
+        <div className="ch">
+          <h2>{nav==='form'?'📋 แบบฟอร์มบันทึก RCA':nav==='list'?'📁 รายการ RCA':nav==='ai'?'🤖 AI Analysis':nav==='kb'?'📚 ความรู้ RCA':'📊 Dashboard'}</h2>
+          <div className="ha">
+            {nav==='form'&&<><button className="btn btn-o btn-sm" onClick={hNew}>➕ ใหม่</button><button className="btn btn-p btn-sm" onClick={hSave}>💾 บันทึก</button><button className="btn btn-w btn-sm" onClick={()=>hExp('pdf')}>📄 PDF</button><button className="btn btn-s btn-sm" onClick={()=>hExp('word')}>📝 Word</button></>}
+            {nav==='list'&&<button className="btn btn-p btn-sm" onClick={hNew}>➕ ใหม่</button>}
+          </div>
+        </div>
+        <div className="cb">
+          {nav==='form'&&<FormV fd={fd} sFD={sFD} uf={uf}/>}
+          {nav==='list'&&<ListV rl={rl} onL={hLoad} onN={hNew} sRL={sRL}/>}
+          {nav==='ai'&&<AIV it={it} sIT={sIT} aiL={aiL} aiR={aiR} onA={hAI}/>}
+          {nav==='kb'&&<KBV/>}
+          {nav==='db'&&<DBV stats={stats} rl={rl}/>}
+        </div>
+      </div>
+      {toast&&<div className="toast">{toast}</div>}
+    </div>
+  );
+}
+
+// FORM
+function FormV({fd,sFD,uf}){
+  const[tab,sTab]=useState('p1');
+  const ss=(fd.flowSteps||[]).filter(s=>s.trim());
+  const uFS=(i,v)=>sFD(p=>{const s=[...(p.flowSteps||[])];s[i]=v;return{...p,flowSteps:s}});
+  const aFS=()=>sFD(p=>({...p,flowSteps:[...(p.flowSteps||[]),''],fsSaved:false}));
+  const rFS=i=>sFD(p=>{const s=[...(p.flowSteps||[])];s.splice(i,1);return{...p,flowSteps:s}});
+  const aC=()=>sFD(p=>({...p,cmps:[...p.cmps,{step:'',problem:'',unsafeAct:''}]}));
+  const uC=(i,f,v)=>sFD(p=>{const c=[...p.cmps];c[i]={...c[i],[f]:v};return{...p,cmps:c}});
+  const rC=i=>sFD(p=>({...p,cmps:p.cmps.filter((_,j)=>j!==i)}));
+  const uT=(i,f,v)=>sFD(p=>{const t=[...p.ta];t[i]={...t[i],[f]:v};return{...p,ta:t}});
+  const tTC=(i,item)=>sFD(p=>{const t=[...p.ta];const c=[...(t[i].ck||[])];const j=c.indexOf(item);j>=0?c.splice(j,1):c.push(item);t[i]={...t[i],ck:c};return{...p,ta:t}});
+
+  return(
+    <div>
+      <div className="hb"><span style={{fontSize:20}}>⚠️</span><div style={{flex:1}}><strong>เตือน: ลงระบบ HRMS</strong><label style={{marginLeft:14,cursor:'pointer'}}><input type="checkbox" checked={fd.hrms} onChange={e=>uf('hrms',e.target.checked)} style={{accentColor:'var(--primary)',marginRight:6}}/>ลงในระบบ HRMS ของโรงพยาบาลแล้ว</label></div></div>
+      <div className="ftb">
+        <div className={`ft2 ${tab==='p1'?'ac':''}`} onClick={()=>sTab('p1')}>ตอนที่ 1: ข้อมูลเบื้องต้น</div>
+        <div className={`ft2 ${tab==='p23'?'ac':''}`} onClick={()=>sTab('p23')}>ตอนที่ 2-3: จุดเปลี่ยนและปัจจัยสาเหตุ</div>
+        <div className={`ft2 ${tab==='sm'?'ac':''}`} onClick={()=>sTab('sm')}>สรุปผลและติดตาม</div>
+      </div>
+
+      {tab==='p1'&&<>
+        <div className="fc"><div className="fch">📋 ข้อมูลทั่วไป</div><div className="fcb">
+          <div className="fr"><div className="fg"><label className="fl">หน่วยงาน/ทีมนำ <span className="rq">*</span></label><input className="fi" value={fd.department} onChange={e=>uf('department',e.target.value)} placeholder="ระบุหน่วยงาน"/></div><div className="fg"><label className="fl">วันที่จัดทำ</label><input className="fi" type="date" value={fd.date} onChange={e=>uf('date',e.target.value)}/></div></div>
+          <div className="fr"><div className="fg"><label className="fl">เรื่อง <span className="rq">*</span></label><input className="fi" value={fd.title} onChange={e=>uf('title',e.target.value)} placeholder="ชื่อเหตุการณ์"/></div><div className="fg"><label className="fl">รหัสอุบัติการณ์</label><input className="fi" value={fd.incidentCode} onChange={e=>uf('incidentCode',e.target.value)} placeholder="IR-XXXX"/></div></div>
+          <div className="fg"><label className="fl">ระดับความรุนแรง</label><div style={{display:'flex',gap:24,flexWrap:'wrap'}}><div><div style={{fontSize:11,color:'var(--text-light)',marginBottom:4}}>NCC MERP (A-I)</div><div className="sg">{SEV_L.map(s=><span key={s} className={`sb2 ${fd.sevL===s?'sel':''}`} onClick={()=>uf('sevL',s)}>{s}</span>)}</div></div><div><div style={{fontSize:11,color:'var(--text-light)',marginBottom:4}}>Safety Score (1-5)</div><div className="sg">{SEV_N.map(s=><span key={s} className={`sb2 ${fd.sevN===s?'sel':''}`} onClick={()=>uf('sevN',s)}>{s}</span>)}</div></div></div></div>
+        </div></div>
+        <div className="fc"><div className="fch">📝 บรรยายสรุป</div><div className="fcb">
+          <div className="fg"><label className="fl">1.1 เกิดอะไรขึ้น <span className="rq">*</span></label><textarea className="ft" style={{minHeight:120}} value={fd.whatHappened} onChange={e=>uf('whatHappened',e.target.value)} placeholder="บรรยายรายละเอียด..."/></div>
+          <div className="fr3"><div className="fg"><label className="fl">1.2 เกิดที่</label><input className="fi" value={fd.where} onChange={e=>uf('where',e.target.value)}/></div><div className="fg"><label className="fl">1.3 เวลา</label><input className="fi" type="time" value={fd.when} onChange={e=>uf('when',e.target.value)}/></div><div className="fg"><label className="fl">วันที่เกิดเหตุ</label><input className="fi" type="date" value={fd.eventDate} onChange={e=>uf('eventDate',e.target.value)}/></div></div>
+          <div className="fr"><div className="fg"><label className="fl">วิชาชีพที่เกี่ยวข้อง</label><textarea className="ft" value={fd.professions} onChange={e=>uf('professions',e.target.value)} placeholder="แพทย์, พยาบาล..."/></div><div className="fg"><label className="fl">หน่วยงานที่เกี่ยวข้อง</label><textarea className="ft" value={fd.relatedDepts} onChange={e=>uf('relatedDepts',e.target.value)} placeholder="ER, ICU..."/></div></div>
+          <div className="fr"><div className="fg"><label className="fl">กลุ่ม/หน่วยงานหลักที่แก้ไข</label><input className="fi" value={fd.mainFixDept} onChange={e=>uf('mainFixDept',e.target.value)} placeholder="ระบุกลุ่ม/หน่วยงานหลักที่รับผิดชอบแก้ไข"/></div><div className="fg"><label className="fl">กลุ่ม/หน่วยงานร่วมที่แก้ไข</label><input className="fi" value={fd.subFixDept} onChange={e=>uf('subFixDept',e.target.value)} placeholder="ระบุกลุ่ม/หน่วยงานร่วมที่เกี่ยวข้องในการแก้ไข"/></div></div>
+        </div></div>
+      </>}
+
+      {tab==='p23'&&<>
+        {/* FLOW OF STEPS */}
+        <div className="fc"><div className="fch" style={{justifyContent:'space-between'}}><span>🔄 ตอนที่ 2: Care Process / Flow of Steps</span><div style={{display:'flex',gap:6}}><button className="btn btn-sm" style={{background:'rgba(255,255,255,0.2)',color:'#fff',border:'none'}} onClick={aFS}>+ เพิ่มขั้นตอน</button><button className="btn btn-sm" style={{background:'#27ae60',color:'#fff',border:'none'}} onClick={()=>uf('fsSaved',true)}>💾 บันทึกขั้นตอน</button></div></div>
+        <div className="fcb">
+          <div style={{fontSize:12,color:'var(--text-light)',marginBottom:10}}>ระบุขั้นตอนกระบวนการดูแล/กระบวนการหลักที่เกี่ยวข้อง (เรียงลำดับ)</div>
+          <div className="fse">{(fd.flowSteps||[]).map((s,i)=>(
+            <React.Fragment key={i}>{i>0&&<span className="fa">→</span>}<div style={{position:'relative'}}><input className={`fsb ${fd.fsSaved&&s.trim()?'sv':''}`} value={s} onChange={e=>uFS(i,e.target.value)} placeholder={`ขั้นตอนที่ ${i+1}`} style={{paddingRight:22}}/>{(fd.flowSteps||[]).length>2&&<span style={{position:'absolute',right:4,top:5,cursor:'pointer',fontSize:12,color:'#999',lineHeight:1}} onClick={()=>rFS(i)}>✕</span>}</div></React.Fragment>
+          ))}</div>
+          {fd.fsSaved&&ss.length>0&&<div style={{marginTop:8,fontSize:12,color:'var(--success)'}}>✅ บันทึกแล้ว {ss.length} ขั้นตอน</div>}
+        </div></div>
+
+        {/* CMPs */}
+        <div className="fc"><div className="fch" style={{justifyContent:'space-between'}}><span>⚡ Care Management Problems (CMPs)</span><button className="btn btn-sm" style={{background:'rgba(255,255,255,0.2)',color:'#fff',border:'none'}} onClick={aC}>+ เพิ่ม CMP</button></div>
+        <div className="fcb">{(fd.cmps||[]).map((c,i)=>(
+          <div key={i} style={{padding:14,border:'1px solid var(--border)',borderRadius:8,marginBottom:10,background:'#fafbfc'}}>
+            <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}><strong style={{fontSize:13,color:'var(--primary)'}}>CMP #{i+1}</strong>{fd.cmps.length>1&&<button className="btn btn-sm btn-d" onClick={()=>rC(i)}>✕</button>}</div>
+            <div className="fr3">
+              <div className="fg"><label className="fl">ขั้นตอน (จาก Flow of Steps)</label><select className="fs" value={c.step} onChange={e=>uC(i,'step',e.target.value)}><option value="">เลือกขั้นตอน</option>{ss.map(s=><option key={s} value={s}>{s}</option>)}</select>{ss.length===0&&<div style={{fontSize:11,color:'var(--accent)',marginTop:3}}>* กรุณาบันทึก Flow of Steps ก่อน</div>}</div>
+              <div className="fg"><label className="fl">ปัญหา (CMP)</label><textarea className="ft" style={{minHeight:60}} value={c.problem} onChange={e=>uC(i,'problem',e.target.value)} placeholder="ระบุปัญหา..."/></div>
+              <div className="fg"><label className="fl">Unsafe Act / Potential Change</label><textarea className="ft" style={{minHeight:60}} value={c.unsafeAct} onChange={e=>uC(i,'unsafeAct',e.target.value)} placeholder="จุดเปลี่ยน..."/></div>
+            </div>
+          </div>
+        ))}</div></div>
+
+        {/* TIER ANALYSIS */}
+        <div style={{margin:'16px 0 10px',display:'flex',alignItems:'center',gap:10}}><h3 style={{fontSize:15,fontWeight:700,color:'var(--primary-dark)'}}>🔍 ตอนที่ 3: ปัจจัยสาเหตุ (Contributing Factors)</h3></div>
+        <div style={{fontSize:12,color:'var(--text-light)',marginBottom:12}}>เลือก ☑ ที่หัวข้อ Tier ที่เกี่ยวข้อง แล้วกด ▼ เพื่อขยายรายละเอียด เฉพาะ Tier ที่เลือกจะแสดงใน Export</div>
+        {TD.map((tier,idx)=>{const td=fd.ta[idx]||{};const hd=td.en&&(td.desc||(td.ck||[]).length>0||(td.oc&&td.ot));return<TC key={tier.id} tier={tier} idx={idx} td={td} hd={!!hd} uT={uT} tTC={tTC}/>})}
+      </>}
+
+      {tab==='sm'&&<SummaryTab fd={fd} uf={uf}/>}
+    </div>
+  );
+}
+
+// SUMMARY TAB
+function SummaryTab({fd,uf}){
+  // Auto-generate summaries from Parts 2-3
+  const cmps=(fd.cmps||[]).filter(c=>c.step||c.problem||c.unsafeAct);
+  const activeTiers=(fd.ta||[]).filter(t=>t.en&&(t.desc||(t.ck||[]).length>0||(t.oc&&t.ot)));
+  const tiersWithStrategy=activeTiers.filter(t=>t.strat);
+
+  return(<>
+        {/* Auto Summary from Part 2-3 */}
+        <div className="fc"><div className="fch" style={{background:'linear-gradient(135deg,#2c3e50,#34495e)'}}>📝 สรุปรายละเอียดจากการวิเคราะห์ (ดึงจากตอนที่ 2-3 อัตโนมัติ)</div><div className="fcb">
+
+          {/* 1. สรุปการแก้ไขปัญหา */}
+          <div style={{marginBottom:18}}>
+            <div style={{fontWeight:700,fontSize:14,color:'var(--primary)',marginBottom:8,display:'flex',alignItems:'center',gap:6}}>
+              <span style={{background:'var(--primary)',color:'#fff',width:22,height:22,borderRadius:'50%',display:'inline-flex',alignItems:'center',justifyContent:'center',fontSize:11}}>1</span>
+              สรุปมีการแก้ไขปัญหาอย่างไร
+            </div>
+            {cmps.length===0?<div style={{color:'var(--text-light)',fontSize:13,padding:'8px 12px',background:'#f8f9fa',borderRadius:6}}>ยังไม่มีข้อมูล CMP จากตอนที่ 2</div>:(
+              <div style={{background:'#f8f9fa',borderRadius:8,overflow:'hidden'}}>
+                <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+                  <thead><tr style={{background:'var(--primary-light)'}}>
+                    <th style={{color:'#fff',padding:'8px 12px',textAlign:'left',fontWeight:600,fontSize:12}}>ขั้นตอน</th>
+                    <th style={{color:'#fff',padding:'8px 12px',textAlign:'left',fontWeight:600,fontSize:12}}>ปัญหา (CMP)</th>
+                    <th style={{color:'#fff',padding:'8px 12px',textAlign:'left',fontWeight:600,fontSize:12}}>Unsafe Act / จุดเปลี่ยน</th>
+                  </tr></thead>
+                  <tbody>{cmps.map((c,i)=><tr key={i}><td style={{padding:'8px 12px',borderBottom:'1px solid #eee'}}>{c.step||'-'}</td><td style={{padding:'8px 12px',borderBottom:'1px solid #eee'}}>{c.problem||'-'}</td><td style={{padding:'8px 12px',borderBottom:'1px solid #eee'}}>{c.unsafeAct||'-'}</td></tr>)}</tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* 2. สรุป Contributing Factors */}
+          <div style={{marginBottom:18}}>
+            <div style={{fontWeight:700,fontSize:14,color:'var(--primary)',marginBottom:8,display:'flex',alignItems:'center',gap:6}}>
+              <span style={{background:'var(--primary)',color:'#fff',width:22,height:22,borderRadius:'50%',display:'inline-flex',alignItems:'center',justifyContent:'center',fontSize:11}}>2</span>
+              สรุป Contributing Factors / RCA
+            </div>
+            {activeTiers.length===0?<div style={{color:'var(--text-light)',fontSize:13,padding:'8px 12px',background:'#f8f9fa',borderRadius:6}}>ยังไม่มีข้อมูลจากตอนที่ 3</div>:(
+              <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                {activeTiers.map((t,i)=>{
+                  const info=TD.find(d=>d.id===t.id);
+                  const items=[...(t.ck||[])];
+                  if(t.oc&&t.ot)items.push('อื่นๆ: '+t.ot);
+                  return(
+                    <div key={i} style={{background:'#f8f9fa',border:'1px solid var(--border)',borderRadius:8,padding:12}}>
+                      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
+                        <span style={{background:info?.tc||'#999',color:'#fff',padding:'2px 10px',borderRadius:12,fontSize:10,fontWeight:700}}>{info?.tag}</span>
+                        <span style={{fontWeight:700,fontSize:13}}>{info?.label}</span>
+                      </div>
+                      {items.length>0&&<div style={{fontSize:12,color:'var(--text)',marginBottom:4}}>
+                        <span style={{fontWeight:600,color:'var(--text-light)'}}>ปัจจัย:</span> {items.join(', ')}
+                      </div>}
+                      {t.desc&&<div style={{fontSize:12,color:'var(--text)'}}><span style={{fontWeight:600,color:'var(--text-light)'}}>รายละเอียด:</span> {t.desc}</div>}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* 3. สรุปการปรับ/พัฒนาระบบ */}
+          <div>
+            <div style={{fontWeight:700,fontSize:14,color:'var(--primary)',marginBottom:8,display:'flex',alignItems:'center',gap:6}}>
+              <span style={{background:'var(--primary)',color:'#fff',width:22,height:22,borderRadius:'50%',display:'inline-flex',alignItems:'center',justifyContent:'center',fontSize:11}}>3</span>
+              มีการปรับ/พัฒนาระบบอะไร อย่างไร
+            </div>
+            {tiersWithStrategy.length===0?<div style={{color:'var(--text-light)',fontSize:13,padding:'8px 12px',background:'#f8f9fa',borderRadius:6}}>ยังไม่มีข้อมูลกลยุทธ์/มาตรการป้องกันจากตอนที่ 3</div>:(
+              <div style={{background:'#f8f9fa',borderRadius:8,overflow:'hidden'}}>
+                <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+                  <thead><tr style={{background:'var(--success)'}}>
+                    <th style={{color:'#fff',padding:'8px 12px',textAlign:'left',fontWeight:600,fontSize:12}}>Tier / ปัจจัย</th>
+                    <th style={{color:'#fff',padding:'8px 12px',textAlign:'left',fontWeight:600,fontSize:12}}>กลยุทธ์/มาตรการป้องกัน</th>
+                    <th style={{color:'#fff',padding:'8px 12px',textAlign:'left',fontWeight:600,fontSize:12}}>เป้าหมาย/ตัวชี้วัด</th>
+                    <th style={{color:'#fff',padding:'8px 12px',textAlign:'left',fontWeight:600,fontSize:12}}>ผู้รับผิดชอบ</th>
+                  </tr></thead>
+                  <tbody>{tiersWithStrategy.map((t,i)=>{const info=TD.find(d=>d.id===t.id);return<tr key={i}><td style={{padding:'8px 12px',borderBottom:'1px solid #eee',fontWeight:600}}>{info?.label||'-'}</td><td style={{padding:'8px 12px',borderBottom:'1px solid #eee'}}>{t.strat}</td><td style={{padding:'8px 12px',borderBottom:'1px solid #eee'}}>{t.ind||'-'}</td><td style={{padding:'8px 12px',borderBottom:'1px solid #eee'}}>{t.resp||'-'}</td></tr>})}</tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+        </div></div>
+
+        {/* ส่งข้อมูล / ติดตาม */}
+        <div className="fc"><div className="fch">📊 สรุปผลการดำเนินงาน</div><div className="fcb">
+          <div className="fr"><div className="fg"><label className="fl">ส่งข้อมูลกลับวันที่</label><input className="fi" type="date" value={fd.summaryDate} onChange={e=>uf('summaryDate',e.target.value)}/></div><div className="fg"><label className="fl">จำนวนวัน</label><select className="fs" value={fd.daysToSubmit} onChange={e=>uf('daysToSubmit',e.target.value)}><option value="">เลือก</option>{DAYS.map(d=><option key={d.v} value={d.v}>{d.l}</option>)}</select></div></div>
+          <div className="fr"><div className="fg"><label className="fl">เดือนที่ติดตามผล</label><input className="fi" type="month" value={fd.followUpMonth} onChange={e=>uf('followUpMonth',e.target.value)}/></div><div className="fg"><label className="fl">สถานะการติดตาม</label><select className="fs" value={fd.followUpStatus} onChange={e=>uf('followUpStatus',e.target.value)}><option value="">ยังไม่ได้ติดตาม</option><option value="in_progress">กำลังดำเนินการ</option><option value="completed">ติดตามเสร็จสิ้น</option></select></div></div>
+        </div></div>
+        <div className="fc"><div className="fch">👤 ผู้จัดทำและผู้เกี่ยวข้อง</div><div className="fcb">
+          <div className="pg">
+            <div className="pb"><div className="rl">เจ้าของอุบัติการณ์</div><input className="fi" value={fd.ownerName} onChange={e=>uf('ownerName',e.target.value)} placeholder="ชื่อ-นามสกุล"/></div>
+            <div className="pb"><div className="rl">หัวหน้าหน่วยงานที่เกี่ยวข้อง</div><input className="fi" value={fd.headName} onChange={e=>uf('headName',e.target.value)} placeholder="ชื่อ-นามสกุล"/></div>
+            <div className="pb"><div className="rl">เลขาความเสี่ยง</div><input className="fi" value={fd.secretaryName} onChange={e=>uf('secretaryName',e.target.value)} placeholder="ชื่อ-นามสกุล"/></div>
+            <div className="pb"><div className="rl">ประธานความเสี่ยง</div><input className="fi" value={fd.chairName} onChange={e=>uf('chairName',e.target.value)} placeholder="ชื่อ-นามสกุล"/></div>
+          </div>
+          <div style={{marginTop:12,fontSize:12,color:'var(--text-light)'}}>* ช่องลายเซ็นจะแสดงเมื่อ Export เป็น PDF หรือ Word เท่านั้น</div>
+        </div></div>
+      </>);
+}
+
+// TIER CARD
+function TC({tier,idx,td,hd,uT,tTC}){
+  const[op,sO]=useState(false);
+  return(
+    <div className={`tc ${hd?'hd':''}`}>
+      <div className="tch" onClick={()=>sO(!op)}>
+        <input type="checkbox" className="tk" checked={!!td.en} onChange={e=>{e.stopPropagation();uT(idx,'en',e.target.checked)}} onClick={e=>e.stopPropagation()}/>
+        <span className="tg" style={{background:tier.tc}}>{tier.tag}</span>
+        <span className="tt">{tier.label}</span>
+        {hd&&<span style={{fontSize:11,color:'var(--success)',fontWeight:600}}>✓ มีข้อมูล</span>}
+        <span className={`tw ${op?'op':''}`}>▼</span>
+      </div>
+      <div className={`tcb ${op?'':'cl'}`}>
+        {!td.en?<div style={{padding:'10px 0',color:'var(--text-light)',fontSize:13}}>กรุณาเลือก ☑ ที่หัวข้อด้านบนเพื่อระบุว่า Tier นี้เกี่ยวข้อง</div>:(
+          <div style={{background:tier.bg,borderRadius:6,padding:16,marginTop:4}}>
+            <div className="fg"><label className="fl">ปัจจัยที่เกี่ยวข้อง</label>
+              <div className="cg">{tier.items.map(item=><label className="ci" key={item}><input type="checkbox" checked={(td.ck||[]).includes(item)} onChange={()=>tTC(idx,item)}/>{item}</label>)}</div>
+              <div className="oir"><label className="ci"><input type="checkbox" checked={!!td.oc} onChange={e=>uT(idx,'oc',e.target.checked)}/>อื่นๆ ระบุ:</label>{td.oc&&<input type="text" value={td.ot||''} onChange={e=>uT(idx,'ot',e.target.value)} placeholder="ระบุปัจจัยอื่นๆ..."/>}</div>
+            </div>
+            <div className="fr"><div className="fg"><label className="fl">บรรยายสรุปส่วนที่เกี่ยวข้อง</label><textarea className="ft" value={td.desc||''} onChange={e=>uT(idx,'desc',e.target.value)} placeholder="อธิบาย..."/></div><div className="fg"><label className="fl">กลยุทธ์/มาตรการป้องกัน</label><textarea className="ft" value={td.strat||''} onChange={e=>uT(idx,'strat',e.target.value)} placeholder="มาตรการ..."/></div></div>
+            <div className="fr3"><div className="fg"><label className="fl">เป้าหมาย/ตัวชี้วัด</label><input className="fi" value={td.ind||''} onChange={e=>uT(idx,'ind',e.target.value)}/></div><div className="fg"><label className="fl">เวลาดำเนินการ</label><input className="fi" value={td.tl||''} onChange={e=>uT(idx,'tl',e.target.value)}/></div><div className="fg"><label className="fl">ผู้รับผิดชอบ</label><input className="fi" value={td.resp||''} onChange={e=>uT(idx,'resp',e.target.value)}/></div></div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// LIST
+function ListV({rl,onL,onN,sRL}){
+  const del=id=>{if(confirm('ลบ?'))sRL(p=>p.filter(r=>r.id!==id))};
+  if(!rl.length)return<div style={{textAlign:'center',padding:60,color:'var(--text-light)'}}><div style={{fontSize:48}}>📋</div><div style={{fontSize:16,fontWeight:600,marginTop:8}}>ยังไม่มี RCA</div><button className="btn btn-p" style={{marginTop:16}} onClick={onN}>➕ สร้างใหม่</button></div>;
+  return<table className="rlt"><thead><tr><th>รหัส</th><th>เรื่อง</th><th>หน่วยงาน</th><th>วันที่</th><th>ระดับ</th><th>HRMS</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody>{rl.map(r=><tr key={r.id}><td style={{fontWeight:600,color:'var(--primary)'}}>{r.id}</td><td>{r.title||'-'}</td><td>{r.department||'-'}</td><td>{r.date||'-'}</td><td>{r.sevL||'-'}{r.sevN?'/'+r.sevN:''}</td><td>{r.hrms?<span className="stb sth">✅</span>:<span style={{color:'var(--accent)'}}>❌</span>}</td><td><span className={`stb ${r.followUpStatus==='completed'?'stc':'std'}`}>{r.followUpStatus==='completed'?'เสร็จ':r.followUpStatus==='in_progress'?'ดำเนินการ':'รอ'}</span></td><td><button className="btn btn-sm btn-p" onClick={()=>onL(r)}>เปิด</button><button className="btn btn-sm btn-d" style={{marginLeft:4}} onClick={()=>del(r.id)}>ลบ</button></td></tr>)}</tbody></table>;
+}
+
+// AI
+function AIV({it,sIT,aiL,aiR,onA}){
+  return<div className="fc"><div className="fch">🤖 AI วิเคราะห์อุบัติการณ์ → แบบฟอร์ม RCA</div><div className="fcb">
+    <p style={{fontSize:13,color:'var(--text-light)',marginBottom:12}}>ใส่รายละเอียดอุบัติการณ์ แล้ว AI จะวิเคราะห์ตาม 2-Axis Swiss Cheese Model</p>
+    <div className="fg"><label className="fl">รายละเอียดอุบัติการณ์ <span className="rq">*</span></label><textarea className="ft" style={{minHeight:160}} value={it} onChange={e=>sIT(e.target.value)} placeholder={"บรรยายรายละเอียดอุบัติการณ์...\n- เกิดอะไรขึ้น\n- เมื่อไร ที่ไหน\n- ใครเกี่ยวข้อง\n- ผลกระทบ"}/></div>
+    <div className="aiu" onClick={()=>document.getElementById('aif')?.click()}><div style={{fontSize:28,marginBottom:6}}>📎</div><div style={{fontWeight:600,fontSize:13}}>อัพโหลดไฟล์ (.txt, .csv)</div><input id="aif" type="file" accept=".txt,.csv" style={{display:'none'}} onChange={e=>{const f=e.target.files[0];if(f){const r=new FileReader();r.onload=ev=>sIT(ev.target.result);r.readAsText(f)}}}/></div>
+    <button className="btn btn-p" onClick={onA} disabled={aiL}>{aiL?<><span className="lsp"></span> กำลังวิเคราะห์...</>:'🔍 วิเคราะห์ด้วย AI'}</button>
+    {aiR&&<div className="air"><div style={{fontWeight:700,marginBottom:8,color:'var(--primary)'}}>📊 ผลการวิเคราะห์:</div>{aiR}</div>}
+  </div></div>;
+}
+
+// KNOWLEDGE
+function KBV(){
+  const[op,sO]=useState(new Set([0,1]));
+  const tg=i=>{sO(p=>{const n=new Set(p);n.has(i)?n.delete(i):n.add(i);return n})};
+  return<div style={{maxHeight:'calc(100vh - 160px)',overflowY:'auto'}}>
+    <div style={{background:'linear-gradient(135deg,#1a5276,#2980b9)',color:'#fff',padding:20,borderRadius:'var(--radius)',marginBottom:16}}><h3 style={{fontSize:16,marginBottom:4}}>📚 คู่มือการทำ RCA</h3><p style={{fontSize:13,opacity:0.9}}>สรุปจาก 2-Axis Swiss Cheese Model & 5-Tier RCA (HA Forum 2569)</p></div>
+    {KS.map((s,i)=><div className="kc" key={i}><div className="kch" onClick={()=>tg(i)}>{s.t}<span>{op.has(i)?'▲':'▼'}</span></div><div className={`kcb ${op.has(i)?'':'cl'}`}>{s.c.split('\n').map((l,j)=><div key={j} style={{marginBottom:l?4:8}}>{l}</div>)}</div></div>)}
+  </div>;
+}
+
+// DASHBOARD
+function DBV({stats,rl}){
+  const c1=useRef(null),c2=useRef(null),h1=useRef(null),h2=useRef(null);
+  useEffect(()=>{
+    if(c1.current){if(h1.current)h1.current.destroy();const ctx=c1.current.getContext('2d');const m={};rl.forEach(r=>{const k=r.date?r.date.substring(0,7):'N/A';m[k]=(m[k]||0)+1});const l=Object.keys(m).sort();h1.current=new Chart(ctx,{type:'bar',data:{labels:l.length?l:['ไม่มีข้อมูล'],datasets:[{label:'RCA',data:l.length?l.map(k=>m[k]):[0],backgroundColor:'rgba(26,82,118,0.7)',borderRadius:6}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1}}}}})}
+    if(c2.current){if(h2.current)h2.current.destroy();const ctx=c2.current.getContext('2d');const s={};rl.forEach(r=>{const k=r.sevL||'N/A';s[k]=(s[k]||0)+1});h2.current=new Chart(ctx,{type:'doughnut',data:{labels:Object.keys(s),datasets:[{data:Object.values(s),backgroundColor:['#e74c3c','#e67e22','#f1c40f','#27ae60','#2980b9','#8e44ad','#95a5a6','#34495e','#1abc9c']}]},options:{responsive:true,plugins:{legend:{position:'bottom'}}}})}
+    return()=>{if(h1.current)h1.current.destroy();if(h2.current)h2.current.destroy()};
+  },[rl]);
+  const hp=stats.total?Math.round(stats.hrms/stats.total*100):0,fp=stats.total?Math.round(stats.fu/stats.total*100):0;
+  return<div>
+    <div className="ssg"><div className="sc"><div className="sv2">{stats.total}</div><div className="sl">จำนวน RCA ทั้งหมด</div></div><div className="sc su"><div className="sv2">{hp}%</div><div className="sl">ลง HRMS ({stats.hrms}/{stats.total})</div></div><div className="sc wa"><div className="sv2">{fp}%</div><div className="sl">ติดตามรายเดือน ({stats.fu}/{stats.total})</div></div><div className="sc da"><div className="sv2">{stats.total-stats.hrms}</div><div className="sl">ยังไม่ลง HRMS</div></div></div>
+    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}><div className="cc"><div className="ct">📊 RCA รายเดือน</div><canvas ref={c1}></canvas></div><div className="cc"><div className="ct">🎯 ระดับความรุนแรง</div><canvas ref={c2}></canvas></div></div>
+    <div className="fc"><div className="fch">📈 ความคืบหน้า</div><div className="fcb">
+      <div style={{marginBottom:14}}><div style={{display:'flex',justifyContent:'space-between',fontSize:13,marginBottom:4}}><span>ลงระบบ HRMS</span><span style={{fontWeight:700}}>{hp}%</span></div><div style={{background:'#eee',borderRadius:10,height:12,overflow:'hidden'}}><div style={{width:`${hp}%`,height:'100%',background:'var(--success)',borderRadius:10,transition:'width 0.5s'}}></div></div></div>
+      <div><div style={{display:'flex',justifyContent:'space-between',fontSize:13,marginBottom:4}}><span>ติดตามรายเดือน</span><span style={{fontWeight:700}}>{fp}%</span></div><div style={{background:'#eee',borderRadius:10,height:12,overflow:'hidden'}}><div style={{width:`${fp}%`,height:'100%',background:'var(--primary-light)',borderRadius:10,transition:'width 0.5s'}}></div></div></div>
+    </div></div>
+  </div>;
+}
+
+ReactDOM.render(<App/>,document.getElementById('root'));
+</script>
+</body>
+</html>

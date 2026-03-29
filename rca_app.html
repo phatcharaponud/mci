@@ -95,10 +95,6 @@ body{font-family:'Sarabun','Noto Sans Thai',sans-serif;background:var(--bg);colo
 .kch{padding:12px 16px;background:linear-gradient(135deg,var(--primary),var(--primary-light));color:#fff;font-weight:700;font-size:13px;cursor:pointer;display:flex;justify-content:space-between;align-items:center}
 .kcb{padding:16px;font-size:13px;line-height:1.7}
 .kcb.cl{display:none}
-/* AI */
-.aiu{border:2px dashed var(--border);border-radius:var(--radius);padding:28px 20px;text-align:center;cursor:pointer;transition:all 0.2s;margin-bottom:16px}
-.aiu:hover{border-color:var(--primary-light);background:rgba(41,128,185,0.03)}
-.air{background:#f8f9fa;border-radius:6px;padding:14px;margin-top:12px;font-size:13px;line-height:1.7;white-space:pre-wrap;max-height:400px;overflow-y:auto}
 /* Dashboard */
 .ssg{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:20px}
 .sc{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);padding:20px;text-align:center}
@@ -284,7 +280,7 @@ ${fmt==='pdf'?'<script>setTimeout(()=>window.print(),600)<\/script>':''}
 
 // APP
 function App(){
-  const[nav,sN]=useState('form'),[rl,sRL]=useState(loadL),[ci,sCI]=useState(null),[fd,sFD]=useState({...DF,ta:mkTD()}),[toast,sT]=useState(null),[aiL,sAL]=useState(false),[aiR,sAR]=useState(''),[it,sIT]=useState(''),[sync,sSync]=useState('');
+  const[nav,sN]=useState('form'),[rl,sRL]=useState(loadL),[ci,sCI]=useState(null),[fd,sFD]=useState({...DF,ta:mkTD()}),[toast,sT]=useState(null),[sync,sSync]=useState('');
   const skipSync=useRef(true),cloudTimer=useRef(null);
   useEffect(()=>{saveL(rl);if(!GAS_URL||skipSync.current)return;clearTimeout(cloudTimer.current);cloudTimer.current=setTimeout(()=>{sSync('saving');cloudSave(rl).then(ok=>{sSync(ok?'ok':'error');setTimeout(()=>sSync(''),3000)})},2000)},[rl]);
   useEffect(()=>{if(!GAS_URL){skipSync.current=false;return}sSync('loading');cloudLoad().then(d=>{if(d&&d.length>0){sRL(d);saveL(d)}sSync('ok');setTimeout(()=>{sSync('');skipSync.current=false},800)}).catch(()=>{sSync('error');skipSync.current=false})},[]);
@@ -295,7 +291,6 @@ function App(){
   const hSave=()=>{const e={id:ci||gid(),...fd,savedAt:new Date().toISOString(),status:'draft'};if(!ci)sCI(e.id);sRL(p=>{const i=p.findIndex(r=>r.id===e.id);if(i>=0){const n=[...p];n[i]=e;return n}return[...p,e]});st('✅ บันทึก RCA เรียบร้อย')};
   const hLoad=r=>{sCI(r.id);sFD({...DF,...r,ta:(r.ta||mkTD()).map(migTier)});sN('form')};
   const hExp=f=>{const w=window.open('','_blank');w.document.write(bExp(fd,f));w.document.close();st(f==='pdf'?'📄 เปิดหน้า PDF':'📝 เปิด Word')};
-  const hAI=async()=>{if(!it.trim())return st('⚠️ กรุณาใส่ข้อมูลก่อน');sAL(true);sAR('');try{const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:4000,messages:[{role:"user",content:`คุณเป็นผู้เชี่ยวชาญ RCA ในรพ. วิเคราะห์อุบัติการณ์ตาม 2-Axis Swiss Cheese Model & 5-Tier RCA ตอบ JSON ภาษาไทย:\n\nอุบัติการณ์: ${it}\n\n{"whatHappened":"สรุป","flowSteps":["ขั้นตอน"],"cmps":[{"step":"","problem":"","unsafeAct":""}],"tierAnalysis":{"tier1":"","tier2":"","tier3":"","tier4":""},"recommendations":[""]}`}]})});const d=await r.json();const txt=d.content?.map(i=>i.text||'').join('\n')||'ไม่สามารถวิเคราะห์ได้';sAR(txt);try{const p=JSON.parse(txt.replace(/```json|```/g,'').trim());if(p.whatHappened)uf('whatHappened',p.whatHappened);if(p.flowSteps){const s=[...p.flowSteps];while(s.length<5)s.push('');uf('flowSteps',s);uf('fsSaved',true)}if(p.cmps)uf('cmps',p.cmps);st('✅ วิเคราะห์เสร็จ เติมข้อมูลแล้ว')}catch{}}catch(e){sAR('เกิดข้อผิดพลาด: '+e.message)}sAL(false)};
   const stats={total:rl.length,hrms:rl.filter(r=>r.hrms).length,fu:rl.filter(r=>r.followUpStatus==='completed').length};
 
   return(
@@ -307,7 +302,6 @@ function App(){
           <div className={`ni ${nav==='form'?'ac':''}`} onClick={()=>sN('form')}><span className="ni-i">📋</span>แบบฟอร์ม RCA</div>
           <div className={`ni ${nav==='list'?'ac':''}`} onClick={()=>sN('list')}><span className="ni-i">📁</span>รายการ RCA{rl.length>0&&<span className="ni-b">{rl.length}</span>}</div>
           <div className="ns">เครื่องมือ</div>
-          <div className={`ni ${nav==='ai'?'ac':''}`} onClick={()=>sN('ai')}><span className="ni-i">🤖</span>AI วิเคราะห์</div>
           <div className={`ni ${nav==='kb'?'ac':''}`} onClick={()=>sN('kb')}><span className="ni-i">📚</span>ความรู้ RCA</div>
           <div className="ns">รายงาน</div>
           <div className={`ni ${nav==='db'?'ac':''}`} onClick={()=>sN('db')}><span className="ni-i">📊</span>Dashboard</div>
@@ -315,7 +309,7 @@ function App(){
       </div>
       <div className="mc">
         <div className="ch">
-          <h2>{nav==='form'?'📋 แบบฟอร์มบันทึก RCA':nav==='list'?'📁 รายการ RCA':nav==='ai'?'🤖 AI Analysis':nav==='kb'?'📚 ความรู้ RCA':'📊 Dashboard'}</h2>
+          <h2>{nav==='form'?'📋 แบบฟอร์มบันทึก RCA':nav==='list'?'📁 รายการ RCA':nav==='kb'?'📚 ความรู้ RCA':'📊 Dashboard'}</h2>
           <div className="ha">
             {GAS_URL?<>{sync==='loading'&&<span style={{fontSize:12,color:'#2980b9',whiteSpace:'nowrap'}}>🔄 โหลด...</span>}{sync==='saving'&&<span style={{fontSize:12,color:'#e67e22',whiteSpace:'nowrap'}}>💾 Sync...</span>}{sync==='ok'&&<span style={{fontSize:12,color:'#27ae60',whiteSpace:'nowrap'}}>✅ Synced</span>}{sync==='error'&&<span style={{fontSize:12,color:'#e74c3c',whiteSpace:'nowrap'}}>❌ Error</span>}<button className="btn btn-o btn-sm" onClick={hRefresh} title="โหลดข้อมูลจาก Cloud">🔄</button></>:<span style={{fontSize:11,color:'#856404',background:'#fff3cd',padding:'4px 10px',borderRadius:4,whiteSpace:'nowrap'}}>⚠️ Offline - ไม่ได้เชื่อม Cloud</span>}
             {nav==='form'&&<><button className="btn btn-o btn-sm" onClick={hNew}>➕ ใหม่</button><button className="btn btn-p btn-sm" onClick={hSave}>💾 บันทึก</button><button className="btn btn-w btn-sm" onClick={()=>hExp('pdf')}>📄 PDF</button><button className="btn btn-s btn-sm" onClick={()=>hExp('word')}>📝 Word</button></>}
@@ -325,7 +319,6 @@ function App(){
         <div className="cb">
           {nav==='form'&&<FormV fd={fd} sFD={sFD} uf={uf}/>}
           {nav==='list'&&<ListV rl={rl} onL={hLoad} onN={hNew} sRL={sRL}/>}
-          {nav==='ai'&&<AIV it={it} sIT={sIT} aiL={aiL} aiR={aiR} onA={hAI}/>}
           {nav==='kb'&&<KBV/>}
           {nav==='db'&&<DBV stats={stats} rl={rl}/>}
         </div>
@@ -644,17 +637,6 @@ function TC({tier,idx,td,hd,fd,uT,uTE,tTCE,aTE,rTE}){
 function ListV({rl,onL,onN,sRL}){
   if(!rl.length)return<div style={{textAlign:'center',padding:60,color:'var(--text-light)'}}><div style={{fontSize:48}}>📋</div><div style={{fontSize:16,fontWeight:600,marginTop:8}}>ยังไม่มี RCA</div><button className="btn btn-p" style={{marginTop:16}} onClick={onN}>➕ สร้างใหม่</button></div>;
   return<table className="rlt"><thead><tr><th>รหัส</th><th>เรื่อง</th><th>หน่วยงาน</th><th>วันที่</th><th>ระดับ</th><th>HRMS</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody>{rl.map(r=><tr key={r.id}><td style={{fontWeight:600,color:'var(--primary)'}}>{r.id}</td><td>{r.title||'-'}</td><td>{r.department||'-'}</td><td>{r.date||'-'}</td><td>{r.sevL||'-'}{r.sevN?'/'+r.sevN:''}</td><td>{r.hrms?<span className="stb sth">✅</span>:<span style={{color:'var(--accent)'}}>❌</span>}</td><td><span className={`stb ${r.followUpStatus==='completed'?'stc':'std'}`}>{r.followUpStatus==='completed'?'เสร็จ':r.followUpStatus==='in_progress'?'ดำเนินการ':'รอ'}</span></td><td><button className="btn btn-sm btn-p" onClick={()=>onL(r)}>เปิด</button></td></tr>)}</tbody></table>;
-}
-
-// AI
-function AIV({it,sIT,aiL,aiR,onA}){
-  return<div className="fc"><div className="fch">🤖 AI วิเคราะห์อุบัติการณ์ → แบบฟอร์ม RCA</div><div className="fcb">
-    <p style={{fontSize:13,color:'var(--text-light)',marginBottom:12}}>ใส่รายละเอียดอุบัติการณ์ แล้ว AI จะวิเคราะห์ตาม 2-Axis Swiss Cheese Model</p>
-    <div className="fg"><label className="fl">รายละเอียดอุบัติการณ์ <span className="rq">*</span></label><textarea className="ft" style={{minHeight:160}} value={it} onChange={e=>sIT(e.target.value)} placeholder={"บรรยายรายละเอียดอุบัติการณ์...\n- เกิดอะไรขึ้น\n- เมื่อไร ที่ไหน\n- ใครเกี่ยวข้อง\n- ผลกระทบ"}/></div>
-    <div className="aiu" onClick={()=>document.getElementById('aif')?.click()}><div style={{fontSize:28,marginBottom:6}}>📎</div><div style={{fontWeight:600,fontSize:13}}>อัพโหลดไฟล์ (.txt, .csv)</div><input id="aif" type="file" accept=".txt,.csv" style={{display:'none'}} onChange={e=>{const f=e.target.files[0];if(f){const r=new FileReader();r.onload=ev=>sIT(ev.target.result);r.readAsText(f)}}}/></div>
-    <button className="btn btn-p" onClick={onA} disabled={aiL}>{aiL?<><span className="lsp"></span> กำลังวิเคราะห์...</>:'🔍 วิเคราะห์ด้วย AI'}</button>
-    {aiR&&<div className="air"><div style={{fontWeight:700,marginBottom:8,color:'var(--primary)'}}>📊 ผลการวิเคราะห์:</div>{aiR}</div>}
-  </div></div>;
 }
 
 // KNOWLEDGE

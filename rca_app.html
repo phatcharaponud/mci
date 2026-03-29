@@ -165,6 +165,49 @@ const GAS_URL='https://script.google.com/macros/s/AKfycbw99ZlV1OaTqG1Mp5C_Xc0Bnv
 async function cloudLoad(){if(!GAS_URL)return null;try{const r=await fetch(GAS_URL);const t=await r.text();try{const d=JSON.parse(t);return Array.isArray(d)?d:null}catch{return null}}catch(e){console.error('Cloud load:',e);return null}}
 async function cloudSave(data){if(!GAS_URL)return false;try{await fetch(GAS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(data)});return true}catch(e){console.error('Cloud save:',e);return false}}
 
+// Generate linkage diagram SVG string for export
+function bLinkageSVG(fd){
+  var ss=(fd.flowSteps||[]).filter(function(s){return s.trim()});
+  var cmps=(fd.cmps||[]).filter(function(c){return c.step||c.problem||c.unsafeAct});
+  if(!ss.length)return'<p style="color:#999">ยังไม่มีข้อมูล Flow of Steps</p>';
+  var cols=ss.length,LW=130,CW=Math.max(100,Math.min(140,700/cols)),BW=CW-22,BH=36,TRH=62,UAH=70,FSH=62;
+  var W=LW+cols*CW+10,H=5*TRH+UAH+FSH;
+  function tY(n){return(5-n)*TRH}var uY=5*TRH,fY=uY+UAH;
+  function cX(i){return LW+i*CW+CW/2}
+  function gT(n){return(fd.ta||[]).map(function(t,i){var o={};for(var k in t)o[k]=t[k];o.info=TD[i];return o}).filter(function(t){return t.en&&t.info.tier===n})}
+  function gTx(t){var ck=(t.ck||[]).slice();if(t.oc&&t.ot)ck.push(t.ot);if(t.desc)return t.desc.length>45?t.desc.slice(0,45)+'…':t.desc;return ck.length?(ck.length>2?ck.slice(0,2).join(', ')+'…':ck.join(', ')):''}
+  var cm={};cmps.forEach(function(c){var i=ss.indexOf(c.step);if(i>=0)cm[i]=c});
+  var cc=Object.keys(cm).map(Number);
+  var tp={};[5,4,3,2,1].forEach(function(n){var it=gT(n);tp[n]=[];it.forEach(function(t,i){var o={};for(var k in t)o[k]=t[k];o.col=Math.min(Math.round(i*cols/it.length+cols/(it.length*2)-.5),cols-1);tp[n].push(o)})});
+  var ln=[];
+  cc.forEach(function(i){ln.push({x1:cX(i),y1:uY+UAH/2+BH/2,x2:cX(i),y2:fY+FSH/2-BH/2})});
+  [5,4,3,2,1].forEach(function(n){(tp[n]||[]).forEach(function(t){var tx=cX(t.col),tb=tY(n)+TRH/2+BH/2,f=false;
+    for(var b=n-1;b>=1&&!f;b--)if((tp[b]||[]).length){var nr=tp[b][0],md=999;tp[b].forEach(function(bt){var d=Math.abs(bt.col-t.col);if(d<md){md=d;nr=bt}});ln.push({x1:tx,y1:tb,x2:cX(nr.col),y2:tY(b)+TRH/2-BH/2});f=true}
+    if(!f&&cc.length){var nc=cc[0],md2=999;cc.forEach(function(ci){var d=Math.abs(ci-t.col);if(d<md2){md2=d;nc=ci}});ln.push({x1:tx,y1:tb,x2:cX(nc),y2:uY+UAH/2-BH/2})}})});
+  var TL={5:{n:'Tier 5',s:['สังคม/นอกองค์กร']},4:{n:'Tier 4',s:['การบริหารจัดการ','นโยบาย']},3:{n:'Tier 3',s:['สวล.,ข้อมูล','ระบบ']},2:{n:'Tier 2',s:['ลักษณะงาน','ทีม']},1:{n:'Tier 1',s:['ผู้ป่วย','บุคลากร']}};
+  function bx(x,y,w,h,t,fs){return'<g><rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="5" fill="#fff" stroke="#444" stroke-width="1.5"/><foreignObject x="'+(x+3)+'" y="'+(y+2)+'" width="'+(w-6)+'" height="'+(h-4)+'"><div xmlns="http://www.w3.org/1999/xhtml" style="font-size:'+(fs||10)+'px;text-align:center;line-height:1.3;overflow:hidden;height:100%;display:flex;align-items:center;justify-content:center;word-break:break-word">'+t+'</div></foreignObject></g>'}
+  var s='<svg xmlns="http://www.w3.org/2000/svg" width="'+W+'" height="'+H+'" style="font-family:Sarabun,sans-serif;display:block;max-width:100%">';
+  s+='<defs><marker id="la" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="#555"/></marker><marker id="lr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="#444"/></marker></defs>';
+  s+='<rect x="0" y="0" width="'+W+'" height="'+(5*TRH)+'" fill="#d6e4ee"/>';
+  s+='<rect x="0" y="'+uY+'" width="'+W+'" height="'+UAH+'" fill="#dcedc8"/>';
+  s+='<rect x="0" y="'+fY+'" width="'+W+'" height="'+FSH+'" fill="#fce4cc"/>';
+  [5,4,3,2,1].forEach(function(n){s+='<line x1="'+(LW-10)+'" y1="'+tY(n)+'" x2="'+W+'" y2="'+tY(n)+'" stroke="#b0c4d8" stroke-width="0.7"/>'});
+  s+='<line x1="0" y1="'+uY+'" x2="'+W+'" y2="'+uY+'" stroke="#888" stroke-width="1"/>';
+  s+='<line x1="0" y1="'+fY+'" x2="'+W+'" y2="'+fY+'" stroke="#888" stroke-width="1"/>';
+  s+='<text x="14" y="'+(5*TRH/2)+'" font-size="13" font-weight="700" fill="#1a5276" text-anchor="middle" transform="rotate(-90,14,'+(5*TRH/2)+')">Contributing factors</text>';
+  [5,4,3,2,1].forEach(function(n){var y=tY(n);s+='<text x="28" y="'+(y+22)+'" font-size="11" font-weight="700" fill="#1a5276">'+TL[n].n+'</text>';TL[n].s.forEach(function(sl,j){s+='<text x="28" y="'+(y+36+j*14)+'" font-size="10" fill="#2980b9">'+sl+'</text>'})});
+  s+='<text x="8" y="'+(uY+22)+'" font-size="10" font-weight="700" fill="#33691e">Unsafe act/</text>';
+  s+='<text x="8" y="'+(uY+36)+'" font-size="10" font-weight="700" fill="#33691e">Potential change</text>';
+  s+='<text x="8" y="'+(fY+20)+'" font-size="10" font-weight="700" fill="#c0392b">Flow of steps</text>';
+  s+='<text x="8" y="'+(fY+34)+'" font-size="9" fill="#c0392b">Care process /</text>';
+  s+='<text x="8" y="'+(fY+46)+'" font-size="9" fill="#c0392b">กระบวนการหลัก</text>';
+  ln.forEach(function(l){s+='<line x1="'+l.x1+'" y1="'+l.y1+'" x2="'+l.x2+'" y2="'+l.y2+'" stroke="#555" stroke-width="1.2" marker-end="url(#la)"/>'});
+  ss.forEach(function(st,i){var x=cX(i)-BW/2,y=fY+(FSH-BH)/2;s+=bx(x,y,BW,BH,st);if(i<ss.length-1)s+='<line x1="'+(x+BW+2)+'" y1="'+(y+BH/2)+'" x2="'+(cX(i+1)-BW/2-2)+'" y2="'+(y+BH/2)+'" stroke="#444" stroke-width="1.5" marker-end="url(#lr)"/>'});
+  cc.forEach(function(i){s+=bx(cX(i)-BW/2,uY+(UAH-BH)/2,BW,BH,cm[i].unsafeAct||cm[i].problem||'',9)});
+  [5,4,3,2,1].forEach(function(n){(tp[n]||[]).forEach(function(t){s+=bx(cX(t.col)-BW/2,tY(n)+(TRH-BH)/2,BW,BH,gTx(t),9)})});
+  s+='</svg>';return s;
+}
+
 function bExp(fd,fmt){
   const ss=(fd.flowSteps||[]).filter(s=>s.trim());
   const at=(fd.ta||[]).filter(t=>t.en&&(t.desc||(t.ck||[]).length>0||(t.oc&&t.ot)));
@@ -201,6 +244,9 @@ ${at.length===0?'<p style="color:#999">ไม่มีข้อมูล</p>':at
 
 <h3>3. มีการปรับ/พัฒนาระบบอะไร อย่างไร</h3>
 ${aws.length===0?'<p style="color:#999">ไม่มีข้อมูลกลยุทธ์/มาตรการ</p>':`<table><tr><th>Tier / ปัจจัย</th><th>กลยุทธ์/มาตรการป้องกัน</th><th>เป้าหมาย/ตัวชี้วัด</th><th>ผู้รับผิดชอบ</th></tr>${aws.map(t=>{const info=TD.find(d=>d.id===t.id);return`<tr><td><b>${info?.label||'-'}</b></td><td>${t.strat}</td><td>${t.ind||'-'}</td><td>${t.resp||'-'}</td></tr>`}).join('')}</table>`}
+
+<h3>4. รูปภาพแสดงความเชื่อมโยง (2-Axis Swiss Cheese Model)</h3>
+<div style="overflow-x:auto;margin:10px 0;border:1px solid #ccc;border-radius:6px;padding:8px;background:#fff">${bLinkageSVG(fd)}</div>
 
 <h2>สรุปผลการดำเนินงาน</h2>
 <table><tr><td><b>ส่งข้อมูลกลับวันที่:</b> ${fd.summaryDate||'-'}</td><td><b>จำนวนวัน:</b> ${fd.daysToSubmit||'-'}</td></tr>

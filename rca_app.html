@@ -161,7 +161,7 @@ function gid(){return'RCA-'+Date.now().toString(36).toUpperCase()}
 
 // ===== Google Sheets Cloud Sync =====
 // ใส่ URL ของ Google Apps Script Web App ที่ deploy แล้ว
-const GAS_URL='';
+const GAS_URL='https://script.google.com/macros/s/AKfycbw99ZlV1OaTqG1Mp5C_Xc0Bnvmvr_7rp6lp9f9_Abc45_ivkc9ZAyKz3Bh_40LdzZk1/exec';
 async function cloudLoad(){if(!GAS_URL)return null;try{const r=await fetch(GAS_URL);const t=await r.text();try{const d=JSON.parse(t);return Array.isArray(d)?d:null}catch{return null}}catch(e){console.error('Cloud load:',e);return null}}
 async function cloudSave(data){if(!GAS_URL)return false;try{await fetch(GAS_URL,{method:'POST',body:JSON.stringify(data)});return true}catch(e){console.error('Cloud save:',e);return false}}
 

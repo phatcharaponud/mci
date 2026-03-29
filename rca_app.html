@@ -174,7 +174,8 @@ const KS=[
   {t:'Mindfulness in RCA',c:'❑ คาดการณ์ (Preoccupy with failure)\n❑ เตรียมพร้อม (Commitment to resilience)\n❑ ตาดู (Sensitivity to operation)\n❑ หูฟัง (Deference to expertise)\n❑ ใคร่ครวญ (Reluctance to simplify)'},
 ];
 
-function mkTD(){return TD.map(t=>({id:t.id,en:false,ck:[],oc:false,ot:'',desc:'',strat:'',ind:'',tl:'',resp:''}))}
+function mkTD(){return TD.map(t=>({id:t.id,en:false,entries:[{ck:[],oc:false,ot:'',desc:'',strat:'',ind:'',tl:'',resp:''}]}))}
+function migTier(t){if(t.entries)return t;return{id:t.id,en:t.en,entries:[{ck:t.ck||[],oc:t.oc||false,ot:t.ot||'',desc:t.desc||'',strat:t.strat||'',ind:t.ind||'',tl:t.tl||'',resp:t.resp||''}]}}
 const DF={department:'',date:'',title:'',incidentCode:'',sevL:'',sevN:'',whatHappened:'',where:'',when:'',eventDate:'',professions:'',relatedDepts:'',mainFixDept:'',subFixDept:'',rcaParticipants:'',rcaDate:'',rcaTime:'',flowSteps:['','','','',''],fsSaved:false,cmps:[{step:'',problem:'',unsafeAct:''}],ta:mkTD(),summaryDate:'',daysToSubmit:'',followUpMonth:'',followUpStatus:'',ownerName:'',headName:'',secretaryName:'',chairName:'',hrms:false};
 
 function loadL(){try{return JSON.parse(localStorage.getItem('rca_list')||'[]')}catch{return[]}}
@@ -196,7 +197,7 @@ function bLinkageSVG(fd){
   var W=LW+cols*CW+10,H=5*TRH+UAH+FSH;
   function tY(n){return(5-n)*TRH}var uY=5*TRH,fY=uY+UAH;
   function cX(i){return LW+i*CW+CW/2}
-  function gT(n){return(fd.ta||[]).map(function(t,i){var o={};for(var k in t)o[k]=t[k];o.info=TD[i];return o}).filter(function(t){return t.en&&t.info.tier===n})}
+  function gT(n){var r=[];(fd.ta||[]).forEach(function(t,i){if(!t.en||TD[i].tier!==n)return;(t.entries||[]).forEach(function(e){if(e.desc||(e.ck||[]).length>0||(e.oc&&e.ot)){var o={};for(var k in e)o[k]=e[k];o.info=TD[i];r.push(o)}})});return r}
   function gTx(t){var ck=(t.ck||[]).slice();if(t.oc&&t.ot)ck.push(t.ot);if(t.desc)return t.desc.length>45?t.desc.slice(0,45)+'…':t.desc;return ck.length?(ck.length>2?ck.slice(0,2).join(', ')+'…':ck.join(', ')):''}
   var cm={};cmps.forEach(function(c){var i=ss.indexOf(c.step);if(i>=0)cm[i]=c});
   var cc=Object.keys(cm).map(Number);
@@ -232,7 +233,7 @@ function bLinkageSVG(fd){
 
 function bExp(fd,fmt){
   const ss=(fd.flowSteps||[]).filter(s=>s.trim());
-  const at=(fd.ta||[]).filter(t=>t.en&&(t.desc||(t.ck||[]).length>0||(t.oc&&t.ot)));
+  const at=[];(fd.ta||[]).forEach(t=>{if(!t.en)return;(t.entries||[]).forEach(e=>{if(e.desc||(e.ck||[]).length>0||(e.oc&&e.ot))at.push({...e,id:t.id})})});
   const cmps=(fd.cmps||[]).filter(c=>c.step||c.problem||c.unsafeAct);
   const aws=at.filter(t=>t.strat);
   return`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>RCA - ${fd.title||''}</title>
@@ -287,7 +288,7 @@ function App(){
   const uf=(f,v)=>sFD(p=>({...p,[f]:v}));
   const hNew=()=>{sCI(gid());sFD({...DF,ta:mkTD()});sN('form')};
   const hSave=()=>{const e={id:ci||gid(),...fd,savedAt:new Date().toISOString(),status:'draft'};if(!ci)sCI(e.id);sRL(p=>{const i=p.findIndex(r=>r.id===e.id);if(i>=0){const n=[...p];n[i]=e;return n}return[...p,e]});st('✅ บันทึก RCA เรียบร้อย')};
-  const hLoad=r=>{sCI(r.id);sFD({...DF,...r,ta:r.ta||mkTD()});sN('form')};
+  const hLoad=r=>{sCI(r.id);sFD({...DF,...r,ta:(r.ta||mkTD()).map(migTier)});sN('form')};
   const hExp=f=>{const w=window.open('','_blank');w.document.write(bExp(fd,f));w.document.close();st(f==='pdf'?'📄 เปิดหน้า PDF':'📝 เปิด Word')};
   const hAI=async()=>{if(!it.trim())return st('⚠️ กรุณาใส่ข้อมูลก่อน');sAL(true);sAR('');try{const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:4000,messages:[{role:"user",content:`คุณเป็นผู้เชี่ยวชาญ RCA ในรพ. วิเคราะห์อุบัติการณ์ตาม 2-Axis Swiss Cheese Model & 5-Tier RCA ตอบ JSON ภาษาไทย:\n\nอุบัติการณ์: ${it}\n\n{"whatHappened":"สรุป","flowSteps":["ขั้นตอน"],"cmps":[{"step":"","problem":"","unsafeAct":""}],"tierAnalysis":{"tier1":"","tier2":"","tier3":"","tier4":""},"recommendations":[""]}`}]})});const d=await r.json();const txt=d.content?.map(i=>i.text||'').join('\n')||'ไม่สามารถวิเคราะห์ได้';sAR(txt);try{const p=JSON.parse(txt.replace(/```json|```/g,'').trim());if(p.whatHappened)uf('whatHappened',p.whatHappened);if(p.flowSteps){const s=[...p.flowSteps];while(s.length<5)s.push('');uf('flowSteps',s);uf('fsSaved',true)}if(p.cmps)uf('cmps',p.cmps);st('✅ วิเคราะห์เสร็จ เติมข้อมูลแล้ว')}catch{}}catch(e){sAR('เกิดข้อผิดพลาด: '+e.message)}sAL(false)};
   const stats={total:rl.length,hrms:rl.filter(r=>r.hrms).length,fu:rl.filter(r=>r.followUpStatus==='completed').length};
@@ -340,7 +341,10 @@ function FormV({fd,sFD,uf}){
   const uC=(i,f,v)=>sFD(p=>{const c=[...p.cmps];c[i]={...c[i],[f]:v};return{...p,cmps:c}});
   const rC=i=>sFD(p=>({...p,cmps:p.cmps.filter((_,j)=>j!==i)}));
   const uT=(i,f,v)=>sFD(p=>{const t=[...p.ta];t[i]={...t[i],[f]:v};return{...p,ta:t}});
-  const tTC=(i,item)=>sFD(p=>{const t=[...p.ta];const c=[...(t[i].ck||[])];const j=c.indexOf(item);j>=0?c.splice(j,1):c.push(item);t[i]={...t[i],ck:c};return{...p,ta:t}});
+  const uTE=(i,ei,f,v)=>sFD(p=>{const t=[...p.ta];const es=[...(t[i].entries||[])];es[ei]={...es[ei],[f]:v};t[i]={...t[i],entries:es};return{...p,ta:t}});
+  const tTCE=(i,ei,item)=>sFD(p=>{const t=[...p.ta];const es=[...(t[i].entries||[])];const c=[...(es[ei].ck||[])];const j=c.indexOf(item);j>=0?c.splice(j,1):c.push(item);es[ei]={...es[ei],ck:c};t[i]={...t[i],entries:es};return{...p,ta:t}});
+  const aTE=i=>sFD(p=>{const t=[...p.ta];t[i]={...t[i],entries:[...(t[i].entries||[]),{ck:[],oc:false,ot:'',desc:'',strat:'',ind:'',tl:'',resp:''}]};return{...p,ta:t}});
+  const rTE=(i,ei)=>sFD(p=>{const t=[...p.ta];t[i]={...t[i],entries:(t[i].entries||[]).filter((_,j)=>j!==ei)};return{...p,ta:t}});
 
   return(
     <div>
@@ -396,7 +400,7 @@ function FormV({fd,sFD,uf}){
         {/* TIER ANALYSIS */}
         <div style={{margin:'16px 0 10px',display:'flex',alignItems:'center',gap:10}}><h3 style={{fontSize:15,fontWeight:700,color:'var(--primary-dark)'}}>🔍 ตอนที่ 3: ปัจจัยสาเหตุ (Contributing Factors)</h3></div>
         <div style={{fontSize:12,color:'var(--text-light)',marginBottom:12}}>เลือก ☑ ที่หัวข้อ Tier ที่เกี่ยวข้อง แล้วกด ▼ เพื่อขยายรายละเอียด เฉพาะ Tier ที่เลือกจะแสดงใน Export</div>
-        {TD.map((tier,idx)=>{const td=fd.ta[idx]||{};const hd=td.en&&(td.desc||(td.ck||[]).length>0||(td.oc&&td.ot));return<TC key={tier.id} tier={tier} idx={idx} td={td} hd={!!hd} uT={uT} tTC={tTC}/>})}
+        {TD.map((tier,idx)=>{const td=fd.ta[idx]||{};const hd=td.en&&(td.entries||[]).some(e=>e.desc||(e.ck||[]).length>0||(e.oc&&e.ot));return<TC key={tier.id} tier={tier} idx={idx} td={td} hd={!!hd} uT={uT} uTE={uTE} tTCE={tTCE} aTE={aTE} rTE={rTE}/>})}
       </>}
 
       {tab==='sm'&&<SummaryTab fd={fd} uf={uf}/>}
@@ -408,7 +412,7 @@ function FormV({fd,sFD,uf}){
 function SummaryTab({fd,uf}){
   // Auto-generate summaries from Parts 2-3
   const cmps=(fd.cmps||[]).filter(c=>c.step||c.problem||c.unsafeAct);
-  const activeTiers=(fd.ta||[]).filter(t=>t.en&&(t.desc||(t.ck||[]).length>0||(t.oc&&t.ot)));
+  const activeTiers=[];(fd.ta||[]).forEach(t=>{if(!t.en)return;(t.entries||[]).forEach(e=>{if(e.desc||(e.ck||[]).length>0||(e.oc&&e.ot))activeTiers.push({...e,id:t.id})})});
   const tiersWithStrategy=activeTiers.filter(t=>t.strat);
 
   return(<>
@@ -521,9 +525,9 @@ function LinkageDiagram({fd}){
   const cols=ss.length,LW=130,CW=Math.max(110,Math.min(155,750/cols)),BW=CW-25,BH=40,TRH=68,UAH=76,FSH=68;
   const W=LW+cols*CW+10,H=5*TRH+UAH+FSH;
   const tY=n=>(5-n)*TRH,uY=5*TRH,fY=uY+UAH,cX=i=>LW+i*CW+CW/2;
-  // Get active tier items for a tier number
-  const gT=n=>(fd.ta||[]).map((t,i)=>({...t,info:TD[i]})).filter(t=>t.en&&t.info.tier===n);
-  // Get display text for a tier item (from checked factors or description)
+  // Get active tier entries for a tier number (flattened from entries)
+  const gT=n=>{const r=[];(fd.ta||[]).forEach((t,i)=>{if(!t.en||TD[i].tier!==n)return;(t.entries||[]).forEach(e=>{if(e.desc||(e.ck||[]).length>0||(e.oc&&e.ot))r.push({...e,info:TD[i]})})});return r};
+  // Get display text for a tier entry (from checked factors or description)
   const gTx=t=>{const ck=[...(t.ck||[])];if(t.oc&&t.ot)ck.push(t.ot);if(t.desc)return t.desc.length>50?t.desc.slice(0,50)+'…':t.desc;return ck.length?(ck.length>2?ck.slice(0,2).join(', ')+'…':ck.join(', ')):''};
   // Map CMPs to step column indices
   const cm={};cmps.forEach(c=>{const i=ss.indexOf(c.step);if(i>=0)cm[i]=c});
@@ -575,26 +579,36 @@ function LinkageDiagram({fd}){
 }
 
 // TIER CARD
-function TC({tier,idx,td,hd,uT,tTC}){
+function TC({tier,idx,td,hd,uT,uTE,tTCE,aTE,rTE}){
   const[op,sO]=useState(false);
+  const entries=td.entries||[{ck:[],oc:false,ot:'',desc:'',strat:'',ind:'',tl:'',resp:''}];
   return(
     <div className={`tc ${hd?'hd':''}`}>
       <div className="tch" onClick={()=>sO(!op)}>
         <input type="checkbox" className="tk" checked={!!td.en} onChange={e=>{e.stopPropagation();uT(idx,'en',e.target.checked)}} onClick={e=>e.stopPropagation()}/>
         <span className="tg" style={{background:tier.tc}}>{tier.tag}</span>
         <span className="tt">{tier.label}</span>
-        {hd&&<span style={{fontSize:11,color:'var(--success)',fontWeight:600}}>✓ มีข้อมูล</span>}
+        {hd&&<span style={{fontSize:11,color:'var(--success)',fontWeight:600}}>✓ มีข้อมูล ({entries.length})</span>}
         <span className={`tw ${op?'op':''}`}>▼</span>
       </div>
       <div className={`tcb ${op?'':'cl'}`}>
         {!td.en?<div style={{padding:'10px 0',color:'var(--text-light)',fontSize:13}}>กรุณาเลือก ☑ ที่หัวข้อด้านบนเพื่อระบุว่า Tier นี้เกี่ยวข้อง</div>:(
-          <div style={{background:tier.bg,borderRadius:6,padding:16,marginTop:4}}>
-            <div className="fg"><label className="fl">ปัจจัยที่เกี่ยวข้อง</label>
-              <div className="cg">{tier.items.map(item=><label className="ci" key={item}><input type="checkbox" checked={(td.ck||[]).includes(item)} onChange={()=>tTC(idx,item)}/>{item}</label>)}</div>
-              <div className="oir"><label className="ci"><input type="checkbox" checked={!!td.oc} onChange={e=>uT(idx,'oc',e.target.checked)}/>อื่นๆ ระบุ:</label>{td.oc&&<input type="text" value={td.ot||''} onChange={e=>uT(idx,'ot',e.target.value)} placeholder="ระบุปัจจัยอื่นๆ..."/>}</div>
-            </div>
-            <div className="fr"><div className="fg"><label className="fl">บรรยายสรุปส่วนที่เกี่ยวข้อง</label><textarea className="ft" value={td.desc||''} onChange={e=>uT(idx,'desc',e.target.value)} placeholder="อธิบาย..."/></div><div className="fg"><label className="fl">กลยุทธ์/มาตรการป้องกัน</label><textarea className="ft" value={td.strat||''} onChange={e=>uT(idx,'strat',e.target.value)} placeholder="มาตรการ..."/></div></div>
-            <div className="fr3"><div className="fg"><label className="fl">เป้าหมาย/ตัวชี้วัด</label><input className="fi" value={td.ind||''} onChange={e=>uT(idx,'ind',e.target.value)}/></div><div className="fg"><label className="fl">เวลาดำเนินการ</label><input className="fi" value={td.tl||''} onChange={e=>uT(idx,'tl',e.target.value)}/></div><div className="fg"><label className="fl">ผู้รับผิดชอบ</label><input className="fi" value={td.resp||''} onChange={e=>uT(idx,'resp',e.target.value)}/></div></div>
+          <div style={{marginTop:4}}>
+            {entries.map((e,ei)=>(
+              <div key={ei} style={{background:tier.bg,borderRadius:6,padding:16,marginBottom:10,border:'1px solid var(--border)'}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+                  <strong style={{fontSize:13,color:tier.tc}}>รายการที่ {ei+1}</strong>
+                  {entries.length>1&&<button className="btn btn-sm btn-d" onClick={()=>rTE(idx,ei)}>✕ ลบ</button>}
+                </div>
+                <div className="fg"><label className="fl">ปัจจัยที่เกี่ยวข้อง</label>
+                  <div className="cg">{tier.items.map(item=><label className="ci" key={item}><input type="checkbox" checked={(e.ck||[]).includes(item)} onChange={()=>tTCE(idx,ei,item)}/>{item}</label>)}</div>
+                  <div className="oir"><label className="ci"><input type="checkbox" checked={!!e.oc} onChange={ev=>uTE(idx,ei,'oc',ev.target.checked)}/>อื่นๆ ระบุ:</label>{e.oc&&<input type="text" value={e.ot||''} onChange={ev=>uTE(idx,ei,'ot',ev.target.value)} placeholder="ระบุปัจจัยอื่นๆ..."/>}</div>
+                </div>
+                <div className="fr"><div className="fg"><label className="fl">บรรยายสรุปส่วนที่เกี่ยวข้อง</label><textarea className="ft" value={e.desc||''} onChange={ev=>uTE(idx,ei,'desc',ev.target.value)} placeholder="อธิบาย..."/></div><div className="fg"><label className="fl">กลยุทธ์/มาตรการป้องกัน</label><textarea className="ft" value={e.strat||''} onChange={ev=>uTE(idx,ei,'strat',ev.target.value)} placeholder="มาตรการ..."/></div></div>
+                <div className="fr3"><div className="fg"><label className="fl">เป้าหมาย/ตัวชี้วัด</label><input className="fi" value={e.ind||''} onChange={ev=>uTE(idx,ei,'ind',ev.target.value)}/></div><div className="fg"><label className="fl">เวลาดำเนินการ</label><input className="fi" value={e.tl||''} onChange={ev=>uTE(idx,ei,'tl',ev.target.value)}/></div><div className="fg"><label className="fl">ผู้รับผิดชอบ</label><input className="fi" value={e.resp||''} onChange={ev=>uTE(idx,ei,'resp',ev.target.value)}/></div></div>
+              </div>
+            ))}
+            <button className="btn btn-sm btn-p" onClick={()=>aTE(idx)} style={{marginTop:2}}>+ เพิ่มรายการ</button>
           </div>
         )}
       </div>

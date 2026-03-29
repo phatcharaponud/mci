@@ -159,6 +159,12 @@ function loadL(){try{return JSON.parse(localStorage.getItem('rca_list')||'[]')}c
 function saveL(l){localStorage.setItem('rca_list',JSON.stringify(l))}
 function gid(){return'RCA-'+Date.now().toString(36).toUpperCase()}
 
+// ===== Google Sheets Cloud Sync =====
+// ใส่ URL ของ Google Apps Script Web App ที่ deploy แล้ว
+const GAS_URL='';
+async function cloudLoad(){if(!GAS_URL)return null;try{const r=await fetch(GAS_URL);const t=await r.text();try{const d=JSON.parse(t);return Array.isArray(d)?d:null}catch{return null}}catch(e){console.error('Cloud load:',e);return null}}
+async function cloudSave(data){if(!GAS_URL)return false;try{await fetch(GAS_URL,{method:'POST',body:JSON.stringify(data)});return true}catch(e){console.error('Cloud save:',e);return false}}
+
 function bExp(fd,fmt){
   const ss=(fd.flowSteps||[]).filter(s=>s.trim());
   const at=(fd.ta||[]).filter(t=>t.en&&(t.desc||(t.ck||[]).length>0||(t.oc&&t.ot)));
@@ -212,8 +218,11 @@ ${fmt==='pdf'?'<script>setTimeout(()=>window.print(),600)<\/script>':''}
 
 // APP
 function App(){
-  const[nav,sN]=useState('form'),[rl,sRL]=useState(loadL),[ci,sCI]=useState(null),[fd,sFD]=useState({...DF,ta:mkTD()}),[toast,sT]=useState(null),[aiL,sAL]=useState(false),[aiR,sAR]=useState(''),[it,sIT]=useState('');
-  useEffect(()=>{saveL(rl)},[rl]);
+  const[nav,sN]=useState('form'),[rl,sRL]=useState(loadL),[ci,sCI]=useState(null),[fd,sFD]=useState({...DF,ta:mkTD()}),[toast,sT]=useState(null),[aiL,sAL]=useState(false),[aiR,sAR]=useState(''),[it,sIT]=useState(''),[sync,sSync]=useState('');
+  const skipSync=useRef(true),cloudTimer=useRef(null);
+  useEffect(()=>{saveL(rl);if(!GAS_URL||skipSync.current)return;clearTimeout(cloudTimer.current);cloudTimer.current=setTimeout(()=>{sSync('saving');cloudSave(rl).then(ok=>{sSync(ok?'ok':'error');setTimeout(()=>sSync(''),3000)})},2000)},[rl]);
+  useEffect(()=>{if(!GAS_URL){skipSync.current=false;return}sSync('loading');cloudLoad().then(d=>{if(d&&d.length>0){sRL(d);saveL(d)}sSync('ok');setTimeout(()=>{sSync('');skipSync.current=false},800)}).catch(()=>{sSync('error');skipSync.current=false})},[]);
+  const hRefresh=()=>{if(!GAS_URL)return st('⚠️ ยังไม่ได้ตั้งค่า Google Sheets');sSync('loading');cloudLoad().then(d=>{if(d){sRL(d);saveL(d);st('✅ โหลดข้อมูลจาก Cloud สำเร็จ')}else st('⚠️ ไม่พบข้อมูลจาก Cloud');sSync('')}).catch(()=>{sSync('error');st('❌ โหลดข้อมูลไม่สำเร็จ')})};
   const st=m=>{sT(m);setTimeout(()=>sT(null),3000)};
   const uf=(f,v)=>sFD(p=>({...p,[f]:v}));
   const hNew=()=>{sCI(gid());sFD({...DF,ta:mkTD()});sN('form')};
@@ -242,6 +251,7 @@ function App(){
         <div className="ch">
           <h2>{nav==='form'?'📋 แบบฟอร์มบันทึก RCA':nav==='list'?'📁 รายการ RCA':nav==='ai'?'🤖 AI Analysis':nav==='kb'?'📚 ความรู้ RCA':'📊 Dashboard'}</h2>
           <div className="ha">
+            {GAS_URL?<>{sync==='loading'&&<span style={{fontSize:12,color:'#2980b9',whiteSpace:'nowrap'}}>🔄 โหลด...</span>}{sync==='saving'&&<span style={{fontSize:12,color:'#e67e22',whiteSpace:'nowrap'}}>💾 Sync...</span>}{sync==='ok'&&<span style={{fontSize:12,color:'#27ae60',whiteSpace:'nowrap'}}>✅ Synced</span>}{sync==='error'&&<span style={{fontSize:12,color:'#e74c3c',whiteSpace:'nowrap'}}>❌ Error</span>}<button className="btn btn-o btn-sm" onClick={hRefresh} title="โหลดข้อมูลจาก Cloud">🔄</button></>:<span style={{fontSize:11,color:'#856404',background:'#fff3cd',padding:'4px 10px',borderRadius:4,whiteSpace:'nowrap'}}>⚠️ Offline - ไม่ได้เชื่อม Cloud</span>}
             {nav==='form'&&<><button className="btn btn-o btn-sm" onClick={hNew}>➕ ใหม่</button><button className="btn btn-p btn-sm" onClick={hSave}>💾 บันทึก</button><button className="btn btn-w btn-sm" onClick={()=>hExp('pdf')}>📄 PDF</button><button className="btn btn-s btn-sm" onClick={()=>hExp('word')}>📝 Word</button></>}
             {nav==='list'&&<button className="btn btn-p btn-sm" onClick={hNew}>➕ ใหม่</button>}
           </div>

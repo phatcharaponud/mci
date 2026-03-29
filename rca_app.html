@@ -421,6 +421,15 @@ function SummaryTab({fd,uf}){
             )}
           </div>
 
+          {/* 4. รูปภาพแสดงความเชื่อมโยง */}
+          <div style={{marginTop:18}}>
+            <div style={{fontWeight:700,fontSize:14,color:'var(--primary)',marginBottom:8,display:'flex',alignItems:'center',gap:6}}>
+              <span style={{background:'var(--primary)',color:'#fff',width:22,height:22,borderRadius:'50%',display:'inline-flex',alignItems:'center',justifyContent:'center',fontSize:11}}>4</span>
+              รูปภาพแสดงความเชื่อมโยง (2-Axis Swiss Cheese Model)
+            </div>
+            <LinkageDiagram fd={fd}/>
+          </div>
+
         </div></div>
 
         {/* ส่งข้อมูล / ติดตาม */}
@@ -438,6 +447,67 @@ function SummaryTab({fd,uf}){
           <div style={{marginTop:12,fontSize:12,color:'var(--text-light)'}}>* ช่องลายเซ็นจะแสดงเมื่อ Export เป็น PDF หรือ Word เท่านั้น</div>
         </div></div>
       </>);
+}
+
+// LINKAGE DIAGRAM (2-Axis Swiss Cheese Model)
+function LinkageDiagram({fd}){
+  const ss=(fd.flowSteps||[]).filter(s=>s.trim());
+  const cmps=(fd.cmps||[]).filter(c=>c.step||c.problem||c.unsafeAct);
+  if(!ss.length)return<div style={{color:'var(--text-light)',fontSize:13,padding:'8px 12px',background:'#f8f9fa',borderRadius:6}}>ยังไม่มีข้อมูล Flow of Steps จากตอนที่ 2</div>;
+  const cols=ss.length,LW=130,CW=Math.max(110,Math.min(155,750/cols)),BW=CW-25,BH=40,TRH=68,UAH=76,FSH=68;
+  const W=LW+cols*CW+10,H=5*TRH+UAH+FSH;
+  const tY=n=>(5-n)*TRH,uY=5*TRH,fY=uY+UAH,cX=i=>LW+i*CW+CW/2;
+  // Get active tier items for a tier number
+  const gT=n=>(fd.ta||[]).map((t,i)=>({...t,info:TD[i]})).filter(t=>t.en&&t.info.tier===n);
+  // Get display text for a tier item (from checked factors or description)
+  const gTx=t=>{const ck=[...(t.ck||[])];if(t.oc&&t.ot)ck.push(t.ot);if(t.desc)return t.desc.length>50?t.desc.slice(0,50)+'…':t.desc;return ck.length?(ck.length>2?ck.slice(0,2).join(', ')+'…':ck.join(', ')):''};
+  // Map CMPs to step column indices
+  const cm={};cmps.forEach(c=>{const i=ss.indexOf(c.step);if(i>=0)cm[i]=c});
+  const cc=Object.keys(cm).map(Number);
+  // Distribute tier items across columns
+  const tp={};
+  [5,4,3,2,1].forEach(n=>{const it=gT(n);tp[n]=[];if(!it.length)return;it.forEach((t,i)=>{tp[n].push({...t,col:Math.min(Math.round(i*cols/it.length+cols/(it.length*2)-.5),cols-1)})})});
+  // Build connection lines: tier→tier, tier→CMP, CMP→flowStep
+  const ln=[];
+  cc.forEach(i=>{ln.push({x1:cX(i),y1:uY+UAH/2+BH/2,x2:cX(i),y2:fY+FSH/2-BH/2})});
+  [5,4,3,2,1].forEach(n=>{(tp[n]||[]).forEach(t=>{const tx=cX(t.col),tb=tY(n)+TRH/2+BH/2;let f=false;
+    for(let b=n-1;b>=1&&!f;b--)if((tp[b]||[]).length){let nr=tp[b][0],md=999;tp[b].forEach(bt=>{const d=Math.abs(bt.col-t.col);if(d<md){md=d;nr=bt}});ln.push({x1:tx,y1:tb,x2:cX(nr.col),y2:tY(b)+TRH/2-BH/2});f=true}
+    if(!f&&cc.length){let nc=cc[0],md=999;cc.forEach(ci=>{const d=Math.abs(ci-t.col);if(d<md){md=d;nc=ci}});ln.push({x1:tx,y1:tb,x2:cX(nc),y2:uY+UAH/2-BH/2})}})});
+  const TL={5:{n:'Tier 5',s:['สังคม/นอกองค์กร']},4:{n:'Tier 4',s:['การบริหารจัดการ','นโยบาย']},3:{n:'Tier 3',s:['สวล.,ข้อมูล','ระบบ']},2:{n:'Tier 2',s:['ลักษณะงาน','ทีม']},1:{n:'Tier 1',s:['ผู้ป่วย','บุคลากร']}};
+  // Render helper for boxes with text
+  const bx=(x,y,w,h,t,fs)=><g><rect x={x} y={y} width={w} height={h} rx={5} fill="#fff" stroke="#444" strokeWidth={1.5}/><foreignObject x={x+3} y={y+2} width={w-6} height={h-4}><div style={{fontSize:fs||10,textAlign:'center',lineHeight:'1.3',overflow:'hidden',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',wordBreak:'break-word'}}>{t}</div></foreignObject></g>;
+  return<div style={{overflowX:'auto',margin:'8px 0',border:'1px solid var(--border)',borderRadius:8,background:'#fff'}}>
+    <svg width={W} height={H} style={{fontFamily:'Sarabun,Noto Sans Thai,sans-serif',display:'block'}}>
+      <defs><marker id="la" viewBox="0 0 10 10" refX={9} refY={5} markerWidth={6} markerHeight={6} orient="auto"><path d="M0 0L10 5L0 10z" fill="#555"/></marker><marker id="lr" viewBox="0 0 10 10" refX={9} refY={5} markerWidth={6} markerHeight={6} orient="auto"><path d="M0 0L10 5L0 10z" fill="#444"/></marker></defs>
+      {/* Background bands */}
+      <rect x={0} y={0} width={W} height={5*TRH} fill="#d6e4ee"/>
+      <rect x={0} y={uY} width={W} height={UAH} fill="#dcedc8"/>
+      <rect x={0} y={fY} width={W} height={FSH} fill="#fce4cc"/>
+      {/* Tier row separators */}
+      {[5,4,3,2,1].map(n=><line key={n} x1={LW-10} y1={tY(n)} x2={W} y2={tY(n)} stroke="#b0c4d8" strokeWidth={.7}/>)}
+      <line x1={0} y1={uY} x2={W} y2={uY} stroke="#888" strokeWidth={1}/>
+      <line x1={0} y1={fY} x2={W} y2={fY} stroke="#888" strokeWidth={1}/>
+      {/* Vertical label: Contributing factors */}
+      <text x={14} y={5*TRH/2} fontSize={13} fontWeight={700} fill="#1a5276" textAnchor="middle" transform={`rotate(-90,14,${5*TRH/2})`}>Contributing factors</text>
+      {/* Tier labels */}
+      {[5,4,3,2,1].map(n=><g key={`l${n}`}><text x={28} y={tY(n)+22} fontSize={11} fontWeight={700} fill="#1a5276">{TL[n].n}</text>{TL[n].s.map((s,j)=><text key={j} x={28} y={tY(n)+36+j*14} fontSize={10} fill="#2980b9">{s}</text>)}</g>)}
+      {/* Unsafe act label */}
+      <text x={8} y={uY+22} fontSize={10} fontWeight={700} fill="#33691e">Unsafe act/</text>
+      <text x={8} y={uY+36} fontSize={10} fontWeight={700} fill="#33691e">Potential change</text>
+      {/* Flow steps label */}
+      <text x={8} y={fY+20} fontSize={10} fontWeight={700} fill="#c0392b">Flow of steps</text>
+      <text x={8} y={fY+34} fontSize={9} fill="#c0392b">Care process /</text>
+      <text x={8} y={fY+46} fontSize={9} fill="#c0392b">กระบวนการหลัก</text>
+      {/* Connection lines with arrows */}
+      {ln.map((l,i)=><line key={i} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} stroke="#555" strokeWidth={1.2} markerEnd="url(#la)"/>)}
+      {/* Flow step boxes with arrows between them */}
+      {ss.map((s,i)=>{const x=cX(i)-BW/2,y=fY+(FSH-BH)/2;return<g key={`f${i}`}>{bx(x,y,BW,BH,s)}{i<ss.length-1&&<line x1={x+BW+2} y1={y+BH/2} x2={cX(i+1)-BW/2-2} y2={y+BH/2} stroke="#444" strokeWidth={1.5} markerEnd="url(#lr)"/>}</g>})}
+      {/* CMP / Unsafe Act boxes */}
+      {cc.map(i=><React.Fragment key={`c${i}`}>{bx(cX(i)-BW/2,uY+(UAH-BH)/2,BW,BH,cm[i].unsafeAct||cm[i].problem||'',9)}</React.Fragment>)}
+      {/* Tier factor boxes */}
+      {[5,4,3,2,1].map(n=>(tp[n]||[]).map((t,j)=><React.Fragment key={`t${n}${j}`}>{bx(cX(t.col)-BW/2,tY(n)+(TRH-BH)/2,BW,BH,gTx(t),9)}</React.Fragment>))}
+    </svg>
+  </div>;
 }
 
 // TIER CARD

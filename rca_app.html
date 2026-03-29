@@ -470,9 +470,8 @@ function TC({tier,idx,td,hd,uT,tTC}){
 
 // LIST
 function ListV({rl,onL,onN,sRL}){
-  const del=id=>{if(confirm('ลบ?'))sRL(p=>p.filter(r=>r.id!==id))};
   if(!rl.length)return<div style={{textAlign:'center',padding:60,color:'var(--text-light)'}}><div style={{fontSize:48}}>📋</div><div style={{fontSize:16,fontWeight:600,marginTop:8}}>ยังไม่มี RCA</div><button className="btn btn-p" style={{marginTop:16}} onClick={onN}>➕ สร้างใหม่</button></div>;
-  return<table className="rlt"><thead><tr><th>รหัส</th><th>เรื่อง</th><th>หน่วยงาน</th><th>วันที่</th><th>ระดับ</th><th>HRMS</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody>{rl.map(r=><tr key={r.id}><td style={{fontWeight:600,color:'var(--primary)'}}>{r.id}</td><td>{r.title||'-'}</td><td>{r.department||'-'}</td><td>{r.date||'-'}</td><td>{r.sevL||'-'}{r.sevN?'/'+r.sevN:''}</td><td>{r.hrms?<span className="stb sth">✅</span>:<span style={{color:'var(--accent)'}}>❌</span>}</td><td><span className={`stb ${r.followUpStatus==='completed'?'stc':'std'}`}>{r.followUpStatus==='completed'?'เสร็จ':r.followUpStatus==='in_progress'?'ดำเนินการ':'รอ'}</span></td><td><button className="btn btn-sm btn-p" onClick={()=>onL(r)}>เปิด</button><button className="btn btn-sm btn-d" style={{marginLeft:4}} onClick={()=>del(r.id)}>ลบ</button></td></tr>)}</tbody></table>;
+  return<table className="rlt"><thead><tr><th>รหัส</th><th>เรื่อง</th><th>หน่วยงาน</th><th>วันที่</th><th>ระดับ</th><th>HRMS</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody>{rl.map(r=><tr key={r.id}><td style={{fontWeight:600,color:'var(--primary)'}}>{r.id}</td><td>{r.title||'-'}</td><td>{r.department||'-'}</td><td>{r.date||'-'}</td><td>{r.sevL||'-'}{r.sevN?'/'+r.sevN:''}</td><td>{r.hrms?<span className="stb sth">✅</span>:<span style={{color:'var(--accent)'}}>❌</span>}</td><td><span className={`stb ${r.followUpStatus==='completed'?'stc':'std'}`}>{r.followUpStatus==='completed'?'เสร็จ':r.followUpStatus==='in_progress'?'ดำเนินการ':'รอ'}</span></td><td><button className="btn btn-sm btn-p" onClick={()=>onL(r)}>เปิด</button></td></tr>)}</tbody></table>;
 }
 
 // AI

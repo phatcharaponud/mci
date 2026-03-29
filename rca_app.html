@@ -14,7 +14,14 @@
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Sarabun','Noto Sans Thai',sans-serif;background:var(--bg);color:var(--text);font-size:14px}
 .app{display:flex;height:100vh;overflow:hidden}
-.sb{width:280px;min-width:280px;background:var(--sidebar-bg);color:#ecf0f1;display:flex;flex-direction:column;z-index:100}
+.sb{width:280px;min-width:280px;background:var(--sidebar-bg);color:#ecf0f1;display:flex;flex-direction:column;z-index:100;transition:width 0.25s,min-width 0.25s}
+.sb.collapsed{width:60px;min-width:60px}
+.sb.collapsed .sb-h h1,.sb.collapsed .sb-h .st,.sb.collapsed .ns,.sb.collapsed .ni span:not(.ni-i),.sb.collapsed .ni-b{display:none}
+.sb.collapsed .sb-h{padding:12px 0;text-align:center}
+.sb.collapsed .ni{padding:10px 0;justify-content:center}
+.sb.collapsed .ni-i{width:auto;font-size:20px}
+.sb-toggle{padding:8px;text-align:center;cursor:pointer;border-top:1px solid rgba(255,255,255,0.1);font-size:18px;color:rgba(255,255,255,0.6);transition:color 0.2s}
+.sb-toggle:hover{color:#fff}
 .sb-h{padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.1)}
 .sb-h h1{font-size:15px;font-weight:700;color:#fff;line-height:1.4}
 .sb-h .st{font-size:11px;color:rgba(255,255,255,0.6);margin-top:4px}
@@ -280,7 +287,7 @@ ${fmt==='pdf'?'<script>setTimeout(()=>window.print(),600)<\/script>':''}
 
 // APP
 function App(){
-  const[nav,sN]=useState('form'),[rl,sRL]=useState(loadL),[ci,sCI]=useState(null),[fd,sFD]=useState({...DF,ta:mkTD()}),[toast,sT]=useState(null),[sync,sSync]=useState('');
+  const[nav,sN]=useState('form'),[rl,sRL]=useState(loadL),[ci,sCI]=useState(null),[fd,sFD]=useState({...DF,ta:mkTD()}),[toast,sT]=useState(null),[sync,sSync]=useState(''),[sbCol,sSbCol]=useState(false);
   const skipSync=useRef(true),cloudTimer=useRef(null);
   useEffect(()=>{saveL(rl);if(!GAS_URL||skipSync.current)return;clearTimeout(cloudTimer.current);cloudTimer.current=setTimeout(()=>{sSync('saving');cloudSave(rl).then(ok=>{sSync(ok?'ok':'error');setTimeout(()=>sSync(''),3000)})},2000)},[rl]);
   useEffect(()=>{if(!GAS_URL){skipSync.current=false;return}sSync('loading');cloudLoad().then(d=>{if(d&&d.length>0){sRL(d);saveL(d)}sSync('ok');setTimeout(()=>{sSync('');skipSync.current=false},800)}).catch(()=>{sSync('error');skipSync.current=false})},[]);
@@ -295,17 +302,20 @@ function App(){
 
   return(
     <div className="app">
-      <div className="sb">
+      <div className={`sb ${sbCol?'collapsed':''}`}>
         <div className="sb-h"><h1>🏥 RCA Management System</h1><div className="st">โรงพยาบาลมหาวิทยาลัยพะเยา</div></div>
         <div className="sb-n">
           <div className="ns">แบบฟอร์ม</div>
-          <div className={`ni ${nav==='form'?'ac':''}`} onClick={()=>sN('form')}><span className="ni-i">📋</span>แบบฟอร์ม RCA</div>
-          <div className={`ni ${nav==='list'?'ac':''}`} onClick={()=>sN('list')}><span className="ni-i">📁</span>รายการ RCA{rl.length>0&&<span className="ni-b">{rl.length}</span>}</div>
+          <div className={`ni ${nav==='form'?'ac':''}`} onClick={()=>sN('form')}><span className="ni-i">📋</span><span>แบบฟอร์ม RCA</span></div>
+          <div className={`ni ${nav==='list'?'ac':''}`} onClick={()=>sN('list')}><span className="ni-i">📁</span><span>รายการ RCA</span>{rl.length>0&&<span className="ni-b">{rl.length}</span>}</div>
           <div className="ns">เครื่องมือ</div>
-          <div className={`ni ${nav==='kb'?'ac':''}`} onClick={()=>sN('kb')}><span className="ni-i">📚</span>ความรู้ RCA</div>
+          <div className={`ni ${nav==='kb'?'ac':''}`} onClick={()=>sN('kb')}><span className="ni-i">📚</span><span>ความรู้ RCA</span></div>
           <div className="ns">รายงาน</div>
-          <div className={`ni ${nav==='db'?'ac':''}`} onClick={()=>sN('db')}><span className="ni-i">📊</span>Dashboard</div>
+          <div className={`ni ${nav==='db'?'ac':''}`} onClick={()=>sN('db')}><span className="ni-i">📊</span><span>Dashboard</span></div>
+          <div className="ns">ระบบภายนอก</div>
+          <div className="ni" onClick={()=>window.open('https://hrms59.thai-nrls.org/HRMS41347/Account/Login','_blank')}><span className="ni-i">🔗</span><span>ระบบ HRMS</span></div>
         </div>
+        <div className="sb-toggle" onClick={()=>sSbCol(!sbCol)}>{sbCol?'▶':'◀'}</div>
       </div>
       <div className="mc">
         <div className="ch">

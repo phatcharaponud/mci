@@ -119,8 +119,8 @@ body{font-family:'Sarabun','Noto Sans Thai',sans-serif;background:var(--bg);colo
 .lsp{display:inline-block;width:18px;height:18px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:sp 0.6s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
 .tp-wrap{position:relative;display:inline-block}
-.tp-wrap .tp-box{visibility:hidden;opacity:0;position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);background:#1a3a52;color:#fff;padding:10px 14px;border-radius:8px;font-size:12px;line-height:1.6;width:320px;max-width:90vw;z-index:200;box-shadow:0 4px 16px rgba(0,0,0,0.25);pointer-events:none;transition:opacity 0.2s,visibility 0.2s;font-weight:400;text-align:left;white-space:normal}
-.tp-wrap .tp-box::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:6px solid transparent;border-top-color:#1a3a52}
+.tp-wrap .tp-box{visibility:hidden;opacity:0;position:absolute;bottom:calc(100% + 10px);left:0;background:#1a3a52;color:#fff;padding:10px 14px;border-radius:8px;font-size:12px;line-height:1.6;width:360px;z-index:200;box-shadow:0 4px 16px rgba(0,0,0,0.25);pointer-events:none;transition:opacity 0.2s,visibility 0.2s;font-weight:400;text-align:left;white-space:normal}
+.tp-wrap .tp-box::after{content:'';position:absolute;top:100%;left:16px;border:6px solid transparent;border-top-color:#1a3a52}
 .tp-wrap:hover .tp-box{visibility:visible;opacity:1}
 </style>
 </head>

@@ -602,7 +602,7 @@ function TC({tier,idx,td,hd,fd,uT,uTE,tTCE,aTE,rTE}){
   // Build link options: CMPs + lower tier entries
   const linkOpts=[];
   (fd.cmps||[]).forEach((c,i)=>{if(c.step||c.problem||c.unsafeAct)linkOpts.push({val:JSON.stringify({type:'cmp',index:i}),label:`CMP #${i+1}: ${c.unsafeAct||c.problem||c.step||''}`})});
-  (fd.ta||[]).forEach((t,ti)=>{if(!t.en)return;const info=TD[ti];if(info.tier>=curTier)return;(t.entries||[]).forEach((te,tei)=>{const ck=[...(te.ck||[])];const txt=te.desc||ck.slice(0,2).join(', ')||'';if(!txt)return;linkOpts.push({val:JSON.stringify({type:'tier',tierId:t.id,entryIndex:tei}),label:`${info.label} #${tei+1}: ${txt.length>30?txt.slice(0,30)+'…':txt}`})})});
+  (fd.ta||[]).forEach((t,ti)=>{if(!t.en)return;const info=TD[ti];if(info.tier>curTier||(info.tier===curTier&&t.id===td.id))return;(t.entries||[]).forEach((te,tei)=>{const ck=[...(te.ck||[])];const txt=te.desc||ck.slice(0,2).join(', ')||'';if(!txt)return;linkOpts.push({val:JSON.stringify({type:'tier',tierId:t.id,entryIndex:tei}),label:`${info.label} #${tei+1}: ${txt.length>30?txt.slice(0,30)+'…':txt}`})})});
   const getLinkVal=e=>e.linkedTo?JSON.stringify(e.linkedTo):'';
   const setLink=(ei,v)=>uTE(idx,ei,'linkedTo',v?JSON.parse(v):null);
   return(

@@ -196,7 +196,7 @@ function bLinkageSVG(fd){
   var ss=(fd.flowSteps||[]).filter(function(s){return s.trim()});
   var cmps=(fd.cmps||[]).filter(function(c){return c.step||c.problem||c.unsafeAct});
   if(!ss.length)return'<p style="color:#999">ยังไม่มีข้อมูล Flow of Steps</p>';
-  var cols=ss.length,LW=130,CW=Math.max(110,Math.min(150,750/cols)),BW=CW-18,BH=56,TRH=76,UAH=76,FSH=76;
+  var cols=ss.length,LW=130,CW=Math.max(130,Math.min(170,850/cols)),BW=CW-14,BH=74,TRH=94,UAH=94,FSH=94;
   var W=LW+cols*CW+10,H=5*TRH+UAH+FSH;
   function tY(n){return(5-n)*TRH}var uY=5*TRH,fY=uY+UAH;
   function cX(i){return LW+i*CW+CW/2}
@@ -530,7 +530,7 @@ function LinkageDiagram({fd}){
   const ss=(fd.flowSteps||[]).filter(s=>s.trim());
   const cmps=(fd.cmps||[]).filter(c=>c.step||c.problem||c.unsafeAct);
   if(!ss.length)return<div style={{color:'var(--text-light)',fontSize:13,padding:'8px 12px',background:'#f8f9fa',borderRadius:6}}>ยังไม่มีข้อมูล Flow of Steps จากตอนที่ 2</div>;
-  const cols=ss.length,LW=130,CW=Math.max(120,Math.min(165,800/cols)),BW=CW-20,BH=60,TRH=80,UAH=80,FSH=80;
+  const cols=ss.length,LW=130,CW=Math.max(140,Math.min(180,900/cols)),BW=CW-16,BH=78,TRH=98,UAH=98,FSH=98;
   const W=LW+cols*CW+10,H=5*TRH+UAH+FSH;
   const tY=n=>(5-n)*TRH,uY=5*TRH,fY=uY+UAH,cX=i=>LW+i*CW+CW/2;
   // Get active tier entries for a tier number (flattened from entries)

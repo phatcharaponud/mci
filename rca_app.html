@@ -216,7 +216,7 @@ function bLinkageSVG(fd){
     var f=false;for(var b=n-1;b>=1&&!f;b--)if((tp[b]||[]).length){var nr=tp[b][0],md=999;tp[b].forEach(function(bt){var d=Math.abs(bt.col-t.col);if(d<md){md=d;nr=bt}});ln.push({x1:tx,y1:tb,x2:cX(nr.col),y2:tY(b)+TRH/2-BH/2});f=true}
     if(!f&&cc.length){var nc=cc[0],md2=999;cc.forEach(function(ci2){var d=Math.abs(ci2-t.col);if(d<md2){md2=d;nc=ci2}});ln.push({x1:tx,y1:tb,x2:cX(nc),y2:uY+UAH/2-BH/2})}})});
   var TL={5:{n:'Tier 5',s:['สังคม/นอกองค์กร']},4:{n:'Tier 4',s:['การบริหารจัดการ','นโยบาย']},3:{n:'Tier 3',s:['สวล.,ข้อมูล','ระบบ']},2:{n:'Tier 2',s:['ลักษณะงาน','ทีม']},1:{n:'Tier 1',s:['ผู้ป่วย','บุคลากร']}};
-  function bx(x,y,w,h,t,fs){return'<g><rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="5" fill="#fff" stroke="#444" stroke-width="1.5"/><foreignObject x="'+(x+3)+'" y="'+(y+2)+'" width="'+(w-6)+'" height="'+(h-4)+'"><div xmlns="http://www.w3.org/1999/xhtml" style="font-size:'+(fs||10)+'px;text-align:center;line-height:1.3;overflow:hidden;height:100%;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;align-items:center;justify-content:center;word-break:break-word">'+t+'</div></foreignObject></g>'}
+  function bx(x,y,w,h,t,fs){return'<g><rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="5" fill="#fff" stroke="#444" stroke-width="1.5"/><foreignObject x="'+(x+3)+'" y="'+(y+1)+'" width="'+(w-6)+'" height="'+(h-2)+'"><div xmlns="http://www.w3.org/1999/xhtml" style="font-size:'+(fs||11)+'px;text-align:center;line-height:1.35;overflow:hidden;width:100%;height:100%;display:flex;align-items:center;justify-content:center;word-break:break-word"><span style="display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;text-overflow:ellipsis">'+t+'</span></div></foreignObject></g>'}
   var s='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+W+' '+H+'" width="100%" style="font-family:Sarabun,sans-serif;display:block;max-width:100%;height:auto">';
   s+='<defs><marker id="la" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="#555"/></marker><marker id="lr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="#444"/></marker></defs>';
   s+='<rect x="0" y="0" width="'+W+'" height="'+(5*TRH)+'" fill="#d6e4ee"/>';
@@ -234,8 +234,8 @@ function bLinkageSVG(fd){
   s+='<text x="8" y="'+(fY+46)+'" font-size="9" fill="#c0392b">กระบวนการหลัก</text>';
   ln.forEach(function(l){s+='<line x1="'+l.x1+'" y1="'+l.y1+'" x2="'+l.x2+'" y2="'+l.y2+'" stroke="#555" stroke-width="1.2" marker-end="url(#la)"/>'});
   ss.forEach(function(st,i){var x=cX(i)-BW/2,y=fY+(FSH-BH)/2;s+=bx(x,y,BW,BH,st);if(i<ss.length-1)s+='<line x1="'+(x+BW+2)+'" y1="'+(y+BH/2)+'" x2="'+(cX(i+1)-BW/2-2)+'" y2="'+(y+BH/2)+'" stroke="#444" stroke-width="1.5" marker-end="url(#lr)"/>'});
-  cc.forEach(function(i){s+=bx(cX(i)-BW/2,uY+(UAH-BH)/2,BW,BH,cm[i].unsafeAct||cm[i].problem||'',9)});
-  [5,4,3,2,1].forEach(function(n){(tp[n]||[]).forEach(function(t){s+=bx(cX(t.col)-BW/2,tY(n)+(TRH-BH)/2,BW,BH,gTx(t),9)})});
+  cc.forEach(function(i){s+=bx(cX(i)-BW/2,uY+(UAH-BH)/2,BW,BH,cm[i].unsafeAct||cm[i].problem||'')});
+  [5,4,3,2,1].forEach(function(n){(tp[n]||[]).forEach(function(t){s+=bx(cX(t.col)-BW/2,tY(n)+(TRH-BH)/2,BW,BH,gTx(t))})});
   s+='</svg>';return s;
 }
 
@@ -562,7 +562,7 @@ function LinkageDiagram({fd}){
   [5,4,3,2,1].forEach(n=>{(tp[n]||[]).forEach(t=>{const tgt=findTarget(t,n);if(tgt)ln.push({x1:cX(t.col),y1:tY(n)+TRH/2+BH/2,x2:tgt.x,y2:tgt.y})})});
   const TL={5:{n:'Tier 5',s:['สังคม/นอกองค์กร']},4:{n:'Tier 4',s:['การบริหารจัดการ','นโยบาย']},3:{n:'Tier 3',s:['สวล.,ข้อมูล','ระบบ']},2:{n:'Tier 2',s:['ลักษณะงาน','ทีม']},1:{n:'Tier 1',s:['ผู้ป่วย','บุคลากร']}};
   // Render helper for boxes with text
-  const bx=(x,y,w,h,t,fs)=><g><rect x={x} y={y} width={w} height={h} rx={5} fill="#fff" stroke="#444" strokeWidth={1.5}/><foreignObject x={x+3} y={y+2} width={w-6} height={h-4}><div style={{fontSize:fs||10,textAlign:'center',lineHeight:'1.3',overflow:'hidden',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',wordBreak:'break-word',WebkitLineClamp:4,WebkitBoxOrient:'vertical',display:'-webkit-box'}}>{t}</div></foreignObject></g>;
+  const bx=(x,y,w,h,t,fs)=><g><rect x={x} y={y} width={w} height={h} rx={5} fill="#fff" stroke="#444" strokeWidth={1.5}/><foreignObject x={x+3} y={y+1} width={w-6} height={h-2}><div style={{fontSize:fs||11,textAlign:'center',lineHeight:'1.35',overflow:'hidden',width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',wordBreak:'break-word'}}><span style={{display:'-webkit-box',WebkitLineClamp:4,WebkitBoxOrient:'vertical',overflow:'hidden',textOverflow:'ellipsis'}}>{t}</span></div></foreignObject></g>;
   return<div style={{overflowX:'auto',margin:'8px 0',border:'1px solid var(--border)',borderRadius:8,background:'#fff'}}>
     <svg width={W} height={H} style={{fontFamily:'Sarabun,Noto Sans Thai,sans-serif',display:'block'}}>
       <defs><marker id="la" viewBox="0 0 10 10" refX={9} refY={5} markerWidth={6} markerHeight={6} orient="auto"><path d="M0 0L10 5L0 10z" fill="#555"/></marker><marker id="lr" viewBox="0 0 10 10" refX={9} refY={5} markerWidth={6} markerHeight={6} orient="auto"><path d="M0 0L10 5L0 10z" fill="#444"/></marker></defs>
@@ -590,9 +590,9 @@ function LinkageDiagram({fd}){
       {/* Flow step boxes with arrows between them */}
       {ss.map((s,i)=>{const x=cX(i)-BW/2,y=fY+(FSH-BH)/2;return<g key={`f${i}`}>{bx(x,y,BW,BH,s)}{i<ss.length-1&&<line x1={x+BW+2} y1={y+BH/2} x2={cX(i+1)-BW/2-2} y2={y+BH/2} stroke="#444" strokeWidth={1.5} markerEnd="url(#lr)"/>}</g>})}
       {/* CMP / Unsafe Act boxes */}
-      {cc.map(i=><React.Fragment key={`c${i}`}>{bx(cX(i)-BW/2,uY+(UAH-BH)/2,BW,BH,cm[i].unsafeAct||cm[i].problem||'',9)}</React.Fragment>)}
+      {cc.map(i=><React.Fragment key={`c${i}`}>{bx(cX(i)-BW/2,uY+(UAH-BH)/2,BW,BH,cm[i].unsafeAct||cm[i].problem||'')}</React.Fragment>)}
       {/* Tier factor boxes */}
-      {[5,4,3,2,1].map(n=>(tp[n]||[]).map((t,j)=><React.Fragment key={`t${n}${j}`}>{bx(cX(t.col)-BW/2,tY(n)+(TRH-BH)/2,BW,BH,gTx(t),9)}</React.Fragment>))}
+      {[5,4,3,2,1].map(n=>(tp[n]||[]).map((t,j)=><React.Fragment key={`t${n}${j}`}>{bx(cX(t.col)-BW/2,tY(n)+(TRH-BH)/2,BW,BH,gTx(t))}</React.Fragment>))}
     </svg>
   </div>;
 }

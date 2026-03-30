@@ -196,12 +196,12 @@ function bLinkageSVG(fd){
   var ss=(fd.flowSteps||[]).filter(function(s){return s.trim()});
   var cmps=(fd.cmps||[]).filter(function(c){return c.step||c.problem||c.unsafeAct});
   if(!ss.length)return'<p style="color:#999">ยังไม่มีข้อมูล Flow of Steps</p>';
-  var cols=ss.length,LW=130,CW=Math.max(110,Math.min(150,750/cols)),BW=CW-18,BH=56,TRH=76,UAH=76,FSH=76;
+  var cols=ss.length,LW=130,CW=Math.max(130,Math.min(170,850/cols)),BW=CW-14,BH=74,TRH=94,UAH=94,FSH=94;
   var W=LW+cols*CW+10,H=5*TRH+UAH+FSH;
   function tY(n){return(5-n)*TRH}var uY=5*TRH,fY=uY+UAH;
   function cX(i){return LW+i*CW+CW/2}
   function gT(n){var r=[];(fd.ta||[]).forEach(function(t,i){if(!t.en||TD[i].tier!==n)return;(t.entries||[]).forEach(function(e){if(e.desc||(e.ck||[]).length>0||(e.oc&&e.ot)){var o={};for(var k in e)o[k]=e[k];o.info=TD[i];r.push(o)}})});return r}
-  function gTx(t){var ck=(t.ck||[]).slice();if(t.oc&&t.ot)ck.push(t.ot);if(t.desc)return t.desc.length>45?t.desc.slice(0,45)+'…':t.desc;return ck.length?(ck.length>2?ck.slice(0,2).join(', ')+'…':ck.join(', ')):''}
+  function gTx(t){var ck=(t.ck||[]).slice();if(t.oc&&t.ot)ck.push(t.ot);var parts=[];if(ck.length)parts.push(ck.join(', '));if(t.desc)parts.push(t.desc);return parts.join(' ')||''}
   var cm={};cmps.forEach(function(c){var i=ss.indexOf(c.step);if(i>=0)cm[i]=c});
   var cc=Object.keys(cm).map(Number);
   function resCol(e){if(!e.linkedTo)return-1;if(e.linkedTo.type==='cmp'){var c=(fd.cmps||[])[e.linkedTo.index];return c?ss.indexOf(c.step):-1}if(e.linkedTo.type==='tier'){var tt=null;(fd.ta||[]).forEach(function(x){if(x.id===e.linkedTo.tierId)tt=x});var te=tt&&tt.entries?tt.entries[e.linkedTo.entryIndex]:null;return te?resCol(te):-1}return-1}
@@ -530,13 +530,13 @@ function LinkageDiagram({fd}){
   const ss=(fd.flowSteps||[]).filter(s=>s.trim());
   const cmps=(fd.cmps||[]).filter(c=>c.step||c.problem||c.unsafeAct);
   if(!ss.length)return<div style={{color:'var(--text-light)',fontSize:13,padding:'8px 12px',background:'#f8f9fa',borderRadius:6}}>ยังไม่มีข้อมูล Flow of Steps จากตอนที่ 2</div>;
-  const cols=ss.length,LW=130,CW=Math.max(120,Math.min(165,800/cols)),BW=CW-20,BH=60,TRH=80,UAH=80,FSH=80;
+  const cols=ss.length,LW=130,CW=Math.max(140,Math.min(180,900/cols)),BW=CW-16,BH=78,TRH=98,UAH=98,FSH=98;
   const W=LW+cols*CW+10,H=5*TRH+UAH+FSH;
   const tY=n=>(5-n)*TRH,uY=5*TRH,fY=uY+UAH,cX=i=>LW+i*CW+CW/2;
   // Get active tier entries for a tier number (flattened from entries)
   const gT=n=>{const r=[];(fd.ta||[]).forEach((t,i)=>{if(!t.en||TD[i].tier!==n)return;(t.entries||[]).forEach(e=>{if(e.desc||(e.ck||[]).length>0||(e.oc&&e.ot))r.push({...e,info:TD[i]})})});return r};
-  // Get display text for a tier entry (from checked factors or description)
-  const gTx=t=>{const ck=[...(t.ck||[])];if(t.oc&&t.ot)ck.push(t.ot);if(t.desc)return t.desc.length>50?t.desc.slice(0,50)+'…':t.desc;return ck.length?(ck.length>2?ck.slice(0,2).join(', ')+'…':ck.join(', ')):''};
+  // Get display text for a tier entry: factors first, then description
+  const gTx=t=>{const ck=[...(t.ck||[])];if(t.oc&&t.ot)ck.push(t.ot);const parts=[];if(ck.length)parts.push(ck.join(', '));if(t.desc)parts.push(t.desc);return parts.join(' ')||''};
   // Map CMPs to step column indices
   const cm={};cmps.forEach(c=>{const i=ss.indexOf(c.step);if(i>=0)cm[i]=c});
   const cc=Object.keys(cm).map(Number);

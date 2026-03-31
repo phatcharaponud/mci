@@ -61,18 +61,18 @@ function doGet(e) {
   }
 }
 
-// POST = บันทึกข้อมูล หรือ รับ Line Webhook
+// POST = บันทึกข้อมูล RCA
 function doPost(e) {
   try {
     var body = e.postData.contents;
     var parsed = JSON.parse(body);
 
-    // ===== ตรวจว่าเป็น Line Webhook Event หรือไม่ =====
+    // ถ้าเป็น Line Webhook event ให้ข้ามไป (GAS ไม่รองรับ Webhook 200 OK)
     if (parsed.events && Array.isArray(parsed.events)) {
-      return handleLineWebhook(parsed);
+      return ContentService.createTextOutput(JSON.stringify({ status: 'ok' })).setMimeType(ContentService.MimeType.JSON);
     }
 
-    // ===== ปกติ = บันทึกข้อมูล RCA =====
+    // ปกติ = บันทึกข้อมูล RCA
     var sheet = getOrCreateSheet();
     var records = parsed;
 
@@ -109,75 +109,105 @@ function doPost(e) {
 }
 
 // ===== Line Webhook Handler =====
-// รับ event จาก Line แล้วบันทึก Group ID / User ID อัตโนมัติ
-// วิธีใช้:
-// 1. Deploy Apps Script เป็น Web App (Anyone can access)
-// 2. คัดลอก URL ไปใส่ที่ Line Developers > Messaging API > Webhook URL
-// 3. เชิญ Bot เข้ากลุ่ม Line หรือพิมพ์ข้อความหา Bot
-// 4. ดูผลที่ Sheet "Line_IDs" จะเห็น Group ID / User ID อัตโนมัติ
-function handleLineWebhook(data) {
+// หมายเหตุ: Google Apps Script Web App ตอบ 302 redirect ซึ่ง Line Webhook
+// ต้องการ 200 OK ตรงๆ ดังนั้น Webhook verify จะ error
+// แต่ Line ยังส่ง event มาได้ (แค่ verify ไม่ผ่าน)
+// ถ้าต้องการ Webhook ที่ verify ผ่าน ใช้ Cloud Functions หรือ Heroku แทน
+//
+// === วิธีรับ Group ID แบบไม่ต้องใช้ Webhook ===
+// 1. ใส่ LINE_TOKEN ด้านล่าง
+// 2. เชิญ Bot เข้ากลุ่ม Line
+// 3. รันฟังก์ชัน getGroupIdFromRecentChats() จาก Apps Script Editor
+// 4. ดูผลที่ Sheet "Line_IDs"
+
+// ดึง Group ID จาก Bot ที่เข้าร่วมกลุ่มอยู่
+function getGroupIdFromRecentChats() {
+  if (!LINE_TOKEN) {
+    Logger.log('ERROR: กรุณาใส่ LINE_TOKEN ก่อน');
+    return;
+  }
+
+  // ใช้ Line Get Bot Info API เพื่อตรวจว่า Bot ทำงานได้
+  try {
+    var res = UrlFetchApp.fetch('https://api.line.me/v2/bot/info', {
+      headers: { 'Authorization': 'Bearer ' + LINE_TOKEN }
+    });
+    var botInfo = JSON.parse(res.getContentText());
+    Logger.log('Bot: ' + botInfo.displayName + ' (userId: ' + botInfo.userId + ')');
+  } catch(err) {
+    Logger.log('ERROR: LINE_TOKEN ไม่ถูกต้อง - ' + err.message);
+    return;
+  }
+
+  Logger.log('');
+  Logger.log('=== วิธีรับ Group ID ===');
+  Logger.log('1. เชิญ Bot เข้ากลุ่ม Line ที่ต้องการ');
+  Logger.log('2. ในกลุ่ม เปิด URL นี้ในเบราว์เซอร์มือถือ:');
+  Logger.log('   line://nv/chat');
+  Logger.log('3. หรือใช้วิธีดังนี้:');
+  Logger.log('');
+  Logger.log('วิธีง่ายที่สุด: ใส่ Group ID ด้วยตนเอง');
+  Logger.log('- เปิด LINE Official Account Manager (manager.line.biz)');
+  Logger.log('- ไปที่ Chat > เลือกกลุ่ม > ดู URL จะมี Group ID');
+  Logger.log('');
+  Logger.log('หรือ: ใช้ LIFF URL ด้านล่างเปิดในกลุ่ม แล้วกรอก Group ID ด้วยตนเอง');
+  Logger.log('');
+  Logger.log('Bot User ID ของคุณ: ' + botInfo.userId);
+  Logger.log('นำ User ID นี้ไปใส่ LINE_GROUP_ID ได้ ถ้าต้องการแจ้งเตือนแชทส่วนตัว');
+
+  // บันทึก Bot User ID ลง Sheet
+  saveLineId('user', botInfo.userId, botInfo.displayName + ' (Bot)');
+}
+
+// บันทึก Group ID ด้วยตนเอง - รันจาก Apps Script แล้วแก้ ID
+function saveGroupIdManually() {
+  // ===== แก้ไข Group ID ตรงนี้ =====
+  var groupId = '';  // ← ใส่ Group ID ที่ได้จาก LINE OA Manager
+  var groupName = 'ทีม RCA'; // ← ใส่ชื่อกลุ่ม
+  // ==================================
+
+  if (!groupId) {
+    Logger.log('กรุณาใส่ groupId ในฟังก์ชัน saveGroupIdManually() ก่อนรัน');
+    return;
+  }
+  saveLineId('group', groupId, groupName);
+  Logger.log('บันทึก Group ID เรียบร้อย: ' + groupId);
+  Logger.log('นำ ID นี้ไปใส่ที่ LINE_GROUP_ID ด้านบน');
+}
+
+function saveLineId(type, id, label) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName('Line_IDs');
   if (!sheet) {
     sheet = ss.insertSheet('Line_IDs');
-    sheet.getRange('A1:E1').setValues([['ประเภท', 'ID', 'ชื่อ', 'วันที่พบ', 'Event Type']]);
-    sheet.getRange('A1:E1').setFontWeight('bold').setBackground('#06c755').setFontColor('#fff');
+    sheet.getRange('A1:D1').setValues([['ประเภท', 'ID', 'ชื่อ', 'วันที่บันทึก']]);
+    sheet.getRange('A1:D1').setFontWeight('bold').setBackground('#06c755').setFontColor('#fff');
     sheet.setFrozenRows(1);
     sheet.setColumnWidth(2, 350);
   }
-
-  var events = data.events || [];
-  for (var i = 0; i < events.length; i++) {
-    var ev = events[i];
-    var src = ev.source || {};
-    var type = src.type || ''; // user, group, room
-    var id = '';
-    var label = '';
-
-    if (src.groupId) {
-      type = 'group';
-      id = src.groupId;
-      label = 'กลุ่ม Line';
-      // ดึงชื่อกลุ่มถ้าได้ (ต้องมี LINE_TOKEN)
-      if (LINE_TOKEN) {
-        try {
-          var res = UrlFetchApp.fetch('https://api.line.me/v2/bot/group/' + id + '/summary', {
-            headers: { 'Authorization': 'Bearer ' + LINE_TOKEN }
-          });
-          var info = JSON.parse(res.getContentText());
-          if (info.groupName) label = info.groupName;
-        } catch(err) {}
-      }
-    } else if (src.userId) {
-      type = 'user';
-      id = src.userId;
-      label = 'ผู้ใช้';
-      if (LINE_TOKEN) {
-        try {
-          var res2 = UrlFetchApp.fetch('https://api.line.me/v2/bot/profile/' + id, {
-            headers: { 'Authorization': 'Bearer ' + LINE_TOKEN }
-          });
-          var info2 = JSON.parse(res2.getContentText());
-          if (info2.displayName) label = info2.displayName;
-        } catch(err) {}
-      }
-    }
-
-    if (id) {
-      // เช็คว่ามี ID นี้ในตารางแล้วหรือยัง
-      var existing = sheet.getRange(2, 2, Math.max(sheet.getLastRow() - 1, 1), 1).getValues();
-      var found = false;
-      for (var j = 0; j < existing.length; j++) {
-        if (existing[j][0] === id) { found = true; break; }
-      }
-      if (!found) {
-        sheet.appendRow([type, id, label, new Date().toISOString(), ev.type]);
-        Logger.log('New Line ID saved: ' + type + ' = ' + id + ' (' + label + ')');
-      }
+  // เช็คซ้ำ
+  var lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    var existing = sheet.getRange(2, 2, lastRow - 1, 1).getValues();
+    for (var i = 0; i < existing.length; i++) {
+      if (existing[i][0] === id) { Logger.log('ID นี้มีอยู่แล้ว'); return; }
     }
   }
+  sheet.appendRow([type, id, label, new Date().toISOString()]);
+}
 
-  return ContentService.createTextOutput(JSON.stringify({ status: 'ok' })).setMimeType(ContentService.MimeType.JSON);
+// ส่งข้อความทดสอบหา User ID ของตัวเอง (แชทส่วนตัว)
+function testSendToMyself() {
+  if (!LINE_TOKEN) { Logger.log('ใส่ LINE_TOKEN ก่อน'); return; }
+  try {
+    var res = UrlFetchApp.fetch('https://api.line.me/v2/bot/info', {
+      headers: { 'Authorization': 'Bearer ' + LINE_TOKEN }
+    });
+    var botInfo = JSON.parse(res.getContentText());
+    Logger.log('Bot OK: ' + botInfo.displayName);
+  } catch(err) {
+    Logger.log('LINE_TOKEN ผิด: ' + err.message);
+  }
 }
 
 // ฟังก์ชันทดสอบ - รันจาก Apps Script Editor เพื่อเช็คว่า Sheet ทำงานปกติ

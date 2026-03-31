@@ -195,7 +195,7 @@ async function cloudSave(data){if(!GAS_URL)return false;try{await fetch(GAS_URL,
 function loadSch(){try{return JSON.parse(localStorage.getItem('rca_schedules')||'[]')}catch{return[]}}
 function saveSch(l){localStorage.setItem('rca_schedules',JSON.stringify(l))}
 function schId(){return'SCH-'+Date.now().toString(36).toUpperCase()}
-async function cloudLoadSch(){if(!GAS_URL)return null;try{const r=await fetch(GAS_URL+'?action=schedules');const t=await r.text();try{const d=JSON.parse(t);return Array.isArray(d)?d:null}catch{return null}}catch{return null}}
+async function cloudLoadSch(){if(!GAS_URL)return null;try{const r=await fetch(GAS_URL+'?action=schedules');const t=await r.text();try{const d=JSON.parse(t);if(!Array.isArray(d))return null;return d.map(s=>({...s,rcaDate:s.rcaDate?(s.rcaDate+'').slice(0,10):'',rcaTime:s.rcaTime?(/^\d{2}:\d{2}/.test(s.rcaTime)?s.rcaTime:(/T(\d{2}:\d{2})/.test(s.rcaTime+'')?(s.rcaTime+'').match(/T(\d{2}:\d{2})/)[1]:'')):''}))}catch{return null}}catch{return null}}
 async function cloudSaveSch(data){if(!GAS_URL)return false;try{await fetch(GAS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'schedules',data:data})});return true}catch{return false}}
 
 // Generate linkage diagram SVG string for export

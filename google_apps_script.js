@@ -202,7 +202,7 @@ function testSetup() {
 //    - Time: 08:00 - 09:00
 // =====================================================
 
-var LINE_TOKEN = ''; // ← ใส่ Line Messaging API Channel Access Token
+var LINE_TOKEN = 'sidmkdnSpNFg9k1jR0lv13viC+EfieglA5y3kxCecBcu77L47t8Edx3cOR7Sb+etgPaOGBXgXda7uXYg87/wmdw+4M2pfPa6p0Fpm8qw08uIlWd0daRt6ynK649TkklPmWKJ+JRZL/gsECnfH8ZD1QdB04t89/1O/w1cDnyilFU='; // ← ใส่ Line Messaging API Channel Access Token
 var LINE_GROUP_ID = ''; // ← ใส่ Group ID หรือ User ID ที่ต้องการแจ้งเตือน
 var SCHEDULE_SHEET = 'RCA_Schedule';
 

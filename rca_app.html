@@ -191,6 +191,11 @@ const GAS_URL='https://script.google.com/macros/s/AKfycbw99ZlV1OaTqG1Mp5C_Xc0Bnv
 async function cloudLoad(){if(!GAS_URL)return null;try{const r=await fetch(GAS_URL);const t=await r.text();try{const d=JSON.parse(t);return Array.isArray(d)?d:null}catch{return null}}catch(e){console.error('Cloud load:',e);return null}}
 async function cloudSave(data){if(!GAS_URL)return false;try{await fetch(GAS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(data)});return true}catch(e){console.error('Cloud save:',e);return false}}
 
+// Schedule (RCA Calendar) storage
+function loadSch(){try{return JSON.parse(localStorage.getItem('rca_schedules')||'[]')}catch{return[]}}
+function saveSch(l){localStorage.setItem('rca_schedules',JSON.stringify(l))}
+function schId(){return'SCH-'+Date.now().toString(36).toUpperCase()}
+
 // Generate linkage diagram SVG string for export
 function bLinkageSVG(fd){
   var ss=(fd.flowSteps||[]).filter(function(s){return s.trim()});
@@ -287,7 +292,8 @@ ${fmt==='pdf'?'<script>setTimeout(()=>window.print(),600)<\/script>':''}
 
 // APP
 function App(){
-  const[nav,sN]=useState('form'),[rl,sRL]=useState(loadL),[ci,sCI]=useState(null),[fd,sFD]=useState({...DF,ta:mkTD()}),[toast,sT]=useState(null),[sync,sSync]=useState(''),[sbCol,sSbCol]=useState(false);
+  const[nav,sN]=useState('form'),[rl,sRL]=useState(loadL),[ci,sCI]=useState(null),[fd,sFD]=useState({...DF,ta:mkTD()}),[toast,sT]=useState(null),[sync,sSync]=useState(''),[sbCol,sSbCol]=useState(false),[sch,sSch]=useState(loadSch);
+  useEffect(()=>{saveSch(sch)},[sch]);
   const skipSync=useRef(true),cloudTimer=useRef(null);
   useEffect(()=>{saveL(rl);if(!GAS_URL||skipSync.current)return;clearTimeout(cloudTimer.current);cloudTimer.current=setTimeout(()=>{sSync('saving');cloudSave(rl).then(ok=>{sSync(ok?'ok':'error');setTimeout(()=>sSync(''),3000)})},2000)},[rl]);
   useEffect(()=>{if(!GAS_URL){skipSync.current=false;return}sSync('loading');cloudLoad().then(d=>{if(d&&d.length>0){sRL(d);saveL(d)}sSync('ok');setTimeout(()=>{sSync('');skipSync.current=false},800)}).catch(()=>{sSync('error');skipSync.current=false})},[]);
@@ -309,6 +315,7 @@ function App(){
           <div className={`ni ${nav==='form'?'ac':''}`} onClick={()=>sN('form')}><span className="ni-i">📋</span><span>แบบฟอร์ม RCA</span></div>
           <div className={`ni ${nav==='list'?'ac':''}`} onClick={()=>sN('list')}><span className="ni-i">📁</span><span>รายการ RCA</span>{rl.length>0&&<span className="ni-b">{rl.length}</span>}</div>
           <div className="ns">เครื่องมือ</div>
+          <div className={`ni ${nav==='cal'?'ac':''}`} onClick={()=>sN('cal')}><span className="ni-i">📅</span><span>ปฏิทินกำหนด RCA</span></div>
           <div className={`ni ${nav==='kb'?'ac':''}`} onClick={()=>sN('kb')}><span className="ni-i">📚</span><span>ความรู้ RCA</span></div>
           <div className="ns">รายงาน</div>
           <div className={`ni ${nav==='db'?'ac':''}`} onClick={()=>sN('db')}><span className="ni-i">📊</span><span>Dashboard</span></div>
@@ -319,7 +326,7 @@ function App(){
       </div>
       <div className="mc">
         <div className="ch">
-          <h2>{nav==='form'?'📋 แบบฟอร์มบันทึก RCA':nav==='list'?'📁 รายการ RCA':nav==='kb'?'📚 ความรู้ RCA':'📊 Dashboard'}</h2>
+          <h2>{nav==='form'?'📋 แบบฟอร์มบันทึก RCA':nav==='list'?'📁 รายการ RCA':nav==='cal'?'📅 ปฏิทินกำหนดทำ RCA':nav==='kb'?'📚 ความรู้ RCA':'📊 Dashboard'}</h2>
           <div className="ha">
             {GAS_URL?<>{sync==='loading'&&<span style={{fontSize:12,color:'#2980b9',whiteSpace:'nowrap'}}>🔄 โหลด...</span>}{sync==='saving'&&<span style={{fontSize:12,color:'#e67e22',whiteSpace:'nowrap'}}>💾 Sync...</span>}{sync==='ok'&&<span style={{fontSize:12,color:'#27ae60',whiteSpace:'nowrap'}}>✅ Synced</span>}{sync==='error'&&<span style={{fontSize:12,color:'#e74c3c',whiteSpace:'nowrap'}}>❌ Error</span>}<button className="btn btn-o btn-sm" onClick={hRefresh} title="โหลดข้อมูลจาก Cloud">🔄</button></>:<span style={{fontSize:11,color:'#856404',background:'#fff3cd',padding:'4px 10px',borderRadius:4,whiteSpace:'nowrap'}}>⚠️ Offline - ไม่ได้เชื่อม Cloud</span>}
             {nav==='form'&&<><button className="btn btn-o btn-sm" onClick={hNew}>➕ ใหม่</button><button className="btn btn-p btn-sm" onClick={hSave}>💾 บันทึก</button><button className="btn btn-w btn-sm" onClick={()=>hExp('pdf')}>📄 PDF</button><button className="btn btn-s btn-sm" onClick={()=>hExp('word')}>📝 Word</button></>}
@@ -329,6 +336,7 @@ function App(){
         <div className="cb">
           {nav==='form'&&<FormV fd={fd} sFD={sFD} uf={uf}/>}
           {nav==='list'&&<ListV rl={rl} onL={hLoad} onN={hNew} sRL={sRL}/>}
+          {nav==='cal'&&<CalV sch={sch} sSch={sSch} st={st}/>}
           {nav==='kb'&&<KBV/>}
           {nav==='db'&&<DBV stats={stats} rl={rl}/>}
         </div>
@@ -647,6 +655,83 @@ function TC({tier,idx,td,hd,fd,uT,uTE,tTCE,aTE,rTE}){
 function ListV({rl,onL,onN,sRL}){
   if(!rl.length)return<div style={{textAlign:'center',padding:60,color:'var(--text-light)'}}><div style={{fontSize:48}}>📋</div><div style={{fontSize:16,fontWeight:600,marginTop:8}}>ยังไม่มี RCA</div><button className="btn btn-p" style={{marginTop:16}} onClick={onN}>➕ สร้างใหม่</button></div>;
   return<table className="rlt"><thead><tr><th>รหัส</th><th>เรื่อง</th><th>หน่วยงาน</th><th>วันที่</th><th>ระดับ</th><th>HRMS</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody>{rl.map(r=><tr key={r.id}><td style={{fontWeight:600,color:'var(--primary)'}}>{r.id}</td><td>{r.title||'-'}</td><td>{r.department||'-'}</td><td>{r.date||'-'}</td><td>{r.sevL||'-'}{r.sevN?'/'+r.sevN:''}</td><td>{r.hrms?<span className="stb sth">✅</span>:<span style={{color:'var(--accent)'}}>❌</span>}</td><td><span className={`stb ${r.followUpStatus==='completed'?'stc':'std'}`}>{r.followUpStatus==='completed'?'เสร็จ':r.followUpStatus==='in_progress'?'ดำเนินการ':'รอ'}</span></td><td><button className="btn btn-sm btn-p" onClick={()=>onL(r)}>เปิด</button></td></tr>)}</tbody></table>;
+}
+
+// CALENDAR
+function CalV({sch,sSch,st}){
+  const[cM,sCM]=useState(()=>{const n=new Date();return{y:n.getFullYear(),m:n.getMonth()}});
+  const[showForm,sSF]=useState(false);
+  const[editId,sEI]=useState(null);
+  const[f,sF]=useState({title:'',department:'',rcaDate:'',rcaTime:'',location:''});
+  const daysInMonth=new Date(cM.y,cM.m+1,0).getDate();
+  const firstDay=new Date(cM.y,cM.m,1).getDay();
+  const mNames=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+  const prevM=()=>sCM(p=>p.m===0?{y:p.y-1,m:11}:{y:p.y,m:p.m-1});
+  const nextM=()=>sCM(p=>p.m===11?{y:p.y+1,m:0}:{y:p.y,m:p.m+1});
+  const pad=n=>String(n).padStart(2,'0');
+  const getEvt=d=>{const ds=`${cM.y}-${pad(cM.m+1)}-${pad(d)}`;return sch.filter(s=>s.rcaDate===ds)};
+  const openNew=(d)=>{const ds=d?`${cM.y}-${pad(cM.m+1)}-${pad(d)}`:'';sEI(null);sF({title:'',department:'',rcaDate:ds,rcaTime:'',location:''});sSF(true)};
+  const openEdit=(s)=>{sEI(s.id);sF({title:s.title,department:s.department,rcaDate:s.rcaDate,rcaTime:s.rcaTime,location:s.location});sSF(true)};
+  const hSave=()=>{if(!f.title||!f.rcaDate)return st('⚠️ กรุณาระบุเรื่องและวันที่');if(editId){sSch(p=>p.map(s=>s.id===editId?{...s,...f}:s))}else{sSch(p=>[...p,{id:schId(),...f,createdAt:new Date().toISOString()}])}sSF(false);st('✅ บันทึกกำหนดการ RCA เรียบร้อย')};
+  const hDel=(id)=>{if(confirm('ลบกำหนดการนี้?'))sSch(p=>p.filter(s=>s.id!==id))};
+  const today=new Date();const todayStr=`${today.getFullYear()}-${pad(today.getMonth()+1)}-${pad(today.getDate())}`;
+  // Upcoming schedules
+  const upcoming=sch.filter(s=>s.rcaDate>=todayStr).sort((a,b)=>a.rcaDate.localeCompare(b.rcaDate)).slice(0,5);
+  const days=[];for(let i=0;i<firstDay;i++)days.push(null);for(let d=1;d<=daysInMonth;d++)days.push(d);
+  return<div>
+    {/* Upcoming */}
+    <div className="fc" style={{marginBottom:16}}><div className="fch" style={{background:'linear-gradient(135deg,#e67e22,#f39c12)'}}>📅 กำหนดการ RCA ที่จะถึง</div><div className="fcb">
+      {upcoming.length===0?<div style={{color:'var(--text-light)',fontSize:13,padding:8}}>ไม่มีกำหนดการที่จะถึง</div>:
+      <div style={{display:'flex',flexDirection:'column',gap:8}}>{upcoming.map(s=><div key={s.id} style={{background:'#fff8e1',border:'1px solid #ffc107',borderRadius:8,padding:12,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <div><strong style={{color:'var(--primary)',fontSize:13}}>{s.title}</strong><div style={{fontSize:12,color:'var(--text-light)',marginTop:2}}>{s.department} | {s.rcaDate} {s.rcaTime?'เวลา '+s.rcaTime:''} {s.location?'| '+s.location:''}</div></div>
+        <div style={{display:'flex',gap:4}}><button className="btn btn-sm btn-p" onClick={()=>openEdit(s)}>แก้ไข</button><button className="btn btn-sm btn-d" onClick={()=>hDel(s.id)}>ลบ</button></div>
+      </div>)}</div>}
+    </div></div>
+    {/* Calendar grid */}
+    <div className="fc"><div className="fch" style={{justifyContent:'space-between'}}>
+      <button className="btn btn-sm" style={{background:'rgba(255,255,255,0.2)',color:'#fff',border:'none'}} onClick={prevM}>◀ ก่อนหน้า</button>
+      <span style={{fontWeight:700}}>{mNames[cM.m]} {cM.y+543} (ค.ศ. {cM.y})</span>
+      <button className="btn btn-sm" style={{background:'rgba(255,255,255,0.2)',color:'#fff',border:'none'}} onClick={nextM}>ถัดไป ▶</button>
+    </div><div className="fcb">
+      <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:2,textAlign:'center',marginBottom:8}}>
+        {['อา','จ','อ','พ','พฤ','ศ','ส'].map(d=><div key={d} style={{fontWeight:700,fontSize:12,color:'var(--primary)',padding:6}}>{d}</div>)}
+        {days.map((d,i)=>{if(!d)return<div key={`e${i}`}/>;const evts=getEvt(d);const isToday=`${cM.y}-${pad(cM.m+1)}-${pad(d)}`===todayStr;
+          return<div key={d} onClick={()=>openNew(d)} style={{padding:4,minHeight:60,border:'1px solid #eee',borderRadius:6,cursor:'pointer',background:isToday?'#e3f2fd':'#fff',position:'relative',transition:'background 0.15s'}} onMouseOver={e=>e.currentTarget.style.background='#f0f3f7'} onMouseOut={e=>e.currentTarget.style.background=isToday?'#e3f2fd':'#fff'}>
+            <div style={{fontSize:12,fontWeight:isToday?700:400,color:isToday?'var(--primary)':'var(--text)'}}>{d}</div>
+            {evts.map(ev=><div key={ev.id} onClick={e=>{e.stopPropagation();openEdit(ev)}} style={{fontSize:9,background:'var(--accent-warm)',color:'#fff',borderRadius:3,padding:'1px 4px',marginTop:2,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis',cursor:'pointer'}} title={ev.title}>{ev.title}</div>)}
+          </div>})}
+      </div>
+      <button className="btn btn-p" onClick={()=>openNew(null)}>+ เพิ่มกำหนดการ RCA</button>
+    </div></div>
+    {/* Form modal */}
+    {showForm&&<div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:300}} onClick={()=>sSF(false)}>
+      <div style={{background:'#fff',borderRadius:12,padding:24,width:480,maxWidth:'90vw',boxShadow:'0 8px 32px rgba(0,0,0,0.2)'}} onClick={e=>e.stopPropagation()}>
+        <h3 style={{fontSize:16,fontWeight:700,color:'var(--primary)',marginBottom:16}}>{editId?'แก้ไขกำหนดการ':'เพิ่มกำหนดการ RCA'}</h3>
+        <div className="fg"><label className="fl">หัวข้อเรื่อง <span className="rq">*</span></label><input className="fi" value={f.title} onChange={e=>sF(p=>({...p,title:e.target.value}))} placeholder="ระบุหัวข้อเรื่อง RCA"/></div>
+        <div className="fg"><label className="fl">หน่วยงานที่เกี่ยวข้อง</label><input className="fi" value={f.department} onChange={e=>sF(p=>({...p,department:e.target.value}))} placeholder="ระบุหน่วยงาน"/></div>
+        <div className="fr">
+          <div className="fg"><label className="fl">วันที่ (ปี ค.ศ.) <span className="rq">*</span></label><input className="fi" type="date" value={f.rcaDate} onChange={e=>sF(p=>({...p,rcaDate:e.target.value}))}/></div>
+          <div className="fg"><label className="fl">เวลา</label><input className="fi" type="time" value={f.rcaTime} onChange={e=>sF(p=>({...p,rcaTime:e.target.value}))}/></div>
+        </div>
+        <div className="fg"><label className="fl">สถานที่</label><input className="fi" value={f.location} onChange={e=>sF(p=>({...p,location:e.target.value}))} placeholder="ระบุสถานที่"/></div>
+        <div style={{display:'flex',gap:8,marginTop:16,justifyContent:'flex-end'}}>
+          <button className="btn btn-o" onClick={()=>sSF(false)}>ยกเลิก</button>
+          <button className="btn btn-p" onClick={hSave}>💾 บันทึก</button>
+        </div>
+      </div>
+    </div>}
+    {/* Line OA info */}
+    <div className="fc" style={{marginTop:16}}><div className="fch" style={{background:'#06c755'}}>💬 แจ้งเตือนผ่าน Line OA</div><div className="fcb">
+      <div style={{fontSize:13,lineHeight:1.7,color:'var(--text)'}}>
+        <p>ระบบแจ้งเตือนอัตโนมัติผ่าน Line OA ทำงานผ่าน Google Apps Script:</p>
+        <ul style={{paddingLeft:20,margin:'8px 0'}}>
+          <li><strong>3 วันก่อน</strong>ทำ RCA → แจ้งเรื่อง, หน่วยงาน, วัน/เวลา, สถานที่</li>
+          <li><strong>7 วันหลัง</strong>ทำ RCA → แจ้งให้บันทึกรายงาน RCA ฉบับสมบูรณ์ และลง HRMS</li>
+        </ul>
+        <p style={{fontSize:12,color:'var(--text-light)'}}>* ต้องตั้งค่า Line Messaging API Token ใน Google Apps Script (ดูไฟล์ google_apps_script.js)</p>
+      </div>
+    </div></div>
+  </div>;
 }
 
 // KNOWLEDGE

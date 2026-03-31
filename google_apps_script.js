@@ -106,3 +106,126 @@ function testSetup() {
   Logger.log('Sheet "' + SHEET_NAME + '" ready. Rows: ' + sheet.getLastRow());
   Logger.log('Test passed!');
 }
+
+// =====================================================
+// ===== Line OA Notification สำหรับปฏิทิน RCA =====
+// =====================================================
+// วิธีตั้งค่า:
+// 1. สร้าง Line Official Account ที่ https://developers.line.biz/
+// 2. เปิด Messaging API แล้วคัดลอก Channel Access Token
+// 3. ใส่ Token ด้านล่าง
+// 4. สร้าง Sheet ชื่อ "RCA_Schedule" (หรือจะสร้างอัตโนมัติจากฟังก์ชัน)
+// 5. ตั้ง Trigger: Apps Script > Triggers > Add Trigger
+//    - Function: checkAndNotify
+//    - Event source: Time-driven
+//    - Type: Day timer
+//    - Time: 08:00 - 09:00
+// =====================================================
+
+var LINE_TOKEN = ''; // ← ใส่ Line Messaging API Channel Access Token
+var LINE_GROUP_ID = ''; // ← ใส่ Group ID หรือ User ID ที่ต้องการแจ้งเตือน
+var SCHEDULE_SHEET = 'RCA_Schedule';
+
+function getOrCreateScheduleSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SCHEDULE_SHEET);
+  if (!sheet) {
+    sheet = ss.insertSheet(SCHEDULE_SHEET);
+    sheet.getRange('A1:G1').setValues([['ID', 'เรื่อง', 'หน่วยงาน', 'วันที่', 'เวลา', 'สถานที่', 'แจ้งเตือนแล้ว']]);
+    sheet.getRange('A1:G1').setFontWeight('bold').setBackground('#e67e22').setFontColor('#fff');
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+// ส่งข้อความผ่าน Line OA
+function sendLineMessage(message) {
+  if (!LINE_TOKEN) {
+    Logger.log('LINE_TOKEN not set');
+    return;
+  }
+  var url = 'https://api.line.me/v2/bot/message/push';
+  var payload = {
+    to: LINE_GROUP_ID,
+    messages: [{ type: 'text', text: message }]
+  };
+  UrlFetchApp.fetch(url, {
+    method: 'post',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + LINE_TOKEN
+    },
+    payload: JSON.stringify(payload)
+  });
+  Logger.log('Line message sent: ' + message.substring(0, 50));
+}
+
+// ฟังก์ชันหลัก - เรียกจาก Daily Trigger
+function checkAndNotify() {
+  var sheet = getOrCreateScheduleSheet();
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return;
+
+  var data = sheet.getRange(2, 1, lastRow - 1, 7).getValues();
+  var today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  for (var i = 0; i < data.length; i++) {
+    var id = data[i][0];
+    var title = data[i][1];
+    var dept = data[i][2];
+    var dateStr = data[i][3];
+    var time = data[i][4];
+    var location = data[i][5];
+    var notified = data[i][6] || '';
+
+    if (!dateStr) continue;
+    var rcaDate = new Date(dateStr);
+    rcaDate.setHours(0, 0, 0, 0);
+
+    var diffDays = Math.round((rcaDate - today) / (1000 * 60 * 60 * 24));
+
+    // แจ้งเตือน 3 วันก่อนทำ RCA
+    if (diffDays === 3 && notified.indexOf('3d') < 0) {
+      var msg = '📅 แจ้งเตือน: กำหนดทำ RCA อีก 3 วัน\n\n'
+        + '📋 เรื่อง: ' + title + '\n'
+        + '🏥 หน่วยงาน: ' + dept + '\n'
+        + '📆 วันที่: ' + dateStr + '\n'
+        + (time ? '⏰ เวลา: ' + time + '\n' : '')
+        + (location ? '📍 สถานที่: ' + location + '\n' : '')
+        + '\nกรุณาเตรียมข้อมูลและผู้เข้าร่วมให้พร้อม';
+      sendLineMessage(msg);
+      sheet.getRange(i + 2, 7).setValue(notified + '3d,');
+    }
+
+    // แจ้งเตือน 7 วันหลังทำ RCA
+    if (diffDays === -7 && notified.indexOf('7d') < 0) {
+      var msg2 = '📝 แจ้งเตือน: ครบ 7 วันหลังทำ RCA\n\n'
+        + '📋 เรื่อง: ' + title + '\n'
+        + '🏥 หน่วยงาน: ' + dept + '\n\n'
+        + '✅ กรุณาดำเนินการ:\n'
+        + '1. บันทึกรายงาน RCA ฉบับสมบูรณ์\n'
+        + '2. บันทึกการแก้ไขในระบบ HRMS';
+      sendLineMessage(msg2);
+      sheet.getRange(i + 2, 7).setValue(notified + '7d,');
+    }
+  }
+}
+
+// บันทึกกำหนดการจากหน้าเว็บ (เรียกผ่าน POST ?action=schedule)
+function saveSchedule(schedules) {
+  var sheet = getOrCreateScheduleSheet();
+  var lastRow = sheet.getLastRow();
+  if (lastRow > 1) sheet.getRange(2, 1, lastRow - 1, 7).clearContent();
+  if (schedules.length > 0) {
+    var rows = schedules.map(function(s) {
+      return [s.id || '', s.title || '', s.department || '', s.rcaDate || '', s.rcaTime || '', s.location || '', ''];
+    });
+    sheet.getRange(2, 1, rows.length, 7).setValues(rows);
+  }
+}
+
+// ทดสอบส่ง Line
+function testLineNotification() {
+  sendLineMessage('🔔 ทดสอบแจ้งเตือน RCA Management System\nระบบแจ้งเตือนทำงานปกติ');
+}

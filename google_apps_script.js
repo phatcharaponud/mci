@@ -61,12 +61,20 @@ function doGet(e) {
   }
 }
 
-// POST = บันทึกข้อมูลทั้งหมด
+// POST = บันทึกข้อมูล หรือ รับ Line Webhook
 function doPost(e) {
   try {
-    var sheet = getOrCreateSheet();
     var body = e.postData.contents;
-    var records = JSON.parse(body);
+    var parsed = JSON.parse(body);
+
+    // ===== ตรวจว่าเป็น Line Webhook Event หรือไม่ =====
+    if (parsed.events && Array.isArray(parsed.events)) {
+      return handleLineWebhook(parsed);
+    }
+
+    // ===== ปกติ = บันทึกข้อมูล RCA =====
+    var sheet = getOrCreateSheet();
+    var records = parsed;
 
     // Clear old data (keep header row)
     var lastRow = sheet.getLastRow();
@@ -98,6 +106,78 @@ function doPost(e) {
       JSON.stringify({ status: 'error', message: err.message })
     ).setMimeType(ContentService.MimeType.JSON);
   }
+}
+
+// ===== Line Webhook Handler =====
+// รับ event จาก Line แล้วบันทึก Group ID / User ID อัตโนมัติ
+// วิธีใช้:
+// 1. Deploy Apps Script เป็น Web App (Anyone can access)
+// 2. คัดลอก URL ไปใส่ที่ Line Developers > Messaging API > Webhook URL
+// 3. เชิญ Bot เข้ากลุ่ม Line หรือพิมพ์ข้อความหา Bot
+// 4. ดูผลที่ Sheet "Line_IDs" จะเห็น Group ID / User ID อัตโนมัติ
+function handleLineWebhook(data) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Line_IDs');
+  if (!sheet) {
+    sheet = ss.insertSheet('Line_IDs');
+    sheet.getRange('A1:E1').setValues([['ประเภท', 'ID', 'ชื่อ', 'วันที่พบ', 'Event Type']]);
+    sheet.getRange('A1:E1').setFontWeight('bold').setBackground('#06c755').setFontColor('#fff');
+    sheet.setFrozenRows(1);
+    sheet.setColumnWidth(2, 350);
+  }
+
+  var events = data.events || [];
+  for (var i = 0; i < events.length; i++) {
+    var ev = events[i];
+    var src = ev.source || {};
+    var type = src.type || ''; // user, group, room
+    var id = '';
+    var label = '';
+
+    if (src.groupId) {
+      type = 'group';
+      id = src.groupId;
+      label = 'กลุ่ม Line';
+      // ดึงชื่อกลุ่มถ้าได้ (ต้องมี LINE_TOKEN)
+      if (LINE_TOKEN) {
+        try {
+          var res = UrlFetchApp.fetch('https://api.line.me/v2/bot/group/' + id + '/summary', {
+            headers: { 'Authorization': 'Bearer ' + LINE_TOKEN }
+          });
+          var info = JSON.parse(res.getContentText());
+          if (info.groupName) label = info.groupName;
+        } catch(err) {}
+      }
+    } else if (src.userId) {
+      type = 'user';
+      id = src.userId;
+      label = 'ผู้ใช้';
+      if (LINE_TOKEN) {
+        try {
+          var res2 = UrlFetchApp.fetch('https://api.line.me/v2/bot/profile/' + id, {
+            headers: { 'Authorization': 'Bearer ' + LINE_TOKEN }
+          });
+          var info2 = JSON.parse(res2.getContentText());
+          if (info2.displayName) label = info2.displayName;
+        } catch(err) {}
+      }
+    }
+
+    if (id) {
+      // เช็คว่ามี ID นี้ในตารางแล้วหรือยัง
+      var existing = sheet.getRange(2, 2, Math.max(sheet.getLastRow() - 1, 1), 1).getValues();
+      var found = false;
+      for (var j = 0; j < existing.length; j++) {
+        if (existing[j][0] === id) { found = true; break; }
+      }
+      if (!found) {
+        sheet.appendRow([type, id, label, new Date().toISOString(), ev.type]);
+        Logger.log('New Line ID saved: ' + type + ' = ' + id + ' (' + label + ')');
+      }
+    }
+  }
+
+  return ContentService.createTextOutput(JSON.stringify({ status: 'ok' })).setMimeType(ContentService.MimeType.JSON);
 }
 
 // ฟังก์ชันทดสอบ - รันจาก Apps Script Editor เพื่อเช็คว่า Sheet ทำงานปกติ

@@ -37,9 +37,25 @@ function getOrCreateSheet() {
   return sheet;
 }
 
-// GET = อ่านข้อมูลทั้งหมด
+// GET = อ่านข้อมูล (RCA หรือ Schedules)
 function doGet(e) {
   try {
+    var action = (e && e.parameter && e.parameter.action) || '';
+
+    // อ่านกำหนดการ RCA
+    if (action === 'schedules') {
+      var schSheet = getOrCreateScheduleSheet();
+      var lastRow = schSheet.getLastRow();
+      if (lastRow < 2) return ContentService.createTextOutput('[]').setMimeType(ContentService.MimeType.JSON);
+      var data = schSheet.getRange(2, 1, lastRow - 1, 7).getValues();
+      var result = [];
+      for (var i = 0; i < data.length; i++) {
+        if (data[i][0]) result.push({id:data[i][0],title:data[i][1],department:data[i][2],rcaDate:data[i][3],rcaTime:data[i][4],location:data[i][5]});
+      }
+      return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // อ่านข้อมูล RCA (default)
     var sheet = getOrCreateSheet();
     var lastRow = sheet.getLastRow();
     if (lastRow < 2) {
@@ -72,9 +88,15 @@ function doPost(e) {
       return ContentService.createTextOutput(JSON.stringify({ status: 'ok' })).setMimeType(ContentService.MimeType.JSON);
     }
 
+    // บันทึกกำหนดการ RCA (Schedule)
+    if (parsed.action === 'schedules' && parsed.data) {
+      saveSchedule(parsed.data);
+      return ContentService.createTextOutput(JSON.stringify({ status: 'ok', type: 'schedules' })).setMimeType(ContentService.MimeType.JSON);
+    }
+
     // ปกติ = บันทึกข้อมูล RCA
     var sheet = getOrCreateSheet();
-    var records = parsed;
+    var records = Array.isArray(parsed) ? parsed : [];
 
     // Clear old data (keep header row)
     var lastRow = sheet.getLastRow();

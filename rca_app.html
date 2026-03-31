@@ -195,6 +195,8 @@ async function cloudSave(data){if(!GAS_URL)return false;try{await fetch(GAS_URL,
 function loadSch(){try{return JSON.parse(localStorage.getItem('rca_schedules')||'[]')}catch{return[]}}
 function saveSch(l){localStorage.setItem('rca_schedules',JSON.stringify(l))}
 function schId(){return'SCH-'+Date.now().toString(36).toUpperCase()}
+async function cloudLoadSch(){if(!GAS_URL)return null;try{const r=await fetch(GAS_URL+'?action=schedules');const t=await r.text();try{const d=JSON.parse(t);return Array.isArray(d)?d:null}catch{return null}}catch{return null}}
+async function cloudSaveSch(data){if(!GAS_URL)return false;try{await fetch(GAS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'schedules',data:data})});return true}catch{return false}}
 
 // Generate linkage diagram SVG string for export
 function bLinkageSVG(fd){
@@ -293,10 +295,18 @@ ${fmt==='pdf'?'<script>setTimeout(()=>window.print(),600)<\/script>':''}
 // APP
 function App(){
   const[nav,sN]=useState('form'),[rl,sRL]=useState(loadL),[ci,sCI]=useState(null),[fd,sFD]=useState({...DF,ta:mkTD()}),[toast,sT]=useState(null),[sync,sSync]=useState(''),[sbCol,sSbCol]=useState(false),[sch,sSch]=useState(loadSch);
-  useEffect(()=>{saveSch(sch)},[sch]);
-  const skipSync=useRef(true),cloudTimer=useRef(null);
+  const skipSync=useRef(true),skipSchSync=useRef(true),cloudTimer=useRef(null),schTimer=useRef(null);
+  // RCA data sync
   useEffect(()=>{saveL(rl);if(!GAS_URL||skipSync.current)return;clearTimeout(cloudTimer.current);cloudTimer.current=setTimeout(()=>{sSync('saving');cloudSave(rl).then(ok=>{sSync(ok?'ok':'error');setTimeout(()=>sSync(''),3000)})},2000)},[rl]);
-  useEffect(()=>{if(!GAS_URL){skipSync.current=false;return}sSync('loading');cloudLoad().then(d=>{if(d&&d.length>0){sRL(d);saveL(d)}sSync('ok');setTimeout(()=>{sSync('');skipSync.current=false},800)}).catch(()=>{sSync('error');skipSync.current=false})},[]);
+  // Schedule sync
+  useEffect(()=>{saveSch(sch);if(!GAS_URL||skipSchSync.current)return;clearTimeout(schTimer.current);schTimer.current=setTimeout(()=>{cloudSaveSch(sch)},2000)},[sch]);
+  // Load from cloud on mount
+  useEffect(()=>{if(!GAS_URL){skipSync.current=false;skipSchSync.current=false;return}sSync('loading');
+    Promise.all([cloudLoad(),cloudLoadSch()]).then(([d,s])=>{
+      if(d&&d.length>0){sRL(d);saveL(d)}
+      if(s&&s.length>0){sSch(s);saveSch(s)}
+      sSync('ok');setTimeout(()=>{sSync('');skipSync.current=false;skipSchSync.current=false},800);
+    }).catch(()=>{sSync('error');skipSync.current=false;skipSchSync.current=false})},[]);
   const hRefresh=()=>{if(!GAS_URL)return st('⚠️ ยังไม่ได้ตั้งค่า Google Sheets');sSync('loading');cloudLoad().then(d=>{if(d){sRL(d);saveL(d);st('✅ โหลดข้อมูลจาก Cloud สำเร็จ')}else st('⚠️ ไม่พบข้อมูลจาก Cloud');sSync('')}).catch(()=>{sSync('error');st('❌ โหลดข้อมูลไม่สำเร็จ')})};
   const st=m=>{sT(m);setTimeout(()=>sT(null),3000)};
   const uf=(f,v)=>sFD(p=>({...p,[f]:v}));

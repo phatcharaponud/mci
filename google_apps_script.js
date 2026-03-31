@@ -47,7 +47,7 @@ function doGet(e) {
       var schSheet = getOrCreateScheduleSheet();
       var lastRow = schSheet.getLastRow();
       if (lastRow < 2) return ContentService.createTextOutput('[]').setMimeType(ContentService.MimeType.JSON);
-      var data = schSheet.getRange(2, 1, lastRow - 1, 7).getValues();
+      var data = schSheet.getRange(2, 1, lastRow - 1, 7).getDisplayValues();
       var result = [];
       for (var i = 0; i < data.length; i++) {
         if (data[i][0]) result.push({id:data[i][0],title:data[i][1],department:data[i][2],rcaDate:data[i][3],rcaTime:data[i][4],location:data[i][5]});
@@ -354,6 +354,8 @@ function saveSchedule(schedules) {
       return [s.id || '', s.title || '', s.department || '', s.rcaDate || '', s.rcaTime || '', s.location || '', ''];
     });
     sheet.getRange(2, 1, rows.length, 7).setValues(rows);
+    // กำหนดรูปแบบคอลัมน์วันที่และเวลาเป็น text เพื่อไม่ให้ Sheets แปลงเป็น Date object
+    sheet.getRange(2, 4, rows.length, 2).setNumberFormat('@');
   }
 }
 

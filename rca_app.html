@@ -295,11 +295,11 @@ ${fmt==='pdf'?'<script>setTimeout(()=>window.print(),600)<\/script>':''}
 // APP
 function App(){
   const[nav,sN]=useState('form'),[rl,sRL]=useState(loadL),[ci,sCI]=useState(null),[fd,sFD]=useState({...DF,ta:mkTD()}),[toast,sT]=useState(null),[sync,sSync]=useState(''),[sbCol,sSbCol]=useState(false),[sch,sSch]=useState(loadSch);
-  const skipSync=useRef(true),skipSchSync=useRef(true),cloudTimer=useRef(null),schTimer=useRef(null);
+  const skipSync=useRef(true),skipSchSync=useRef(true),cloudTimer=useRef(null);
   // RCA data sync
   useEffect(()=>{saveL(rl);if(!GAS_URL||skipSync.current)return;clearTimeout(cloudTimer.current);cloudTimer.current=setTimeout(()=>{sSync('saving');cloudSave(rl).then(ok=>{sSync(ok?'ok':'error');setTimeout(()=>sSync(''),3000)})},2000)},[rl]);
-  // Schedule sync
-  useEffect(()=>{saveSch(sch);if(!GAS_URL||skipSchSync.current)return;clearTimeout(schTimer.current);schTimer.current=setTimeout(()=>{cloudSaveSch(sch)},2000)},[sch]);
+  // Schedule sync - ทุกครั้งที่เปลี่ยนแปลง sync ทันที
+  useEffect(()=>{saveSch(sch);if(!GAS_URL||skipSchSync.current)return;sSync('saving');cloudSaveSch(sch).then(ok=>{sSync(ok?'ok':'error');setTimeout(()=>sSync(''),3000)})},[sch]);
   // Load from cloud on mount
   useEffect(()=>{if(!GAS_URL){skipSync.current=false;skipSchSync.current=false;return}sSync('loading');
     Promise.all([cloudLoad(),cloudLoadSch()]).then(([d,s])=>{
@@ -307,7 +307,7 @@ function App(){
       if(s&&s.length>0){sSch(s);saveSch(s)}
       sSync('ok');setTimeout(()=>{sSync('');skipSync.current=false;skipSchSync.current=false},800);
     }).catch(()=>{sSync('error');skipSync.current=false;skipSchSync.current=false})},[]);
-  const hRefresh=()=>{if(!GAS_URL)return st('⚠️ ยังไม่ได้ตั้งค่า Google Sheets');sSync('loading');cloudLoad().then(d=>{if(d){sRL(d);saveL(d);st('✅ โหลดข้อมูลจาก Cloud สำเร็จ')}else st('⚠️ ไม่พบข้อมูลจาก Cloud');sSync('')}).catch(()=>{sSync('error');st('❌ โหลดข้อมูลไม่สำเร็จ')})};
+  const hRefresh=()=>{if(!GAS_URL)return st('⚠️ ยังไม่ได้ตั้งค่า Google Sheets');sSync('loading');Promise.all([cloudLoad(),cloudLoadSch()]).then(([d,s])=>{if(d){sRL(d);saveL(d)}if(s){sSch(s);saveSch(s)}st('✅ โหลดข้อมูลจาก Cloud สำเร็จ');sSync('')}).catch(()=>{sSync('error');st('❌ โหลดข้อมูลไม่สำเร็จ')})};
   const st=m=>{sT(m);setTimeout(()=>sT(null),3000)};
   const uf=(f,v)=>sFD(p=>({...p,[f]:v}));
   const hNew=()=>{sCI(gid());sFD({...DF,ta:mkTD()});sN('form')};

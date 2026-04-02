@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RCA Management System - โรงพยาบาลมหาวิทยาลัยพะเยา</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+<style>
+:root{--primary:#1a5276;--primary-light:#2980b9;--primary-dark:#0e2f44;--accent:#e74c3c;--accent-warm:#f39c12;--success:#27ae60;--bg:#f0f3f7;--card:#fff;--text:#2c3e50;--text-light:#7f8c8d;--border:#dce1e8;--shadow:0 2px 12px rgba(0,0,0,0.08);--radius:8px}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);font-size:14px}
+/* Login page */
+.login-page{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#0e2f44 0%,#1a5276 50%,#2980b9 100%)}
+.login-card{background:#fff;border-radius:16px;padding:40px;width:420px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,0.3);text-align:center}
+.login-card h1{font-size:20px;font-weight:700;color:var(--primary);margin-bottom:4px}
+.login-card .sub{font-size:13px;color:var(--text-light);margin-bottom:24px}
+.login-card .logo{font-size:48px;margin-bottom:12px}
+.google-btn{display:inline-flex;align-items:center;gap:10px;padding:12px 28px;border:2px solid var(--border);border-radius:8px;background:#fff;font-size:14px;font-weight:600;cursor:pointer;transition:all 0.2s;font-family:inherit;color:var(--text)}
+.google-btn:hover{border-color:var(--primary);background:#f8f9fa}
+.google-btn img{width:20px;height:20px}
+.login-error{color:var(--accent);font-size:13px;margin-top:12px}
+.login-info{background:#e3f2fd;border-radius:8px;padding:12px;margin-top:20px;font-size:12px;color:var(--primary);line-height:1.6;text-align:left}
+/* Pending approval */
+.pending-page{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg)}
+.pending-card{background:#fff;border-radius:16px;padding:40px;width:500px;max-width:90vw;box-shadow:var(--shadow);text-align:center}
+.pending-card h2{font-size:18px;color:var(--accent-warm);margin-bottom:8px}
+.pending-card p{font-size:13px;color:var(--text-light);margin-bottom:16px}
+/* Registration form */
+.reg-form{text-align:left;margin-top:16px}
+.reg-form label{display:block;font-size:13px;font-weight:600;margin-bottom:4px}
+.reg-form input{width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;margin-bottom:12px}
+.reg-form input:focus{outline:none;border-color:var(--primary-light)}
+.btn{padding:10px 20px;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:all 0.2s}
+.btn-p{background:var(--primary);color:#fff}.btn-p:hover{background:var(--primary-light)}
+.btn-o{background:transparent;border:1.5px solid var(--border);color:var(--text)}.btn-o:hover{border-color:var(--primary)}
+.btn-d{background:var(--accent);color:#fff}
+.btn-sm{padding:6px 14px;font-size:12px}
+/* Admin panel */
+.admin-badge{background:var(--accent-warm);color:#fff;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:700;margin-left:8px}
+.user-bar{background:#fff;border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;justify-content:space-between;font-size:13px}
+.user-bar .user-info{display:flex;align-items:center;gap:10px}
+.user-bar img{width:28px;height:28px;border-radius:50%}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const {useState,useEffect,useRef}=React;
+
+// ===== Firebase Config =====
+// ต้องใส่ค่าจาก Firebase Console > Project Settings > General > Your apps > Firebase SDK snippet
+const firebaseConfig = {
+  apiKey: "",
+  authDomain: "",
+  projectId: "",
+  storageBucket: "",
+  messagingSenderId: "",
+  appId: ""
+};
+
+// ===== Init Firebase =====
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+const googleProvider = new firebase.auth.GoogleAuthProvider();
+// จำกัดเฉพาะ @up.ac.th
+googleProvider.setCustomParameters({hd: 'up.ac.th'});
+
+const ADMIN_EMAIL = 'phatcharapon.ud@up.ac.th';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbw99ZlV1OaTqG1Mp5C_Xc0Bnvmvr_7rp6lp9f9_Abc45_ivkc9ZAyKz3Bh_40LdzZk1/exec';
+
+// ===== Log to Google Sheets =====
+async function logAccess(email, action){
+  try{await fetch(GAS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'log',email,logAction:action,timestamp:new Date().toISOString()})})}catch(e){}
+}
+
+// ===== LOGIN PAGE =====
+function LoginPage({onLogin,error}){
+  return(
+    <div className="login-page">
+      <div className="login-card">
+        <div className="logo">🏥</div>
+        <h1>RCA Management System</h1>
+        <div className="sub">โรงพยาบาลมหาวิทยาลัยพะเยา</div>
+        <button className="google-btn" onClick={onLogin}>
+          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="G"/>
+          เข้าสู่ระบบด้วย Google (@up.ac.th)
+        </button>
+        {error&&<div className="login-error">{error}</div>}
+        <div className="login-info">
+          <strong>หมายเหตุ:</strong><br/>
+          - ใช้ได้เฉพาะอีเมล @up.ac.th เท่านั้น<br/>
+          - การเข้าใช้ครั้งแรกต้องรอ Admin อนุมัติ<br/>
+          - กรุณากรอกชื่อจริง นามสกุล และหน่วยงาน
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ===== REGISTRATION / PENDING APPROVAL =====
+function PendingPage({user,userData,onSubmitReg,onLogout}){
+  const[fn,sFn]=useState('');
+  const[ln,sLn]=useState('');
+  const[dept,sDept]=useState('');
+  const needsReg=!userData||!userData.fullName;
+  const isPending=userData&&userData.status==='pending';
+
+  const hSubmit=()=>{
+    if(!fn.trim()||!ln.trim()||!dept.trim())return alert('กรุณากรอกข้อมูลให้ครบ');
+    onSubmitReg({fullName:fn.trim()+' '+ln.trim(),firstName:fn.trim(),lastName:ln.trim(),department:dept.trim()});
+  };
+
+  return(
+    <div className="pending-page">
+      <div className="pending-card">
+        <div style={{fontSize:48,marginBottom:12}}>{needsReg?'📝':'⏳'}</div>
+        <h2>{needsReg?'ลงทะเบียนเข้าใช้ระบบ':'รอการอนุมัติ'}</h2>
+        <p>{needsReg?'กรุณากรอกข้อมูลเพื่อขอเข้าใช้ระบบ RCA':'คำขอของคุณอยู่ระหว่างการตรวจสอบจาก Admin'}</p>
+        <div style={{fontSize:13,color:'var(--text-light)',marginBottom:16}}>เข้าสู่ระบบด้วย: {user.email}</div>
+
+        {needsReg&&(
+          <div className="reg-form">
+            <label>ชื่อ</label>
+            <input value={fn} onChange={e=>sFn(e.target.value)} placeholder="ชื่อจริง"/>
+            <label>นามสกุล</label>
+            <input value={ln} onChange={e=>sLn(e.target.value)} placeholder="นามสกุล"/>
+            <label>หน่วยงาน</label>
+            <input value={dept} onChange={e=>sDept(e.target.value)} placeholder="เช่น งานบริหารความเสี่ยง"/>
+            <div style={{display:'flex',gap:8,marginTop:8}}>
+              <button className="btn btn-p" style={{flex:1}} onClick={hSubmit}>ส่งคำขอ</button>
+              <button className="btn btn-o" onClick={onLogout}>ออกจากระบบ</button>
+            </div>
+          </div>
+        )}
+
+        {isPending&&(
+          <div>
+            <div style={{background:'#fff8e1',border:'1px solid #ffc107',borderRadius:8,padding:16,margin:'16px 0',textAlign:'left',fontSize:13}}>
+              <strong>ข้อมูลที่ส่ง:</strong><br/>
+              ชื่อ-นามสกุล: {userData.fullName}<br/>
+              หน่วยงาน: {userData.department}<br/>
+              วันที่สมัคร: {userData.createdAt?.toDate?.()?.toLocaleDateString('th-TH')||'-'}
+            </div>
+            <p style={{fontSize:12,color:'var(--text-light)'}}>Admin จะตรวจสอบและอนุมัติให้โดยเร็ว</p>
+            <button className="btn btn-o" style={{marginTop:12}} onClick={onLogout}>ออกจากระบบ</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ===== ADMIN PANEL =====
+function AdminPanel({users,onApprove,onReject}){
+  const pending=users.filter(u=>u.status==='pending');
+  const approved=users.filter(u=>u.status==='approved');
+  return(
+    <div style={{padding:20}}>
+      <h3 style={{fontSize:16,fontWeight:700,color:'var(--primary)',marginBottom:16}}>👑 จัดการผู้ใช้ ({users.length} คน)</h3>
+
+      {pending.length>0&&<div style={{marginBottom:20}}>
+        <h4 style={{fontSize:14,color:'var(--accent-warm)',marginBottom:8}}>รอการอนุมัติ ({pending.length})</h4>
+        {pending.map(u=>(
+          <div key={u.id} style={{background:'#fff8e1',border:'1px solid #ffc107',borderRadius:8,padding:12,marginBottom:8,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+            <div>
+              <strong>{u.fullName||'ไม่ระบุ'}</strong>
+              <div style={{fontSize:12,color:'var(--text-light)'}}>{u.email} | {u.department||'-'}</div>
+            </div>
+            <div style={{display:'flex',gap:6}}>
+              <button className="btn btn-sm btn-p" onClick={()=>onApprove(u.id)}>✅ อนุมัติ</button>
+              <button className="btn btn-sm btn-d" onClick={()=>onReject(u.id)}>❌ ปฏิเสธ</button>
+            </div>
+          </div>
+        ))}
+      </div>}
+
+      <h4 style={{fontSize:14,color:'var(--success)',marginBottom:8}}>ผู้ใช้ที่อนุมัติแล้ว ({approved.length})</h4>
+      <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+        <thead><tr style={{background:'var(--primary)',color:'#fff'}}>
+          <th style={{padding:8,textAlign:'left'}}>ชื่อ-นามสกุล</th>
+          <th style={{padding:8,textAlign:'left'}}>อีเมล</th>
+          <th style={{padding:8,textAlign:'left'}}>หน่วยงาน</th>
+          <th style={{padding:8,textAlign:'left'}}>วันที่สมัคร</th>
+        </tr></thead>
+        <tbody>{approved.map(u=>(
+          <tr key={u.id} style={{borderBottom:'1px solid var(--border)'}}>
+            <td style={{padding:8}}>{u.fullName}</td>
+            <td style={{padding:8}}>{u.email}</td>
+            <td style={{padding:8}}>{u.department}</td>
+            <td style={{padding:8}}>{u.createdAt?.toDate?.()?.toLocaleDateString('th-TH')||'-'}</td>
+          </tr>
+        ))}</tbody>
+      </table>
+    </div>
+  );
+}
+
+// ===== MAIN APP =====
+function App(){
+  const[user,setUser]=useState(null);
+  const[userData,setUserData]=useState(undefined); // undefined=loading, null=no doc
+  const[loading,setLoading]=useState(true);
+  const[error,setError]=useState('');
+  const[allUsers,setAllUsers]=useState([]);
+
+  // Listen auth state
+  useEffect(()=>{
+    return auth.onAuthStateChanged(async(u)=>{
+      setUser(u);
+      if(u){
+        // Listen user doc
+        const unsub=db.collection('users').doc(u.uid).onSnapshot(doc=>{
+          setUserData(doc.exists?{id:doc.id,...doc.data()}:null);
+          setLoading(false);
+        });
+        // Log access
+        logAccess(u.email,'login');
+        return()=>unsub();
+      }else{
+        setUserData(undefined);
+        setLoading(false);
+      }
+    });
+  },[]);
+
+  // Admin: listen all users
+  useEffect(()=>{
+    if(!user||user.email!==ADMIN_EMAIL)return;
+    const unsub=db.collection('users').onSnapshot(snap=>{
+      setAllUsers(snap.docs.map(d=>({id:d.id,...d.data()})));
+    });
+    return()=>unsub();
+  },[user]);
+
+  // Login
+  const handleLogin=async()=>{
+    setError('');
+    try{
+      const result=await auth.signInWithPopup(googleProvider);
+      const email=result.user.email;
+      if(!email.endsWith('@up.ac.th')){
+        await auth.signOut();
+        setError('กรุณาใช้อีเมล @up.ac.th เท่านั้น');
+        return;
+      }
+      // Auto-approve admin
+      if(email===ADMIN_EMAIL){
+        const doc=await db.collection('users').doc(result.user.uid).get();
+        if(!doc.exists){
+          await db.collection('users').doc(result.user.uid).set({
+            email,fullName:'Admin',department:'บริหารความเสี่ยง',
+            status:'approved',role:'admin',
+            createdAt:firebase.firestore.FieldValue.serverTimestamp()
+          });
+        }
+      }
+    }catch(e){
+      if(e.code==='auth/popup-closed-by-user')return;
+      setError('เกิดข้อผิดพลาด: '+e.message);
+    }
+  };
+
+  // Register
+  const handleRegister=async(data)=>{
+    await db.collection('users').doc(user.uid).set({
+      email:user.email,
+      ...data,
+      status:'pending',
+      role:'user',
+      createdAt:firebase.firestore.FieldValue.serverTimestamp()
+    });
+    logAccess(user.email,'register');
+  };
+
+  // Admin approve/reject
+  const handleApprove=async(uid)=>{
+    await db.collection('users').doc(uid).update({status:'approved',approvedAt:firebase.firestore.FieldValue.serverTimestamp()});
+  };
+  const handleReject=async(uid)=>{
+    if(confirm('ปฏิเสธผู้ใช้นี้?'))await db.collection('users').doc(uid).update({status:'rejected'});
+  };
+
+  // Logout
+  const handleLogout=()=>{
+    if(user)logAccess(user.email,'logout');
+    auth.signOut();
+  };
+
+  // Loading
+  if(loading)return<div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,color:'var(--text-light)'}}>กำลังโหลด...</div>;
+
+  // Not logged in
+  if(!user)return<LoginPage onLogin={handleLogin} error={error}/>;
+
+  // Logged in but no user doc or pending
+  if(!userData||userData.status==='pending'){
+    return<PendingPage user={user} userData={userData} onSubmitReg={handleRegister} onLogout={handleLogout}/>;
+  }
+
+  // Rejected
+  if(userData.status==='rejected'){
+    return<div className="pending-page"><div className="pending-card"><div style={{fontSize:48}}>❌</div><h2>คำขอถูกปฏิเสธ</h2><p>กรุณาติดต่อ Admin</p><button className="btn btn-o" onClick={handleLogout}>ออกจากระบบ</button></div></div>;
+  }
+
+  // Approved - show main app
+  const isAdmin=user.email===ADMIN_EMAIL;
+
+  return(
+    <div>
+      {/* User bar */}
+      <div className="user-bar">
+        <div className="user-info">
+          {user.photoURL&&<img src={user.photoURL} alt=""/>}
+          <span><strong>{userData.fullName}</strong> ({userData.department}){isAdmin&&<span className="admin-badge">ADMIN</span>}</span>
+        </div>
+        <div style={{display:'flex',gap:8,alignItems:'center'}}>
+          <span style={{fontSize:12,color:'var(--text-light)'}}>{user.email}</span>
+          <button className="btn btn-sm btn-o" onClick={handleLogout}>ออกจากระบบ</button>
+        </div>
+      </div>
+
+      {/* Main content placeholder - จะย้าย RCA app มาใส่ */}
+      <div style={{padding:20}}>
+        <div style={{background:'#fff',borderRadius:12,padding:24,boxShadow:'var(--shadow)',marginBottom:16}}>
+          <h2 style={{fontSize:18,fontWeight:700,color:'var(--primary)',marginBottom:8}}>🏥 RCA Management System</h2>
+          <p style={{fontSize:14,color:'var(--text-light)'}}>ยินดีต้อนรับ {userData.fullName} เข้าสู่ระบบ</p>
+          <p style={{fontSize:13,color:'var(--success)',marginTop:8}}>✅ ระบบ Authentication พร้อมใช้งาน</p>
+          <p style={{fontSize:12,color:'var(--text-light)',marginTop:4}}>ขั้นตอนถัดไป: ย้ายฟีเจอร์ RCA form, list, calendar, dashboard มาที่นี่</p>
+        </div>
+
+        {/* Admin panel */}
+        {isAdmin&&<div style={{background:'#fff',borderRadius:12,boxShadow:'var(--shadow)',overflow:'hidden'}}>
+          <div style={{background:'var(--accent-warm)',color:'#fff',padding:'12px 20px',fontWeight:700}}>👑 Admin Panel - จัดการผู้ใช้</div>
+          <AdminPanel users={allUsers} onApprove={handleApprove} onReject={handleReject}/>
+        </div>}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.render(<App/>,document.getElementById('root'));
+</script>
+</body>
+</html>

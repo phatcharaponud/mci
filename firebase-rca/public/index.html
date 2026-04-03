@@ -263,6 +263,10 @@ function App(){
             status:'approved',role:'admin',
             createdAt:firebase.firestore.FieldValue.serverTimestamp()
           });
+        }else if(doc.data().status!=='approved'){
+          await db.collection('users').doc(result.user.uid).update({
+            status:'approved',role:'admin'
+          });
         }
       }
     }catch(e){

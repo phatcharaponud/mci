@@ -892,6 +892,17 @@ function CalV({sch,sSch,st}){
         <div style={{display:'flex',gap:4}}><button className="btn btn-sm btn-p" onClick={()=>openEdit(s)}>แก้ไข</button><button className="btn btn-sm btn-d" onClick={()=>hDel(s.id)}>ลบ</button></div>
       </div>)}</div>}
     </div></div>
+    {/* Line OA info */}
+    <div className="fc" style={{marginTop:16}}><div className="fch" style={{background:'#06c755'}}>💬 แจ้งเตือนผ่าน Line OA</div><div className="fcb">
+      <div style={{fontSize:13,lineHeight:1.7,color:'var(--text)'}}>
+        <p>ระบบแจ้งเตือนอัตโนมัติผ่าน Line OA ทำงานผ่าน Google Apps Script:</p>
+        <ul style={{paddingLeft:20,margin:'8px 0'}}>
+          <li><strong>3 วันก่อน</strong>ทำ RCA → แจ้งเรื่อง, หน่วยงาน, วัน/เวลา, สถานที่</li>
+          <li><strong>7 วันหลัง</strong>ทำ RCA → แจ้งให้บันทึกรายงาน RCA ฉบับสมบูรณ์ และลง HRMS</li>
+        </ul>
+        <p style={{fontSize:12,color:'var(--text-light)'}}>* ต้องตั้งค่า Line Messaging API Token ใน Google Apps Script (ดูไฟล์ google_apps_script.js)</p>
+      </div>
+    </div></div>
     {showForm&&<div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:300}} onClick={()=>sSF(false)}>
       <div style={{background:'#fff',borderRadius:12,padding:24,width:480,maxWidth:'90vw',boxShadow:'0 8px 32px rgba(0,0,0,0.2)'}} onClick={e=>e.stopPropagation()}>
         <h3 style={{fontSize:16,fontWeight:700,color:'var(--primary)',marginBottom:16}}>{editId?'แก้ไขกำหนดการ':'เพิ่มกำหนดการ RCA'}</h3>
@@ -1220,6 +1231,10 @@ function App(){
         </div>
       </div>
       {toast&&<div className="toast">{toast}</div>}
+      {/* Footer */}
+      <div style={{textAlign:'center',padding:'12px 20px',fontSize:11,color:'var(--text-light)',borderTop:'1px solid var(--border)',background:'#fff'}}>
+        RCA Management System | Initiated by <strong>PhatcharaponUd</strong> | โรงพยาบาลมหาวิทยาลัยพะเยา
+      </div>
     </div>
   );
 }

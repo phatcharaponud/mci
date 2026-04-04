@@ -735,16 +735,17 @@ function FormV({fd,sFD,uf}){
       </>}
 
       {tab==='p23'&&<>
-        <div className="fc"><div className="fch" style={{justifyContent:'space-between'}}><span>🔄 ตอนที่ 2: Care Process / Flow of Steps</span><div style={{display:'flex',gap:6}}><button className="btn btn-sm" style={{background:'rgba(255,255,255,0.2)',color:'#fff',border:'none'}} onClick={aFS}>+ เพิ่มขั้นตอน</button><button className="btn btn-sm" style={{background:'#27ae60',color:'#fff',border:'none'}} onClick={()=>uf('fsSaved',true)}>💾 บันทึกขั้นตอน</button></div></div>
+        <div className="fc"><div className="fch"><span>🔄 ตอนที่ 2: Care Process / Flow of Steps</span></div>
         <div className="fcb">
           <div style={{fontSize:12,color:'var(--text-light)',marginBottom:10}}>ระบุขั้นตอนกระบวนการดูแล/กระบวนการหลักที่เกี่ยวข้อง (เรียงลำดับ)</div>
           <div className="fse">{(fd.flowSteps||[]).map((s,i)=>(
             <React.Fragment key={i}>{i>0&&<span className="fa">→</span>}<div style={{position:'relative'}}><input className={`fsb ${fd.fsSaved&&s.trim()?'sv':''}`} value={s} onChange={e=>uFS(i,e.target.value)} placeholder={`ขั้นตอนที่ ${i+1}`} style={{paddingRight:22}}/>{(fd.flowSteps||[]).length>2&&<span style={{position:'absolute',right:4,top:5,cursor:'pointer',fontSize:12,color:'#999',lineHeight:1}} onClick={()=>rFS(i)}>✕</span>}</div></React.Fragment>
           ))}</div>
           {fd.fsSaved&&ss.length>0&&<div style={{marginTop:8,fontSize:12,color:'var(--success)'}}>บันทึกแล้ว {ss.length} ขั้นตอน</div>}
+          <div style={{display:'flex',gap:6,marginTop:12}}><button className="btn btn-sm btn-p" onClick={aFS}>+ เพิ่มขั้นตอน</button><button className="btn btn-sm btn-s" onClick={()=>uf('fsSaved',true)}>💾 บันทึกขั้นตอน</button></div>
         </div></div>
 
-        <div className="fc"><div className="fch" style={{justifyContent:'space-between'}}><span>⚡ Care Management Problems (CMPs)</span><div style={{display:'flex',gap:6}}><button className="btn btn-sm" style={{background:'rgba(255,255,255,0.2)',color:'#fff',border:'none'}} onClick={aC}>+ เพิ่ม CMP</button><button className="btn btn-sm" style={{background:'#27ae60',color:'#fff',border:'none'}} onClick={()=>uf('cmpsSaved',true)}>💾 บันทึก CMP</button></div></div>
+        <div className="fc"><div className="fch"><span>⚡ Care Management Problems (CMPs)</span></div>
         <div className="fcb">{fd.cmpsSaved&&<div style={{marginBottom:10,fontSize:12,color:'var(--success)'}}>บันทึก CMP แล้ว {(fd.cmps||[]).filter(c=>c.step||c.problem||c.unsafeAct).length} รายการ</div>}{(fd.cmps||[]).map((c,i)=>(
           <div key={i} style={{padding:14,border:'1px solid var(--border)',borderRadius:8,marginBottom:10,background:'#fafbfc'}}>
             <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}><strong style={{fontSize:13,color:'var(--primary)'}}>CMP #{i+1}</strong>{fd.cmps.length>1&&<button className="btn btn-sm btn-d" onClick={()=>rC(i)}>✕</button>}</div>
@@ -754,7 +755,7 @@ function FormV({fd,sFD,uf}){
               <div className="fg"><label className="fl">Unsafe Act / Potential Change</label><textarea className="ft" style={{minHeight:60}} value={c.unsafeAct} onChange={e=>uC(i,'unsafeAct',e.target.value)} placeholder="จุดเปลี่ยน..."/></div>
             </div>
           </div>
-        ))}</div></div>
+        ))}<div style={{display:'flex',gap:6,marginTop:8}}><button className="btn btn-sm btn-p" onClick={aC}>+ เพิ่ม CMP</button><button className="btn btn-sm btn-s" onClick={()=>uf('cmpsSaved',true)}>💾 บันทึก CMP</button></div></div></div>
 
         <div style={{margin:'16px 0 10px',display:'flex',alignItems:'center',gap:10}}><h3 style={{fontSize:15,fontWeight:700,color:'var(--primary-dark)'}}>🔍 ตอนที่ 3: ปัจจัยสาเหตุ (Contributing Factors)</h3></div>
         <div style={{fontSize:12,color:'var(--text-light)',marginBottom:12}}>เลือก ☑ ที่หัวข้อ Tier ที่เกี่ยวข้อง แล้วกด ▼ เพื่อขยายรายละเอียด เฉพาะ Tier ที่เลือกจะแสดงใน Export</div>

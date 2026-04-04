@@ -185,6 +185,8 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
+// Session only - logout เมื่อปิด browser/tab
+auth.setPersistence(firebase.auth.Auth.Persistence.SESSION);
 const db = firebase.firestore();
 const storage = firebase.storage();
 const googleProvider = new firebase.auth.GoogleAuthProvider();
@@ -1110,6 +1112,18 @@ function App(){
   const uf=(f,v)=>sFD(p=>({...p,[f]:v}));
   const isAdmin=user&&user.email===ADMIN_EMAIL;
 
+  // Auto logout after 2 hours of inactivity
+  useEffect(()=>{
+    if(!user)return;
+    let timer;
+    const TIMEOUT=2*60*60*1000; // 2 hours
+    const resetTimer=()=>{clearTimeout(timer);timer=setTimeout(()=>{alert('ไม่มีการใช้งาน 2 ชั่วโมง ระบบจะออกจากระบบอัตโนมัติ');auth.signOut()},TIMEOUT)};
+    const events=['mousedown','keydown','scroll','touchstart'];
+    events.forEach(e=>document.addEventListener(e,resetTimer));
+    resetTimer();
+    return()=>{clearTimeout(timer);events.forEach(e=>document.removeEventListener(e,resetTimer))};
+  },[user]);
+
   // Listen auth state
   useEffect(()=>{
     return auth.onAuthStateChanged(async(u)=>{
@@ -1178,8 +1192,9 @@ function App(){
     return()=>unsub();
   },[user,userData]);
 
-  // Login
+  // Login - force account selection every time
   const handleLogin=async()=>{
+    googleProvider.setCustomParameters({hd:'up.ac.th',prompt:'select_account'});
     setError('');
     try{
       const result=await auth.signInWithPopup(googleProvider);
@@ -1229,7 +1244,7 @@ function App(){
   };
 
   // Logout
-  const handleLogout=()=>{auth.signOut()};
+  const handleLogout=()=>{auth.signOut().then(()=>{setUser(null);setUserData(undefined)})};
 
   // RCA actions
   const hNew=()=>{sCI(null);sFD({...DF,ta:mkTD()});sN('form')};

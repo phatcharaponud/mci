@@ -1,0 +1,15 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ข้อร้องเรียน - อ่านได้เฉพาะผู้ที่ล็อกอิน, เขียนได้เฉพาะผู้ที่ล็อกอิน
+    match /complaints/{complaintId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // ข้อมูลผู้ใช้ - อ่าน/เขียนข้อมูลตัวเอง, admin อ่านทั้งหมดได้
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && (request.auth.uid == userId);
+    }
+  }
+}

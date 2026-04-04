@@ -14,6 +14,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 
 <style>
 :root{--primary:#1a5276;--primary-light:#2980b9;--primary-dark:#0e2f44;--accent:#e74c3c;--accent-warm:#f39c12;--success:#27ae60;--bg:#f0f3f7;--card:#fff;--text:#2c3e50;--text-light:#7f8c8d;--border:#dce1e8;--sidebar-bg:#0e2f44;--tier1:#e8f5e9;--tier2:#e3f2fd;--tier3:#fff8e1;--tier4:#fce4ec;--tier5:#f3e5f5;--shadow:0 2px 12px rgba(0,0,0,0.08);--radius:8px}
@@ -185,6 +186,7 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
+const storage = firebase.storage();
 const googleProvider = new firebase.auth.GoogleAuthProvider();
 googleProvider.setCustomParameters({hd: 'up.ac.th'});
 
@@ -312,7 +314,7 @@ function bExp(fd,fmt){
 <table><tr><th>วิชาชีพที่เกี่ยวข้อง</th><th>หน่วยงานที่เกี่ยวข้อง</th></tr><tr><td>${fd.professions||'-'}</td><td>${fd.relatedDepts||'-'}</td></tr></table>
 <table><tr><th>กลุ่ม/หน่วยงานหลักที่แก้ไข</th><th>กลุ่ม/หน่วยงานร่วมที่แก้ไข</th></tr><tr><td>${fd.mainFixDept||'-'}</td><td>${fd.subFixDept||'-'}</td></tr></table>
 <table><tr><th style="width:50%">ผู้เข้าร่วมการทำ RCA</th><th>วันที่/เวลาทำ RCA</th></tr><tr><td>${(fd.rcaParticipants||'-').replace(/\n/g,'<br>')}</td><td>${fd.rcaDate||'-'} ${fd.rcaTime?'เวลา '+fd.rcaTime:''}</td></tr></table>
-${(fd.attachments||[]).length>0?'<h3>เอกสารแนบ</h3><div style="display:flex;flex-wrap:wrap;gap:10px;margin:8px 0">'+(fd.attachments||[]).map(a=>a.type.startsWith('image/')?'<div style="text-align:center;display:inline-block"><img src="'+a.data+'" style="max-width:48%;height:auto;margin:8px;border:1px solid #ccc;border-radius:4px"/><div style="font-size:10px;margin-top:2px">'+a.name+'</div></div>':'<div style="text-align:center;padding:8px;border:1px solid #ccc;border-radius:4px"><div style="font-size:24px">📄</div><div style="font-size:10px">'+a.name+'</div></div>').join('')+'</div>':''}
+${(fd.attachments||[]).length>0?'<h3>เอกสารแนบ</h3><div style="display:flex;flex-wrap:wrap;gap:10px;margin:8px 0">'+(fd.attachments||[]).map(a=>a.type.startsWith('image/')?'<div style="text-align:center;display:inline-block"><img src="'+(a.data||a.url||'')+'" style="max-width:48%;height:auto;margin:8px;border:1px solid #ccc;border-radius:4px"/><div style="font-size:10px;margin-top:2px">'+a.name+'</div></div>':'<div style="text-align:center;padding:8px;border:1px solid #ccc;border-radius:4px"><div style="font-size:24px">📄</div><div style="font-size:10px">'+a.name+'</div></div>').join('')+'</div>':''}
 <h2>ตอนที่ 2: วิเคราะห์ขั้นตอน/กิจกรรมที่เป็นจุดเปลี่ยน</h2>
 <p><b>Flow of Steps:</b></p>
 <div class="fc">${ss.map((s,i)=>`${i>0?'<span class="far">\u2192</span>':''}<span class="fb">${s}</span>`).join('')}</div>
@@ -724,7 +726,7 @@ function FormV({fd,sFD,uf}){
             {(fd.attachments||[]).map((att,ai)=>(
               <div key={ai} style={{border:'1px solid var(--border)',borderRadius:8,padding:8,width:140,textAlign:'center',position:'relative',background:'#f8f9fa'}}>
                 <button onClick={()=>window.__removeAttach(ai)} style={{position:'absolute',top:2,right:6,background:'none',border:'none',fontSize:16,cursor:'pointer',color:'var(--accent)',fontWeight:700}}>✕</button>
-                {att.type.startsWith('image/')?<img src={att.data} style={{width:'100%',height:80,objectFit:'cover',borderRadius:4,marginBottom:4,cursor:'pointer'}} alt={att.name} onClick={()=>sLightboxImg(att.data)}/>:<div style={{height:80,display:'flex',alignItems:'center',justifyContent:'center',fontSize:32,color:'var(--accent)'}}>📄</div>}
+                {att.type.startsWith('image/')?<img src={att.data||att.url} style={{width:'100%',height:80,objectFit:'cover',borderRadius:4,marginBottom:4,cursor:'pointer'}} alt={att.name} onClick={()=>sLightboxImg(att.data||att.url)}/>:<div style={{height:80,display:'flex',alignItems:'center',justifyContent:'center',fontSize:32,color:'var(--accent)'}}>📄</div>}
                 <div style={{fontSize:10,wordBreak:'break-all',lineHeight:1.3}}>{att.name}</div>
                 <div style={{fontSize:9,color:'var(--text-light)'}}>{(att.size/1024).toFixed(0)} KB</div>
               </div>
@@ -1240,7 +1242,24 @@ function App(){
       Object.keys(obj).forEach(k=>{cleaned[k]=cleanForFirestore(obj[k])});
       return cleaned;
     };
-    const docData=cleanForFirestore({...fd,savedAt:new Date().toISOString(),status:'draft',ownerUid:user.uid,ownerEmail:user.email,ownerName:userData.fullName});
+    // Upload attachments to Firebase Storage, store URLs in Firestore (not base64)
+    let uploadedAttachments=[];
+    const rawAttachments=fd.attachments||[];
+    if(rawAttachments.length>0){
+      const rcaId=ci||'temp-'+Date.now();
+      for(let i=0;i<rawAttachments.length;i++){
+        const a=rawAttachments[i];
+        if(a.url){uploadedAttachments.push({name:a.name,type:a.type,size:a.size,url:a.url});continue}
+        if(!a.data)continue;
+        try{
+          const ref=storage.ref('rca-attachments/'+rcaId+'/'+Date.now()+'_'+a.name);
+          await ref.putString(a.data,'data_url');
+          const url=await ref.getDownloadURL();
+          uploadedAttachments.push({name:a.name,type:a.type,size:a.size,url:url});
+        }catch(e){console.error('Upload error:',e);uploadedAttachments.push({name:a.name,type:a.type,size:a.size,url:''})}
+      }
+    }
+    const docData=cleanForFirestore({...fd,attachments:uploadedAttachments,savedAt:new Date().toISOString(),status:'draft',ownerUid:user.uid,ownerEmail:user.email,ownerName:userData.fullName});
     try{
       if(ci){
         await db.collection('rca').doc(ci).set(docData,{merge:true});

@@ -239,7 +239,7 @@ const KS=[
 // ===== Helper Functions =====
 function mkTD(){return TD.map(t=>({id:t.id,en:false,entries:[{ck:[],oc:false,ot:'',desc:'',strat:'',ind:'',tl:'',resp:'',linkedTo:null}]}))}
 function migTier(t){if(t.entries)return{...t,entries:t.entries.map(e=>e.linkedTo!==undefined?e:{...e,linkedTo:null})};return{id:t.id,en:t.en,entries:[{ck:t.ck||[],oc:t.oc||false,ot:t.ot||'',desc:t.desc||'',strat:t.strat||'',ind:t.ind||'',tl:t.tl||'',resp:t.resp||'',linkedTo:null}]}}
-const DF={department:'',date:'',title:'',incidentCode:'',sevL:'',sevN:'',whatHappened:'',where:'',when:'',eventDate:'',professions:'',relatedDepts:'',mainFixDept:'',subFixDept:'',rcaParticipants:'',rcaDate:'',rcaTime:'',flowSteps:['','','','',''],fsSaved:false,cmps:[{step:'',problem:'',unsafeAct:''}],cmpsSaved:false,ta:mkTD(),summaryDate:'',daysToSubmit:'',followUpMonth:'',followUpStatus:'',ownerName:'',headName:'',secretaryName:'',chairName:'',hrms:false};
+const DF={department:'',date:'',title:'',incidentCode:'',sevL:'',sevN:'',whatHappened:'',where:'',when:'',eventDate:'',professions:'',relatedDepts:'',mainFixDept:'',subFixDept:'',rcaParticipants:'',rcaDate:'',rcaTime:'',flowSteps:['','','','',''],fsSaved:false,cmps:[{step:'',problem:'',unsafeAct:''}],cmpsSaved:false,ta:mkTD(),summaryDate:'',daysToSubmit:'',followUpMonth:'',followUpStatus:'',ownerName:'',headName:'',secretaryName:'',chairName:'',hrms:false,attachments:[]};
 function gid(){return'RCA-'+Date.now().toString(36).toUpperCase()}
 function schId(){return'SCH-'+Date.now().toString(36).toUpperCase()}
 
@@ -612,7 +612,7 @@ function FormV({fd,sFD,uf}){
 
   return(
     <div>
-      <div className="hb"><span style={{fontSize:20}}>⚠️</span><div style={{flex:1}}><strong>เตือน: ลงระบบ HRMS</strong><label style={{marginLeft:14,cursor:'pointer'}}><input type="checkbox" checked={fd.hrms} onChange={e=>uf('hrms',e.target.checked)} style={{accentColor:'var(--primary)',marginRight:6}}/>ลงในระบบ HRMS ของโรงพยาบาลแล้ว</label></div></div>
+      <div className="hb"><span style={{fontSize:20}}>⚠️</span><div style={{flex:1}}><strong>เตือน: ลงระบบ HRMS</strong><label style={{marginLeft:14,cursor:'pointer'}}><input type="checkbox" checked={fd.hrms} onChange={e=>uf('hrms',e.target.checked)} style={{accentColor:'var(--primary)',marginRight:6}}/>(หากลงในระบบ HRMS แล้วให้ติ๊กกล่อง)</label></div></div>
       <div className="ftb">
         <div className={`ft2 ${tab==='p1'?'ac':''}`} onClick={()=>sTab('p1')}>ตอนที่ 1: ข้อมูลเบื้องต้น</div>
         <div className={`ft2 ${tab==='p23'?'ac':''}`} onClick={()=>sTab('p23')}>ตอนที่ 2-3: จุดเปลี่ยนและปัจจัยสาเหตุ</div>

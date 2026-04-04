@@ -1101,6 +1101,7 @@ function App(){
   const[ci,sCI]=useState(null);
   const[fd,sFD]=useState({...DF,ta:mkTD()});
   const[toast,sT]=useState(null);
+  const[saving,sSaving]=useState(false);
   const[sbCol,sSbCol]=useState(false);
   const[sch,sSch]=useState([]);
   const[unreadCount,setUnreadCount]=useState(0);
@@ -1233,6 +1234,7 @@ function App(){
   // RCA actions
   const hNew=()=>{sCI(null);sFD({...DF,ta:mkTD()});sN('form')};
   const hSave=async()=>{
+    sSaving(true);
     // Deep clean: remove undefined values recursively for Firestore compatibility
     const cleanForFirestore=(obj)=>{
       if(obj===undefined)return null;
@@ -1273,9 +1275,9 @@ function App(){
         await db.collection('rca').doc(newId).set(docData);
         sCI(newId);
       }
-      st('บันทึก RCA เรียบร้อย');
+      sSaving(false);st('✅ บันทึก RCA เรียบร้อยแล้ว');
     }catch(e){
-      st('เกิดข้อผิดพลาด: '+e.message);
+      sSaving(false);st('เกิดข้อผิดพลาด: '+e.message);
     }
   };
   const hLoad=r=>{sCI(r.id);sFD({...DF,...r,ta:(r.ta||mkTD()).map(migTier)});sN('form');if(isAdmin&&r.adminViewed===false){db.collection('rca').doc(r.id).update({adminViewed:true}).catch(()=>{})}};
@@ -1405,6 +1407,13 @@ function App(){
           </div>
         </div>
       </div>
+      {saving&&<div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:999}}>
+        <div style={{background:'#fff',borderRadius:16,padding:'32px 48px',textAlign:'center',boxShadow:'0 8px 32px rgba(0,0,0,0.3)'}}>
+          <div style={{width:48,height:48,border:'4px solid #dce1e8',borderTopColor:'var(--primary)',borderRadius:'50%',animation:'sp 0.8s linear infinite',margin:'0 auto 16px'}}></div>
+          <div style={{fontSize:16,fontWeight:700,color:'var(--primary)'}}>ระบบกำลังบันทึก...</div>
+          <div style={{fontSize:13,color:'var(--text-light)',marginTop:4}}>กรุณารอสักครู่</div>
+        </div>
+      </div>}
       {toast&&<div className="toast">{toast}</div>}
       {/* Footer */}
       <div style={{textAlign:'center',padding:'12px 20px',fontSize:11,color:'var(--text-light)',borderTop:'1px solid var(--border)',background:'#fff'}}>

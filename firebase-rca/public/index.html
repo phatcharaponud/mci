@@ -1298,6 +1298,16 @@ function App(){
   const hLoad=r=>{sCI(r.id);sFD({...DF,...r,ta:(r.ta||mkTD()).map(migTier)});sN('form');if(isAdmin&&r.adminViewed===false){db.collection('rca').doc(r.id).update({adminViewed:true}).catch(()=>{})}};
   const hExp=f2=>{const w=window.open('','_blank');w.document.write(bExp(fd,f2));w.document.close();st(f2==='pdf'?'เปิดหน้า PDF':'เปิด Word')};
 
+  // Auto-save every 5 minutes when editing RCA form
+  const autoSaveRef=useRef(null);
+  useEffect(()=>{
+    if(nav!=='form'||!user){clearInterval(autoSaveRef.current);return}
+    autoSaveRef.current=setInterval(()=>{
+      if(fd.title||fd.whatHappened||fd.department){hSave().then(()=>{}).catch(()=>{})}
+    },5*60*1000);
+    return()=>clearInterval(autoSaveRef.current);
+  },[nav,user,fd]);
+
   // Schedule actions (Firestore)
   const schSave=(newSch)=>{
     // Sync to Firestore

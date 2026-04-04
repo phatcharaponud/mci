@@ -449,7 +449,7 @@ function PendingPage({user,userData,onSubmitReg,onLogout}){
               <strong>ข้อมูลที่ส่ง:</strong><br/>
               ชื่อ-นามสกุล: {userData.fullName}<br/>
               หน่วยงาน: {userData.department}<br/>
-              วันที่สมัคร: {userData.createdAt?.toDate?.()?.toLocaleDateString('th-TH')||'-'}
+              วันที่สมัคร: {fmtDate(userData.createdAt)}
             </div>
             <p style={{fontSize:12,color:'var(--text-light)'}}>Admin จะตรวจสอบและอนุมัติให้โดยเร็ว</p>
             <button className="btn btn-o" style={{marginTop:12}} onClick={onLogout}>ออกจากระบบ</button>
@@ -516,7 +516,7 @@ function AdminPanel({users,onApprove,onReject}){
             <td style={{padding:8}}>{u.email}</td>
             <td style={{padding:8}}>{u.department}</td>
             <td style={{padding:8}}><span style={{background:u.role==='admin'?'var(--accent-warm)':'#e3f2fd',color:u.role==='admin'?'#fff':'var(--primary)',padding:'2px 8px',borderRadius:10,fontSize:11,fontWeight:600}}>{u.role==='admin'?'Admin':'User'}</span></td>
-            <td style={{padding:8}}>{u.createdAt?.toDate?.()?.toLocaleDateString('th-TH')||'-'}</td>
+            <td style={{padding:8}}>{fmtDate(u.createdAt)}</td>
             <td style={{padding:8}}>
               <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
                 {u.email!==ADMIN_EMAIL&&<button className="btn btn-sm btn-w" onClick={()=>{if(confirm('ยกเลิกการอนุมัติผู้ใช้ '+u.fullName+'?'))db.collection('users').doc(u.id).update({status:'pending'})}}>ยกเลิกอนุมัติ</button>}
@@ -672,9 +672,28 @@ function BoardV({user,userData,isAdmin}){
       </div>
       <div className="fg"><label className="fl">หัวข้อ</label><input className="fi" value={title} onChange={e=>sTitle(e.target.value)} placeholder="หัวข้อโพสต์"/></div>
       <div className="fg"><label className="fl">เนื้อหา</label><textarea className="ft" value={content} onChange={e=>sContent(e.target.value)} placeholder="เขียนเนื้อหา..." style={{minHeight:100}}/></div>
+      <div className="fg"><label className="fl">แนบไฟล์ (JPG, PNG, PDF สูงสุด 10 MB)</label>
+        <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+          <label className="btn btn-o btn-sm" style={{cursor:'pointer'}}>
+            📎 เลือกไฟล์
+            <input type="file" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" multiple onChange={handlePostFileSelect} style={{display:'none'}}/>
+          </label>
+          <span style={{fontSize:12,color:'var(--text-light)'}}>หรือ</span>
+          <input className="fi" style={{flex:1,minWidth:200,marginBottom:0}} value={postLinkUrl} onChange={e=>sPostLinkUrl(e.target.value)} placeholder="วาง URL ลิงก์ที่ต้องการแนบ..." onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();addPostLink()}}}/>
+          <button className="btn btn-sm btn-p" onClick={addPostLink} type="button">+ เพิ่มลิงก์</button>
+        </div>
+        {postAttachFiles.length>0&&<div style={{display:'flex',flexWrap:'wrap',gap:8,marginTop:8}}>
+          {postAttachFiles.map((f,i)=>(
+            <div key={i} style={{background:'#f8f9fa',border:'1px solid var(--border)',borderRadius:6,padding:'4px 8px',display:'flex',alignItems:'center',gap:6,fontSize:12}}>
+              <span>{f._isLink?'🔗':'📄'} {f._isLink?f.name:f.name}</span>
+              <span style={{cursor:'pointer',color:'var(--accent)',fontWeight:700}} onClick={()=>removePostFile(i)}>✕</span>
+            </div>
+          ))}
+        </div>}
+      </div>
       <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
-        <button className="btn btn-o" onClick={()=>sSF(false)}>ยกเลิก</button>
-        <button className="btn btn-p" onClick={hPost}>โพสต์</button>
+        <button className="btn btn-o" onClick={()=>{sSF(false);sPostAttachFiles([]);sPostLinkUrl('')}}>ยกเลิก</button>
+        <button className="btn btn-p" onClick={hPost} disabled={postUploading}>{postUploading?'กำลังอัปโหลด...':'โพสต์'}</button>
       </div>
     </div></div>}
 
@@ -702,8 +721,16 @@ function BoardV({user,userData,isAdmin}){
           </div>
         </div>
         <div style={{fontSize:13,color:'var(--text)',marginTop:8,whiteSpace:'pre-wrap',lineHeight:1.6}}>{p.content}</div>
+        {(p.attachments||[]).length>0&&<div style={{display:'flex',flexWrap:'wrap',gap:8,marginTop:8}}>
+          {(p.attachments||[]).map((att,ai)=>{
+            if(att.type==='link')return<a key={ai} href={att.url} target="_blank" rel="noopener noreferrer" className="board-attach-link">🔗 {att.url.length>60?att.url.substring(0,60)+'...':att.url}</a>;
+            if(att.type&&att.type.startsWith('image/'))return<img key={ai} src={att.url} className="board-attach-thumb" alt={att.name} title={att.name} onClick={()=>sLightboxImg(att.url)}/>;
+            if(att.type==='application/pdf')return<a key={ai} href={att.url} target="_blank" rel="noopener noreferrer" className="board-attach-file">📄 {att.name}</a>;
+            return<a key={ai} href={att.url} target="_blank" rel="noopener noreferrer" className="board-attach-file">📎 {att.name}</a>;
+          })}
+        </div>}
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:10,paddingTop:8,borderTop:'1px solid var(--border)'}}>
-          <div style={{fontSize:11,color:'var(--text-light)'}}>โดย {p.authorName} | {p.createdAt?.toDate?.()?.toLocaleString('th-TH')||'...'}{p.editedAt&&<span style={{marginLeft:6,fontStyle:'italic'}}> (แก้ไขล่าสุด: {p.editedAt?.toDate?.()?.toLocaleString('th-TH')||'...'})</span>}</div>
+          <div style={{fontSize:11,color:'var(--text-light)'}}>โดย {p.authorName} | {fmtDateTime(p.createdAt)}{p.editedAt&&<span style={{marginLeft:6,fontStyle:'italic'}}> (แก้ไขล่าสุด: {fmtDateTime(p.editedAt)})</span>}</div>
           <div style={{display:'flex',gap:6}}>
             <button className="btn btn-sm btn-o" onClick={()=>loadReplies(p.id)}>{expandedPost===p.id?'ซ่อนความคิดเห็น':'ความคิดเห็น'} {(replies[p.id]||[]).length>0?'('+replies[p.id].length+')':''}</button>
             <button className="btn btn-sm btn-p" onClick={()=>{sReplyTo(replyTo===p.id?null:p.id);if(expandedPost!==p.id)loadReplies(p.id)}}>ตอบกลับ</button>
@@ -716,7 +743,7 @@ function BoardV({user,userData,isAdmin}){
             <div key={r.id} className="board-reply">
               <div style={{fontWeight:600,fontSize:12,color:'var(--primary)'}}>{r.authorName}</div>
               <div style={{marginTop:4,whiteSpace:'pre-wrap'}}>{r.content}</div>
-              <div style={{fontSize:10,color:'var(--text-light)',marginTop:4}}>{r.createdAt?.toDate?.()?.toLocaleString('th-TH')||'...'}</div>
+              <div style={{fontSize:10,color:'var(--text-light)',marginTop:4}}>{fmtDateTime(r.createdAt)}</div>
             </div>
           ))}
           {replyTo===p.id&&<div style={{marginTop:8,display:'flex',gap:8}}>
@@ -729,6 +756,10 @@ function BoardV({user,userData,isAdmin}){
         </div>}
       </div>
     ))}
+    {lightboxImg&&<div onClick={()=>sLightboxImg(null)} style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.85)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,cursor:'pointer'}}>
+      <button onClick={e=>{e.stopPropagation();sLightboxImg(null)}} style={{position:'absolute',top:20,right:20,background:'none',border:'none',color:'#fff',fontSize:32,cursor:'pointer',fontWeight:700,zIndex:10000}}>✕</button>
+      <img src={lightboxImg} style={{maxWidth:'90vw',maxHeight:'90vh',objectFit:'contain',borderRadius:8,boxShadow:'0 8px 32px rgba(0,0,0,0.5)'}} onClick={e=>e.stopPropagation()} alt="preview"/>
+    </div>}
   </div>;
 }
 
@@ -784,19 +815,19 @@ function FormV({fd,sFD,uf}){
 
       {tab==='p1'&&<>
         <div className="fc"><div className="fch">📋 ข้อมูลทั่วไป</div><div className="fcb">
-          <div className="fr"><div className="fg"><label className="fl">หน่วยงาน/ทีมนำ <span className="rq">*</span></label><input className="fi" value={fd.department} onChange={e=>uf('department',e.target.value)} placeholder="ระบุหน่วยงาน"/></div><div className="fg"><label className="fl">วันที่จัดทำ (ปี ค.ศ.)</label><input className="fi" type="date" value={fd.date} onChange={e=>uf('date',e.target.value)}/></div></div>
+          <div className="fr"><div className="fg"><label className="fl">หน่วยงาน/ทีมนำ <span className="rq">*</span></label><input className="fi" value={fd.department} onChange={e=>uf('department',e.target.value)} placeholder="ระบุหน่วยงาน"/></div><div className="fg"><label className="fl">วันที่จัดทำ (วัน/เดือน/ปี ค.ศ. ระบบแปลงเป็น พ.ศ. อัตโนมัติ)</label><input className="fi" type="date" value={fd.date} onChange={e=>uf('date',e.target.value)}/></div></div>
           <div className="fr"><div className="fg"><label className="fl">เรื่อง <span className="rq">*</span></label><input className="fi" value={fd.title} onChange={e=>uf('title',e.target.value)} placeholder="ชื่อเหตุการณ์"/></div><div className="fg"><label className="fl">รหัสอุบัติการณ์</label><input className="fi" value={fd.incidentCode} onChange={e=>uf('incidentCode',e.target.value)} placeholder="IR-XXXX"/></div></div>
           <div className="fg"><label className="fl">ระดับความรุนแรง</label><div style={{display:'flex',gap:24,flexWrap:'wrap'}}><div><div style={{fontSize:11,color:'var(--text-light)',marginBottom:4}}>NCC MERP (A-I) <span style={{color:'var(--primary-light)'}}>- วางเมาส์เพื่อดูคำอธิบาย</span></div><div className="sg">{SEV_L.map(s=><span key={s} className="tp-wrap"><span className={`sb2 ${fd.sevL===s?'sel':''}`} onClick={()=>uf('sevL',s)}>{s}</span><span className="tp-box"><b>{s}:</b> {SEV_L_TIP[s]}</span></span>)}</div></div><div><div style={{fontSize:11,color:'var(--text-light)',marginBottom:4}}>Safety Score (1-5) <span style={{color:'var(--primary-light)'}}>- วางเมาส์เพื่อดูคำอธิบาย</span></div><div className="sg">{SEV_N.map(s=><span key={s} className="tp-wrap"><span className={`sb2 ${fd.sevN===s?'sel':''}`} onClick={()=>uf('sevN',s)}>{s}</span><span className="tp-box"><b>ระดับ {s}:</b> {SEV_N_TIP[s]}</span></span>)}</div></div></div></div>
         </div></div>
         <div className="fc"><div className="fch">📝 บรรยายสรุป</div><div className="fcb">
           <div className="fg"><label className="fl">1.1 เกิดอะไรขึ้น <span className="rq">*</span></label><textarea className="ft" style={{minHeight:120}} value={fd.whatHappened} onChange={e=>uf('whatHappened',e.target.value)} placeholder="บรรยายรายละเอียด..."/></div>
-          <div className="fr3"><div className="fg"><label className="fl">1.2 เกิดที่</label><input className="fi" value={fd.where} onChange={e=>uf('where',e.target.value)}/></div><div className="fg"><label className="fl">1.3 เวลา</label><input className="fi" type="time" value={fd.when} onChange={e=>uf('when',e.target.value)}/></div><div className="fg"><label className="fl">วันที่เกิดเหตุ (ปี ค.ศ.)</label><input className="fi" type="date" value={fd.eventDate} onChange={e=>uf('eventDate',e.target.value)}/></div></div>
+          <div className="fr3"><div className="fg"><label className="fl">1.2 เกิดที่</label><input className="fi" value={fd.where} onChange={e=>uf('where',e.target.value)}/></div><div className="fg"><label className="fl">1.3 เวลา</label><input className="fi" type="time" value={fd.when} onChange={e=>uf('when',e.target.value)}/></div><div className="fg"><label className="fl">วันที่เกิดเหตุ (วัน/เดือน/ปี ค.ศ. ระบบแปลงเป็น พ.ศ. อัตโนมัติ)</label><input className="fi" type="date" value={fd.eventDate} onChange={e=>uf('eventDate',e.target.value)}/></div></div>
           <div className="fr"><div className="fg"><label className="fl">วิชาชีพที่เกี่ยวข้อง</label><textarea className="ft" value={fd.professions} onChange={e=>uf('professions',e.target.value)} placeholder="แพทย์, พยาบาล..."/></div><div className="fg"><label className="fl">หน่วยงานที่เกี่ยวข้อง</label><textarea className="ft" value={fd.relatedDepts} onChange={e=>uf('relatedDepts',e.target.value)} placeholder="ER, ICU..."/></div></div>
           <div className="fr"><div className="fg"><label className="fl">กลุ่ม/หน่วยงานหลักที่แก้ไข</label><input className="fi" value={fd.mainFixDept} onChange={e=>uf('mainFixDept',e.target.value)} placeholder="ระบุกลุ่ม/หน่วยงานหลักที่รับผิดชอบแก้ไข"/></div><div className="fg"><label className="fl">กลุ่ม/หน่วยงานร่วมที่แก้ไข</label><input className="fi" value={fd.subFixDept} onChange={e=>uf('subFixDept',e.target.value)} placeholder="ระบุกลุ่ม/หน่วยงานร่วมที่เกี่ยวข้องในการแก้ไข"/></div></div>
         </div></div>
         <div className="fc"><div className="fch">👥 ผู้เข้าร่วมการทำ RCA</div><div className="fcb">
           <div className="fg"><label className="fl">ผู้เข้าร่วมการทำ RCA</label><textarea className="ft" style={{minHeight:80}} value={fd.rcaParticipants} onChange={e=>uf('rcaParticipants',e.target.value)} placeholder="ระบุชื่อ-นามสกุล ตำแหน่ง ของผู้เข้าร่วม (คนละบรรทัด)"/></div>
-          <div className="fr"><div className="fg"><label className="fl">วันที่ทำ RCA (ปี ค.ศ.)</label><input className="fi" type="date" value={fd.rcaDate} onChange={e=>uf('rcaDate',e.target.value)}/></div><div className="fg"><label className="fl">เวลาทำ RCA</label><input className="fi" type="time" value={fd.rcaTime} onChange={e=>uf('rcaTime',e.target.value)}/></div></div>
+          <div className="fr"><div className="fg"><label className="fl">วันที่ทำ RCA (วัน/เดือน/ปี ค.ศ. ระบบแปลงเป็น พ.ศ. อัตโนมัติ)</label><input className="fi" type="date" value={fd.rcaDate} onChange={e=>uf('rcaDate',e.target.value)}/></div><div className="fg"><label className="fl">เวลาทำ RCA</label><input className="fi" type="time" value={fd.rcaTime} onChange={e=>uf('rcaTime',e.target.value)}/></div></div>
         </div></div>
         <div className="fc"><div className="fch">📎 เอกสารแนบ</div><div className="fcb">
           <div style={{marginBottom:12}}>
@@ -1064,7 +1095,7 @@ function ListV({rl,onL,onN,sRL,isAdmin,onExportPdf}){
   return<div>
     <div style={{marginBottom:12}}><input className="fi" value={srch} onChange={e=>sSrch(e.target.value)} placeholder="🔍 ค้นหา RCA ตามชื่อเรื่อง, หน่วยงาน, รหัสอุบัติการณ์, หรือ ID..." style={{maxWidth:500}}/></div>
     {filtered.length===0?<div style={{textAlign:'center',padding:30,color:'var(--text-light)',fontSize:14}}>ไม่พบผลลัพธ์สำหรับ "{srch}"</div>:
-    <table className="rlt"><thead><tr><th>รหัส</th><th>เรื่อง</th><th>หน่วยงาน</th><th>วันที่</th><th>ระดับ</th><th>HRMS</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody>{filtered.map(r=><tr key={r.id}><td style={{fontWeight:600,color:'var(--primary)'}}>{r.id}</td><td>{r.title||'-'}</td><td>{r.department||'-'}</td><td>{r.date||'-'}</td><td>{r.sevL||'-'}{r.sevN?'/'+r.sevN:''}</td><td>{r.hrms?<span className="stb sth">✅</span>:<span style={{color:'var(--accent)'}}>❌</span>}</td><td><span className={`stb ${r.followUpStatus==='completed'?'stc':'std'}`}>{r.followUpStatus==='completed'?'เสร็จ':r.followUpStatus==='in_progress'?'ดำเนินการ':'รอ'}</span></td><td><div style={{display:'flex',gap:4,flexWrap:'wrap'}}><button className="btn btn-sm btn-p" onClick={()=>onL(r)}>เปิด</button><button className="btn btn-sm btn-w" onClick={()=>onExportPdf(r)} title="Export PDF">📄</button>{isAdmin&&<button className="btn btn-sm btn-d" onClick={()=>{if(confirm('ลบ RCA '+r.id+' ('+( r.title||'-')+') ?')){db.collection('rca').doc(r.id).delete().then(()=>{sRL(prev=>prev.filter(x=>x.id!==r.id))})}}} title="ลบ">ลบ</button>}</div></td></tr>)}</tbody></table>}
+    <table className="rlt"><thead><tr><th>รหัส</th><th>เรื่อง</th><th>หน่วยงาน</th><th>วันที่</th><th>ระดับ</th><th>HRMS</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody>{filtered.map(r=><tr key={r.id}><td style={{fontWeight:600,color:'var(--primary)'}}>{r.id}</td><td>{r.title||'-'}</td><td>{r.department||'-'}</td><td>{fmtDate(r.date)}</td><td>{r.sevL||'-'}{r.sevN?'/'+r.sevN:''}</td><td>{r.hrms?<span className="stb sth">✅</span>:<span style={{color:'var(--accent)'}}>❌</span>}</td><td><span className={`stb ${r.followUpStatus==='completed'?'stc':'std'}`}>{r.followUpStatus==='completed'?'เสร็จ':r.followUpStatus==='in_progress'?'ดำเนินการ':'รอ'}</span></td><td><div style={{display:'flex',gap:4,flexWrap:'wrap'}}><button className="btn btn-sm btn-p" onClick={()=>onL(r)}>เปิด</button><button className="btn btn-sm btn-w" onClick={()=>onExportPdf(r)} title="Export PDF">📄</button>{isAdmin&&<button className="btn btn-sm btn-d" onClick={()=>{if(confirm('ลบ RCA '+r.id+' ('+( r.title||'-')+') ?')){db.collection('rca').doc(r.id).delete().then(()=>{sRL(prev=>prev.filter(x=>x.id!==r.id))})}}} title="ลบ">ลบ</button>}</div></td></tr>)}</tbody></table>}
   </div>;
 }
 
@@ -1107,7 +1138,7 @@ function CalV({sch,sSch,st}){
     <div className="fc" style={{marginTop:16}}><div className="fch" style={{background:'linear-gradient(135deg,#e67e22,#f39c12)'}}>📅 กำหนดการ RCA ที่จะถึง</div><div className="fcb">
       {upcoming.length===0?<div style={{color:'var(--text-light)',fontSize:13,padding:8}}>ไม่มีกำหนดการที่จะถึง</div>:
       <div style={{display:'flex',flexDirection:'column',gap:8}}>{upcoming.map(s=><div key={s.id} style={{background:'#fff8e1',border:'1px solid #ffc107',borderRadius:8,padding:12,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-        <div><strong style={{color:'var(--primary)',fontSize:13}}>{s.title}</strong><div style={{fontSize:12,color:'var(--text-light)',marginTop:2}}>{s.department} | {s.rcaDate} {s.rcaTime?'เวลา '+s.rcaTime:''} {s.location?'| '+s.location:''}</div></div>
+        <div><strong style={{color:'var(--primary)',fontSize:13}}>{s.title}</strong><div style={{fontSize:12,color:'var(--text-light)',marginTop:2}}>{s.department} | {fmtDate(s.rcaDate)} {s.rcaTime?'เวลา '+s.rcaTime:''} {s.location?'| '+s.location:''}</div></div>
         <div style={{display:'flex',gap:4}}><button className="btn btn-sm btn-p" onClick={()=>openEdit(s)}>แก้ไข</button><button className="btn btn-sm btn-d" onClick={()=>hDel(s.id)}>ลบ</button></div>
       </div>)}</div>}
     </div></div>
@@ -1128,7 +1159,7 @@ function CalV({sch,sSch,st}){
         <div className="fg"><label className="fl">หัวข้อเรื่อง <span className="rq">*</span></label><input className="fi" value={f.title} onChange={e=>sF(p=>({...p,title:e.target.value}))} placeholder="ระบุหัวข้อเรื่อง RCA"/></div>
         <div className="fg"><label className="fl">หน่วยงานที่เกี่ยวข้อง</label><input className="fi" value={f.department} onChange={e=>sF(p=>({...p,department:e.target.value}))} placeholder="ระบุหน่วยงาน"/></div>
         <div className="fr">
-          <div className="fg"><label className="fl">วันที่ (ปี ค.ศ.) <span className="rq">*</span></label><input className="fi" type="date" value={f.rcaDate} onChange={e=>sF(p=>({...p,rcaDate:e.target.value}))}/></div>
+          <div className="fg"><label className="fl">วันที่ (วัน/เดือน/ปี ค.ศ. ระบบแปลงเป็น พ.ศ. อัตโนมัติ) <span className="rq">*</span></label><input className="fi" type="date" value={f.rcaDate} onChange={e=>sF(p=>({...p,rcaDate:e.target.value}))}/></div>
           <div className="fg"><label className="fl">เวลา</label><input className="fi" type="time" value={f.rcaTime} onChange={e=>sF(p=>({...p,rcaTime:e.target.value}))}/></div>
         </div>
         <div className="fg"><label className="fl">สถานที่</label><input className="fi" value={f.location} onChange={e=>sF(p=>({...p,location:e.target.value}))} placeholder="ระบุสถานที่"/></div>

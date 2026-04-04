@@ -310,6 +310,7 @@ function bExp(fd,fmt){
 <table><tr><th>วิชาชีพที่เกี่ยวข้อง</th><th>หน่วยงานที่เกี่ยวข้อง</th></tr><tr><td>${fd.professions||'-'}</td><td>${fd.relatedDepts||'-'}</td></tr></table>
 <table><tr><th>กลุ่ม/หน่วยงานหลักที่แก้ไข</th><th>กลุ่ม/หน่วยงานร่วมที่แก้ไข</th></tr><tr><td>${fd.mainFixDept||'-'}</td><td>${fd.subFixDept||'-'}</td></tr></table>
 <table><tr><th style="width:50%">ผู้เข้าร่วมการทำ RCA</th><th>วันที่/เวลาทำ RCA</th></tr><tr><td>${(fd.rcaParticipants||'-').replace(/\n/g,'<br>')}</td><td>${fd.rcaDate||'-'} ${fd.rcaTime?'เวลา '+fd.rcaTime:''}</td></tr></table>
+${(fd.attachments||[]).length>0?'<h3>เอกสารแนบ</h3><div style="display:flex;flex-wrap:wrap;gap:10px;margin:8px 0">'+(fd.attachments||[]).map(a=>a.type.startsWith('image/')?'<div style="text-align:center"><img src="'+a.data+'" style="max-width:150px;max-height:100px;border-radius:4px;border:1px solid #ccc"/><div style="font-size:10px;margin-top:2px">'+a.name+'</div></div>':'<div style="text-align:center;padding:8px;border:1px solid #ccc;border-radius:4px"><div style="font-size:24px">📄</div><div style="font-size:10px">'+a.name+'</div></div>').join('')+'</div>':''}
 <h2>ตอนที่ 2: วิเคราะห์ขั้นตอน/กิจกรรมที่เป็นจุดเปลี่ยน</h2>
 <p><b>Flow of Steps:</b></p>
 <div class="fc">${ss.map((s,i)=>`${i>0?'<span class="far">\u2192</span>':''}<span class="fb">${s}</span>`).join('')}</div>
@@ -463,14 +464,23 @@ function AdminPanel({users,onApprove,onReject}){
           <th style={{padding:8,textAlign:'left'}}>ชื่อ-นามสกุล</th>
           <th style={{padding:8,textAlign:'left'}}>อีเมล</th>
           <th style={{padding:8,textAlign:'left'}}>หน่วยงาน</th>
+          <th style={{padding:8,textAlign:'left'}}>บทบาท</th>
           <th style={{padding:8,textAlign:'left'}}>วันที่สมัคร</th>
+          <th style={{padding:8,textAlign:'left'}}>จัดการ</th>
         </tr></thead>
         <tbody>{approved.map(u=>(
           <tr key={u.id} style={{borderBottom:'1px solid var(--border)'}}>
             <td style={{padding:8}}>{u.fullName}</td>
             <td style={{padding:8}}>{u.email}</td>
             <td style={{padding:8}}>{u.department}</td>
+            <td style={{padding:8}}><span style={{background:u.role==='admin'?'var(--accent-warm)':'#e3f2fd',color:u.role==='admin'?'#fff':'var(--primary)',padding:'2px 8px',borderRadius:10,fontSize:11,fontWeight:600}}>{u.role==='admin'?'Admin':'User'}</span></td>
             <td style={{padding:8}}>{u.createdAt?.toDate?.()?.toLocaleDateString('th-TH')||'-'}</td>
+            <td style={{padding:8}}>
+              <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+                <button className="btn btn-sm btn-w" onClick={()=>{if(confirm('ยกเลิกการอนุมัติผู้ใช้ '+u.fullName+'?'))db.collection('users').doc(u.id).update({status:'pending'})}}>ยกเลิกอนุมัติ</button>
+                <button className="btn btn-sm btn-p" onClick={()=>{const newRole=u.role==='admin'?'user':'admin';if(confirm('เปลี่ยนบทบาท '+u.fullName+' เป็น '+newRole+'?'))db.collection('users').doc(u.id).update({role:newRole})}}>{u.role==='admin'?'เปลี่ยนเป็น User':'เปลี่ยนเป็น Admin'}</button>
+              </div>
+            </td>
           </tr>
         ))}</tbody>
       </table>
@@ -489,6 +499,10 @@ function BoardV({user,userData,isAdmin}){
   const[replyText,sReplyText]=useState('');
   const[replies,setReplies]=useState({});
   const[expandedPost,sExpanded]=useState(null);
+  const[editingPost,sEditingPost]=useState(null);
+  const[editTitle,sEditTitle]=useState('');
+  const[editContent,sEditContent]=useState('');
+  const[boardSearch,sBoardSearch]=useState('');
 
   useEffect(()=>{
     const unsub=db.collection('posts').orderBy('createdAt','desc').limit(50).onSnapshot(snap=>{
@@ -531,11 +545,35 @@ function BoardV({user,userData,isAdmin}){
     await db.collection('posts').doc(postId).delete();
   };
 
+  const startEdit=(p)=>{
+    sEditingPost(p.id);sEditTitle(p.title);sEditContent(p.content);
+  };
+  const cancelEdit=()=>{sEditingPost(null);sEditTitle('');sEditContent('')};
+  const hSaveEdit=async(postId)=>{
+    if(!editTitle.trim()||!editContent.trim())return alert('กรุณากรอกหัวข้อและเนื้อหา');
+    await db.collection('posts').doc(postId).update({
+      title:editTitle.trim(),content:editContent.trim(),
+      editedAt:firebase.firestore.FieldValue.serverTimestamp()
+    });
+    sEditingPost(null);sEditTitle('');sEditContent('');
+  };
+
+  // Sort: RM News first, then by createdAt desc
+  const sortedPosts=[...posts].sort((a,b)=>{
+    if(a.category==='RM News'&&b.category!=='RM News')return -1;
+    if(a.category!=='RM News'&&b.category==='RM News')return 1;
+    return 0;
+  });
+
+  // Filter by search
+  const filteredPosts=boardSearch.trim()?sortedPosts.filter(p=>{const q=boardSearch.toLowerCase();return(p.title||'').toLowerCase().includes(q)||(p.content||'').toLowerCase().includes(q)}):sortedPosts;
+
   return<div>
-    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
-      <div style={{fontSize:13,color:'var(--text-light)'}}>แลกเปลี่ยนความรู้และข่าวสาร</div>
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+      <div style={{fontSize:13,color:'var(--text-light)'}}>แลกเปลี่ยนความรู้และข่าวสาร RM News</div>
       <button className="btn btn-p" onClick={()=>sSF(!showForm)}>+ สร้างโพสต์ใหม่</button>
     </div>
+    <div style={{marginBottom:12}}><input className="fi" value={boardSearch} onChange={e=>sBoardSearch(e.target.value)} placeholder="🔍 ค้นหาโพสต์ตามหัวข้อหรือเนื้อหา..." style={{maxWidth:500}}/></div>
 
     {showForm&&<div className="fc" style={{marginBottom:16}}><div className="fch">สร้างโพสต์ใหม่</div><div className="fcb">
       <div className="fg"><label className="fl">หมวดหมู่</label>
@@ -552,26 +590,38 @@ function BoardV({user,userData,isAdmin}){
       </div>
     </div></div>}
 
-    {posts.length===0?<div style={{textAlign:'center',padding:40,color:'var(--text-light)'}}>
+    {filteredPosts.length===0?<div style={{textAlign:'center',padding:40,color:'var(--text-light)'}}>
       <div style={{fontSize:48}}>💬</div>
-      <div style={{fontSize:14,marginTop:8}}>ยังไม่มีโพสต์</div>
-    </div>:posts.map(p=>(
+      <div style={{fontSize:14,marginTop:8}}>{boardSearch.trim()?'ไม่พบโพสต์ที่ตรงกับ "'+boardSearch+'"':'ยังไม่มีโพสต์'}</div>
+    </div>:filteredPosts.map(p=>(
       <div key={p.id} className={`board-post ${p.category==='RM News'?'cat-rm':''}`}>
+        {editingPost===p.id?<div>
+          <div className="fg"><label className="fl">หัวข้อ</label><input className="fi" value={editTitle} onChange={e=>sEditTitle(e.target.value)}/></div>
+          <div className="fg"><label className="fl">เนื้อหา</label><textarea className="ft" value={editContent} onChange={e=>sEditContent(e.target.value)} style={{minHeight:80}}/></div>
+          <div style={{display:'flex',gap:6,justifyContent:'flex-end'}}>
+            <button className="btn btn-sm btn-o" onClick={cancelEdit}>ยกเลิก</button>
+            <button className="btn btn-sm btn-s" onClick={()=>hSaveEdit(p.id)}>บันทึก</button>
+          </div>
+        </div>:<>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
           <div>
             <span className="board-cat" style={{background:p.category==='RCA'?'var(--primary)':'var(--accent-warm)'}}>{p.category}</span>
             <strong style={{fontSize:15}}>{p.title}</strong>
           </div>
-          {(isAdmin||p.authorUid===user.uid)&&<button className="btn btn-sm btn-d" onClick={()=>hDelete(p.id)} style={{padding:'2px 8px',fontSize:11}}>ลบ</button>}
+          <div style={{display:'flex',gap:4}}>
+            {p.authorUid===user.uid&&<button className="btn btn-sm btn-w" onClick={()=>startEdit(p)} style={{padding:'2px 8px',fontSize:11}}>แก้ไข</button>}
+            {isAdmin&&<button className="btn btn-sm btn-d" onClick={()=>hDelete(p.id)} style={{padding:'2px 8px',fontSize:11}}>ลบ</button>}
+          </div>
         </div>
         <div style={{fontSize:13,color:'var(--text)',marginTop:8,whiteSpace:'pre-wrap',lineHeight:1.6}}>{p.content}</div>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:10,paddingTop:8,borderTop:'1px solid var(--border)'}}>
-          <div style={{fontSize:11,color:'var(--text-light)'}}>โดย {p.authorName} | {p.createdAt?.toDate?.()?.toLocaleString('th-TH')||'...'}</div>
+          <div style={{fontSize:11,color:'var(--text-light)'}}>โดย {p.authorName} | {p.createdAt?.toDate?.()?.toLocaleString('th-TH')||'...'}{p.editedAt&&<span style={{marginLeft:6,fontStyle:'italic'}}> (แก้ไขล่าสุด: {p.editedAt?.toDate?.()?.toLocaleString('th-TH')||'...'})</span>}</div>
           <div style={{display:'flex',gap:6}}>
             <button className="btn btn-sm btn-o" onClick={()=>loadReplies(p.id)}>{expandedPost===p.id?'ซ่อนความคิดเห็น':'ความคิดเห็น'} {(replies[p.id]||[]).length>0?'('+replies[p.id].length+')':''}</button>
             <button className="btn btn-sm btn-p" onClick={()=>{sReplyTo(replyTo===p.id?null:p.id);if(expandedPost!==p.id)loadReplies(p.id)}}>ตอบกลับ</button>
           </div>
         </div>
+        </>}
 
         {expandedPost===p.id&&<div style={{marginTop:8}}>
           {(replies[p.id]||[]).map(r=>(
@@ -619,6 +669,30 @@ function FormV({fd,sFD,uf}){
         <div className={`ft2 ${tab==='sm'?'ac':''}`} onClick={()=>sTab('sm')}>สรุปผลและติดตาม</div>
       </div>
 
+      {/* File attachment handler */}
+      {(() => {
+        const handleFileAttach = (e) => {
+          const files = Array.from(e.target.files);
+          const maxSize = 20 * 1024 * 1024;
+          files.forEach(file => {
+            if (file.size > maxSize) { alert(`ไฟล์ ${file.name} มีขนาดเกิน 20 MB`); return; }
+            if (!['image/jpeg','image/png','application/pdf'].includes(file.type)) { alert(`ไฟล์ ${file.name} ไม่ใช่ประเภทที่รองรับ (jpg, png, pdf)`); return; }
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+              sFD(p => ({...p, attachments: [...(p.attachments||[]), {name: file.name, type: file.type, data: ev.target.result, size: file.size}]}));
+            };
+            reader.readAsDataURL(file);
+          });
+          e.target.value = '';
+        };
+        const removeAttach = (idx) => {
+          sFD(p => ({...p, attachments: (p.attachments||[]).filter((_,i) => i !== idx)}));
+        };
+        window.__handleFileAttach = handleFileAttach;
+        window.__removeAttach = removeAttach;
+        return null;
+      })()}
+
       {tab==='p1'&&<>
         <div className="fc"><div className="fch">📋 ข้อมูลทั่วไป</div><div className="fcb">
           <div className="fr"><div className="fg"><label className="fl">หน่วยงาน/ทีมนำ <span className="rq">*</span></label><input className="fi" value={fd.department} onChange={e=>uf('department',e.target.value)} placeholder="ระบุหน่วยงาน"/></div><div className="fg"><label className="fl">วันที่จัดทำ (ปี ค.ศ.)</label><input className="fi" type="date" value={fd.date} onChange={e=>uf('date',e.target.value)}/></div></div>
@@ -634,6 +708,25 @@ function FormV({fd,sFD,uf}){
         <div className="fc"><div className="fch">👥 ผู้เข้าร่วมการทำ RCA</div><div className="fcb">
           <div className="fg"><label className="fl">ผู้เข้าร่วมการทำ RCA</label><textarea className="ft" style={{minHeight:80}} value={fd.rcaParticipants} onChange={e=>uf('rcaParticipants',e.target.value)} placeholder="ระบุชื่อ-นามสกุล ตำแหน่ง ของผู้เข้าร่วม (คนละบรรทัด)"/></div>
           <div className="fr"><div className="fg"><label className="fl">วันที่ทำ RCA (ปี ค.ศ.)</label><input className="fi" type="date" value={fd.rcaDate} onChange={e=>uf('rcaDate',e.target.value)}/></div><div className="fg"><label className="fl">เวลาทำ RCA</label><input className="fi" type="time" value={fd.rcaTime} onChange={e=>uf('rcaTime',e.target.value)}/></div></div>
+        </div></div>
+        <div className="fc"><div className="fch">📎 เอกสารแนบ</div><div className="fcb">
+          <div style={{marginBottom:12}}>
+            <label className="btn btn-p btn-sm" style={{cursor:'pointer'}}>
+              📁 เลือกไฟล์ (JPG, PNG, PDF สูงสุด 20 MB)
+              <input type="file" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" multiple onChange={e=>window.__handleFileAttach(e)} style={{display:'none'}}/>
+            </label>
+          </div>
+          {(fd.attachments||[]).length>0&&<div style={{display:'flex',flexWrap:'wrap',gap:12}}>
+            {(fd.attachments||[]).map((att,ai)=>(
+              <div key={ai} style={{border:'1px solid var(--border)',borderRadius:8,padding:8,width:140,textAlign:'center',position:'relative',background:'#f8f9fa'}}>
+                <button onClick={()=>window.__removeAttach(ai)} style={{position:'absolute',top:2,right:6,background:'none',border:'none',fontSize:16,cursor:'pointer',color:'var(--accent)',fontWeight:700}}>✕</button>
+                {att.type.startsWith('image/')?<img src={att.data} style={{width:'100%',height:80,objectFit:'cover',borderRadius:4,marginBottom:4}} alt={att.name}/>:<div style={{height:80,display:'flex',alignItems:'center',justifyContent:'center',fontSize:32,color:'var(--accent)'}}>📄</div>}
+                <div style={{fontSize:10,wordBreak:'break-all',lineHeight:1.3}}>{att.name}</div>
+                <div style={{fontSize:9,color:'var(--text-light)'}}>{(att.size/1024).toFixed(0)} KB</div>
+              </div>
+            ))}
+          </div>}
+          {(fd.attachments||[]).length===0&&<div style={{color:'var(--text-light)',fontSize:13}}>ยังไม่มีเอกสารแนบ</div>}
         </div></div>
       </>}
 
@@ -870,8 +963,14 @@ function TC({tier,idx,td,hd,fd,uT,uTE,tTCE,aTE,rTE}){
 
 // ===== LIST VIEW =====
 function ListV({rl,onL,onN,sRL}){
+  const[srch,sSrch]=useState('');
+  const filtered=srch.trim()?rl.filter(r=>{const q=srch.toLowerCase();return(r.title||'').toLowerCase().includes(q)||(r.department||'').toLowerCase().includes(q)||(r.incidentCode||'').toLowerCase().includes(q)||(r.id||'').toLowerCase().includes(q)}):rl;
   if(!rl.length)return<div style={{textAlign:'center',padding:60,color:'var(--text-light)'}}><div style={{fontSize:48}}>📋</div><div style={{fontSize:16,fontWeight:600,marginTop:8}}>ยังไม่มี RCA</div><button className="btn btn-p" style={{marginTop:16}} onClick={onN}>➕ สร้างใหม่</button></div>;
-  return<table className="rlt"><thead><tr><th>รหัส</th><th>เรื่อง</th><th>หน่วยงาน</th><th>วันที่</th><th>ระดับ</th><th>HRMS</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody>{rl.map(r=><tr key={r.id}><td style={{fontWeight:600,color:'var(--primary)'}}>{r.id}</td><td>{r.title||'-'}</td><td>{r.department||'-'}</td><td>{r.date||'-'}</td><td>{r.sevL||'-'}{r.sevN?'/'+r.sevN:''}</td><td>{r.hrms?<span className="stb sth">✅</span>:<span style={{color:'var(--accent)'}}>❌</span>}</td><td><span className={`stb ${r.followUpStatus==='completed'?'stc':'std'}`}>{r.followUpStatus==='completed'?'เสร็จ':r.followUpStatus==='in_progress'?'ดำเนินการ':'รอ'}</span></td><td><button className="btn btn-sm btn-p" onClick={()=>onL(r)}>เปิด</button></td></tr>)}</tbody></table>;
+  return<div>
+    <div style={{marginBottom:12}}><input className="fi" value={srch} onChange={e=>sSrch(e.target.value)} placeholder="🔍 ค้นหา RCA ตามชื่อเรื่อง, หน่วยงาน, รหัสอุบัติการณ์, หรือ ID..." style={{maxWidth:500}}/></div>
+    {filtered.length===0?<div style={{textAlign:'center',padding:30,color:'var(--text-light)',fontSize:14}}>ไม่พบผลลัพธ์สำหรับ "{srch}"</div>:
+    <table className="rlt"><thead><tr><th>รหัส</th><th>เรื่อง</th><th>หน่วยงาน</th><th>วันที่</th><th>ระดับ</th><th>HRMS</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody>{filtered.map(r=><tr key={r.id}><td style={{fontWeight:600,color:'var(--primary)'}}>{r.id}</td><td>{r.title||'-'}</td><td>{r.department||'-'}</td><td>{r.date||'-'}</td><td>{r.sevL||'-'}{r.sevN?'/'+r.sevN:''}</td><td>{r.hrms?<span className="stb sth">✅</span>:<span style={{color:'var(--accent)'}}>❌</span>}</td><td><span className={`stb ${r.followUpStatus==='completed'?'stc':'std'}`}>{r.followUpStatus==='completed'?'เสร็จ':r.followUpStatus==='in_progress'?'ดำเนินการ':'รอ'}</span></td><td><button className="btn btn-sm btn-p" onClick={()=>onL(r)}>เปิด</button></td></tr>)}</tbody></table>}
+  </div>;
 }
 
 // ===== CALENDAR VIEW =====
@@ -1197,7 +1296,7 @@ function App(){
   }
 
   // Approved - show main app
-  const navTitle={form:'📋 แบบฟอร์มบันทึก RCA',list:'📁 รายการ RCA',cal:'📅 ปฏิทินกำหนดทำ RCA',kb:'📚 ความรู้ RCA',db:'📊 Dashboard',admin:'👑 จัดการผู้ใช้',board:'💬 กระดานแลกเปลี่ยน'};
+  const navTitle={form:'📋 แบบฟอร์มบันทึก RCA',list:'📁 รายการ RCA',cal:'📅 ปฏิทินกำหนดทำ RCA',kb:'📚 ความรู้ RCA',db:'📊 Dashboard',admin:'👑 จัดการผู้ใช้',board:'💬 กระดานแลกเปลี่ยน & RM News'};
 
   return(
     <div className="app-with-bar">
@@ -1224,7 +1323,7 @@ function App(){
             <div className="ns">เครื่องมือ</div>
             <div className={`ni ${nav==='cal'?'ac':''}`} onClick={()=>sN('cal')}><span className="ni-i">📅</span><span>ปฏิทินกำหนด RCA</span></div>
             <div className={`ni ${nav==='kb'?'ac':''}`} onClick={()=>sN('kb')}><span className="ni-i">📚</span><span>ความรู้ RCA</span></div>
-            <div className={`ni ${nav==='board'?'ac':''}`} onClick={()=>sN('board')}><span className="ni-i">💬</span><span>กระดานแลกเปลี่ยน</span></div>
+            <div className={`ni ${nav==='board'?'ac':''}`} onClick={()=>sN('board')}><span className="ni-i">💬</span><span>กระดานแลกเปลี่ยน & RM News</span></div>
             <div className="ns">รายงาน</div>
             <div className={`ni ${nav==='db'?'ac':''}`} onClick={()=>sN('db')}><span className="ni-i">📊</span><span>Dashboard</span></div>
             {isAdmin&&<><div className="ns">ผู้ดูแลระบบ</div>

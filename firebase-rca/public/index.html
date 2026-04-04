@@ -361,8 +361,11 @@ function PendingPage({user,userData,onSubmitReg,onLogout}){
   const[fn,sFn]=useState('');
   const[ln,sLn]=useState('');
   const[dept,sDept]=useState('');
+  const[showDeptList,sSDL]=useState(false);
   const needsReg=!userData||!userData.fullName;
   const isPending=userData&&userData.status==='pending';
+  const DEPTS=['งานพยาบาลแผนก ER','งานการพยาบาลผู้ป่วยนอก (OPD)','งานพยาบาลแผนก IPD 1/1 (ผู้ป่วยในสามัญ)','งานพยาบาลแผนก IPD3 (ผู้ป่วยในพิเศษ)','งานพยาบาลแผนก ICU','งานการพยาบาลห้องผ่าตัด','งานการพยาบาลห้องคลอด','งานการพยาบาลคลินิกพิเศษ','งานพยาบาลแผนกไตเทียม','งานวิสัญญี','งานธาลัสซีเมีย','งานปฐมภูมิและเสริมสร้างสุขภาพ','งานเภสัชกรรม','งานเทคนิคการแพทย์','งานธนาคารเลือด','งานรังสี','งานกายภาพบำบัด','งานเทคโนโลยีสารสนเทศและนวัตกรรมดิจิทัลทางการแพทย์','งานเวชระเบียนและเวชสถิติ','งานการเงินและบัญชี','งานประกันสุขภาพ','งานบริหารบุคคล','งานพัสดุ','งานโครงสร้างพื้นฐานและวิศวกรรมทางการแพทย์','งาน ENV','งานควบคุมและป้องกันการติดเชื้อ (IC)','งานวิชาการ','QMC (ทีมนำบริหารงานคุณภาพ)','RM (ทีมนำบริหารความเสี่ยง)','PCT sx (ทีมนำการดูแลผู้ป่วยศัลยกรรม)','PCT med (ทีมนำการดูแลผู้ป่วยอายุรกรรม)','PCT ObsGynPed (ทีมนำการดูแลผู้ป่วยสูติ-นรีเวชกรรมและกุมารเวชกรรม)','PTC (ทีมนำเภสัชกรรมและการบำบัด)','IC (ทีมนำป้องกันและควบคุมการติดเชื้อ)','ENV (ทีมนำสิ่งแวดล้อมและความปลอดภัย)','IM (ทีมนำบริหารระบบสารสนเทศ)','HRD (ทีมนำพัฒนาทรัพยากรบุคคล)','HPH (ทีมนำสร้างเสริมสุขภาพ)'];
+  const filteredDepts=dept.trim()?DEPTS.filter(d=>d.toLowerCase().includes(dept.toLowerCase())):DEPTS;
 
   const hSubmit=()=>{
     if(!fn.trim()||!ln.trim()||!dept.trim())return alert('กรุณากรอกข้อมูลให้ครบ');
@@ -384,7 +387,12 @@ function PendingPage({user,userData,onSubmitReg,onLogout}){
             <label>นามสกุล</label>
             <input value={ln} onChange={e=>sLn(e.target.value)} placeholder="นามสกุล"/>
             <label>หน่วยงาน</label>
-            <input value={dept} onChange={e=>sDept(e.target.value)} placeholder="เช่น งานบริหารความเสี่ยง"/>
+            <div style={{position:'relative'}}>
+              <input value={dept} onChange={e=>{sDept(e.target.value);sSDL(true)}} onFocus={()=>sSDL(true)} placeholder="พิมพ์เพื่อค้นหา หรือเลือกจากรายการ"/>
+              {showDeptList&&filteredDepts.length>0&&<div style={{position:'absolute',top:'100%',left:0,right:0,maxHeight:200,overflowY:'auto',background:'#fff',border:'1.5px solid var(--border)',borderRadius:6,zIndex:10,boxShadow:'0 4px 12px rgba(0,0,0,0.15)'}}>
+                {filteredDepts.map(d=><div key={d} onClick={()=>{sDept(d);sSDL(false)}} style={{padding:'8px 12px',fontSize:12,cursor:'pointer',borderBottom:'1px solid #f0f0f0'}} onMouseOver={e=>e.currentTarget.style.background='#e3f2fd'} onMouseOut={e=>e.currentTarget.style.background='#fff'}>{d}</div>)}
+              </div>}
+            </div>
             <div style={{display:'flex',gap:8,marginTop:8}}>
               <button className="btn btn-p" style={{flex:1}} onClick={hSubmit}>ส่งคำขอ</button>
               <button className="btn btn-o" onClick={onLogout}>ออกจากระบบ</button>
@@ -410,8 +418,16 @@ function PendingPage({user,userData,onSubmitReg,onLogout}){
 }
 
 function AdminPanel({users,onApprove,onReject}){
+  const DEPTS=['งานพยาบาลแผนก ER','งานการพยาบาลผู้ป่วยนอก (OPD)','งานพยาบาลแผนก IPD 1/1 (ผู้ป่วยในสามัญ)','งานพยาบาลแผนก IPD3 (ผู้ป่วยในพิเศษ)','งานพยาบาลแผนก ICU','งานการพยาบาลห้องผ่าตัด','งานการพยาบาลห้องคลอด','งานการพยาบาลคลินิกพิเศษ','งานพยาบาลแผนกไตเทียม','งานวิสัญญี','งานธาลัสซีเมีย','งานปฐมภูมิและเสริมสร้างสุขภาพ','งานเภสัชกรรม','งานเทคนิคการแพทย์','งานธนาคารเลือด','งานรังสี','งานกายภาพบำบัด','งานเทคโนโลยีสารสนเทศและนวัตกรรมดิจิทัลทางการแพทย์','งานเวชระเบียนและเวชสถิติ','งานการเงินและบัญชี','งานประกันสุขภาพ','งานบริหารบุคคล','งานพัสดุ','งานโครงสร้างพื้นฐานและวิศวกรรมทางการแพทย์','งาน ENV','งานควบคุมและป้องกันการติดเชื้อ (IC)','งานวิชาการ','QMC (ทีมนำบริหารงานคุณภาพ)','RM (ทีมนำบริหารความเสี่ยง)','PCT sx (ทีมนำการดูแลผู้ป่วยศัลยกรรม)','PCT med (ทีมนำการดูแลผู้ป่วยอายุรกรรม)','PCT ObsGynPed (ทีมนำการดูแลผู้ป่วยสูติ-นรีเวชกรรมและกุมารเวชกรรม)','PTC (ทีมนำเภสัชกรรมและการบำบัด)','IC (ทีมนำป้องกันและควบคุมการติดเชื้อ)','ENV (ทีมนำสิ่งแวดล้อมและความปลอดภัย)','IM (ทีมนำบริหารระบบสารสนเทศ)','HRD (ทีมนำพัฒนาทรัพยากรบุคคล)','HPH (ทีมนำสร้างเสริมสุขภาพ)'];
+  const[editDepts,sED]=useState({});
   const pending=users.filter(u=>u.status==='pending');
   const approved=users.filter(u=>u.status==='approved');
+  const hChangeDept=(uid,val)=>sED(p=>({...p,[uid]:val}));
+  const hApproveWithDept=(uid)=>{
+    const newDept=editDepts[uid];
+    if(newDept!==undefined&&newDept!==''){db.collection('users').doc(uid).update({department:newDept})}
+    onApprove(uid);
+  };
   return(
     <div style={{padding:20}}>
       <h3 style={{fontSize:16,fontWeight:700,color:'var(--primary)',marginBottom:16}}>👑 จัดการผู้ใช้ ({users.length} คน)</h3>
@@ -419,14 +435,23 @@ function AdminPanel({users,onApprove,onReject}){
       {pending.length>0&&<div style={{marginBottom:20}}>
         <h4 style={{fontSize:14,color:'var(--accent-warm)',marginBottom:8}}>รอการอนุมัติ ({pending.length})</h4>
         {pending.map(u=>(
-          <div key={u.id} style={{background:'#fff8e1',border:'1px solid #ffc107',borderRadius:8,padding:12,marginBottom:8,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-            <div>
-              <strong>{u.fullName||'ไม่ระบุ'}</strong>
-              <div style={{fontSize:12,color:'var(--text-light)'}}>{u.email} | {u.department||'-'}</div>
+          <div key={u.id} style={{background:'#fff8e1',border:'1px solid #ffc107',borderRadius:8,padding:12,marginBottom:8}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+              <div>
+                <strong>{u.fullName||'ไม่ระบุ'}</strong>
+                <div style={{fontSize:12,color:'var(--text-light)'}}>{u.email}</div>
+              </div>
+              <div style={{display:'flex',gap:6}}>
+                <button className="btn btn-sm btn-p" onClick={()=>hApproveWithDept(u.id)}>✅ อนุมัติ</button>
+                <button className="btn btn-sm btn-d" onClick={()=>onReject(u.id)}>❌ ปฏิเสธ</button>
+              </div>
             </div>
-            <div style={{display:'flex',gap:6}}>
-              <button className="btn btn-sm btn-p" onClick={()=>onApprove(u.id)}>อนุมัติ</button>
-              <button className="btn btn-sm btn-d" onClick={()=>onReject(u.id)}>ปฏิเสธ</button>
+            <div style={{fontSize:12}}>
+              <label style={{fontWeight:600}}>หน่วยงาน (แก้ไขได้ก่อนอนุมัติ):</label>
+              <select value={editDepts[u.id]!==undefined?editDepts[u.id]:u.department||''} onChange={e=>hChangeDept(u.id,e.target.value)} style={{width:'100%',padding:'6px 10px',border:'1.5px solid var(--border)',borderRadius:6,fontSize:12,fontFamily:'inherit',marginTop:4}}>
+                <option value={u.department||''}>{u.department||'-- ไม่ระบุ --'}</option>
+                {DEPTS.filter(d=>d!==u.department).map(d=><option key={d} value={d}>{d}</option>)}
+              </select>
             </div>
           </div>
         ))}

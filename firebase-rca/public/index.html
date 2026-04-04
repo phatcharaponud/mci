@@ -1230,9 +1230,16 @@ function App(){
   // RCA actions
   const hNew=()=>{sCI(null);sFD({...DF,ta:mkTD()});sN('form')};
   const hSave=async()=>{
-    const docData={...fd,savedAt:new Date().toISOString(),status:'draft',ownerUid:user.uid,ownerEmail:user.email,ownerName:userData.fullName};
-    // Remove firestore-incompatible undefined values
-    Object.keys(docData).forEach(k=>{if(docData[k]===undefined)docData[k]=null});
+    // Deep clean: remove undefined values recursively for Firestore compatibility
+    const cleanForFirestore=(obj)=>{
+      if(obj===undefined)return null;
+      if(obj===null||typeof obj!=='object')return obj;
+      if(Array.isArray(obj))return obj.map(cleanForFirestore);
+      const cleaned={};
+      Object.keys(obj).forEach(k=>{cleaned[k]=cleanForFirestore(obj[k])});
+      return cleaned;
+    };
+    const docData=cleanForFirestore({...fd,savedAt:new Date().toISOString(),status:'draft',ownerUid:user.uid,ownerEmail:user.email,ownerName:userData.fullName});
     try{
       if(ci){
         await db.collection('rca').doc(ci).set(docData,{merge:true});

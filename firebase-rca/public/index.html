@@ -189,6 +189,8 @@ const googleProvider = new firebase.auth.GoogleAuthProvider();
 googleProvider.setCustomParameters({hd: 'up.ac.th'});
 
 const ADMIN_EMAIL = 'phatcharapon.ud@up.ac.th';
+const GAS_URL='https://script.google.com/macros/s/AKfycbw99ZlV1OaTqG1Mp5C_Xc0Bnvmvr_7rp6lp9f9_Abc45_ivkc9ZAyKz3Bh_40LdzZk1/exec';
+async function syncSchToSheet(schedules){if(!GAS_URL)return;try{await fetch(GAS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'schedules',data:schedules})})}catch(e){}}
 
 // ===== Data Constants =====
 const SEV_L=['A','B','C','D','E','F','G','H','I'], SEV_N=['1','2','3','4','5'];
@@ -1091,6 +1093,7 @@ function App(){
   const[toast,sT]=useState(null);
   const[sbCol,sSbCol]=useState(false);
   const[sch,sSch]=useState([]);
+  const[unreadCount,setUnreadCount]=useState(0);
 
   const st=m=>{sT(m);setTimeout(()=>sT(null),3000)};
   const uf=(f,v)=>sFD(p=>({...p,[f]:v}));
@@ -1148,6 +1151,12 @@ function App(){
     });
     return()=>unsub();
   },[user,userData]);
+
+  // Compute unread count for admin
+  useEffect(()=>{
+    if(!isAdmin){setUnreadCount(0);return}
+    setUnreadCount(rl.filter(r=>r.adminViewed===false).length);
+  },[rl,isAdmin]);
 
   // Load schedules from Firestore
   useEffect(()=>{
@@ -1221,15 +1230,21 @@ function App(){
       if(ci){
         await db.collection('rca').doc(ci).set(docData,{merge:true});
       }else{
-        const ref=await db.collection('rca').add(docData);
-        sCI(ref.id);
+        // Generate sequential RCA ID: RCA-001, RCA-002, ...
+        let maxNum=0;
+        const snap=await db.collection('rca').get();
+        snap.forEach(d=>{const id=d.id;const m=id.match(/^RCA-(\d+)$/);if(m){const n=parseInt(m[1],10);if(n>maxNum)maxNum=n}});
+        const newId='RCA-'+String(maxNum+1).padStart(3,'0');
+        docData.adminViewed=false;
+        await db.collection('rca').doc(newId).set(docData);
+        sCI(newId);
       }
       st('บันทึก RCA เรียบร้อย');
     }catch(e){
       st('เกิดข้อผิดพลาด: '+e.message);
     }
   };
-  const hLoad=r=>{sCI(r.id);sFD({...DF,...r,ta:(r.ta||mkTD()).map(migTier)});sN('form')};
+  const hLoad=r=>{sCI(r.id);sFD({...DF,...r,ta:(r.ta||mkTD()).map(migTier)});sN('form');if(isAdmin&&r.adminViewed===false){db.collection('rca').doc(r.id).update({adminViewed:true}).catch(()=>{})}};
   const hExp=f2=>{const w=window.open('','_blank');w.document.write(bExp(fd,f2));w.document.close();st(f2==='pdf'?'เปิดหน้า PDF':'เปิด Word')};
 
   // Schedule actions (Firestore)
@@ -1270,10 +1285,12 @@ function App(){
             db.collection('schedules').doc(s.id).delete().catch(()=>{});
           }
         });
+        syncSchToSheet(newSch);
         return newSch;
       });
     }else{
       sSch(fn);
+      syncSchToSheet(Array.isArray(fn)?fn:[]);
     }
   };
 
@@ -1319,7 +1336,7 @@ function App(){
           <div className="sb-n">
             <div className="ns">แบบฟอร์ม</div>
             <div className={`ni ${nav==='form'?'ac':''}`} onClick={()=>sN('form')}><span className="ni-i">📋</span><span>แบบฟอร์ม RCA</span></div>
-            <div className={`ni ${nav==='list'?'ac':''}`} onClick={()=>sN('list')}><span className="ni-i">📁</span><span>รายการ RCA</span>{rl.length>0&&<span className="ni-b">{rl.length}</span>}</div>
+            <div className={`ni ${nav==='list'?'ac':''}`} onClick={()=>sN('list')}><span className="ni-i">📁</span><span>รายการ RCA</span>{isAdmin&&unreadCount>0&&<span className="ni-b" style={{background:'#e74c3c'}}>{unreadCount}</span>}{rl.length>0&&<span className="ni-b">{rl.length}</span>}</div>
             <div className="ns">เครื่องมือ</div>
             <div className={`ni ${nav==='cal'?'ac':''}`} onClick={()=>sN('cal')}><span className="ni-i">📅</span><span>ปฏิทินกำหนด RCA</span></div>
             <div className={`ni ${nav==='kb'?'ac':''}`} onClick={()=>sN('kb')}><span className="ni-i">📚</span><span>ความรู้ RCA</span></div>

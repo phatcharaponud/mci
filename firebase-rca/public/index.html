@@ -679,9 +679,9 @@ function FormV({fd,sFD,uf}){
       {(() => {
         const handleFileAttach = (e) => {
           const files = Array.from(e.target.files);
-          const maxSize = 20 * 1024 * 1024;
+          const maxSize = 10 * 1024 * 1024;
           files.forEach(file => {
-            if (file.size > maxSize) { alert(`ไฟล์ ${file.name} มีขนาดเกิน 20 MB`); return; }
+            if (file.size > maxSize) { alert(`ไฟล์ ${file.name} มีขนาดเกิน 10 MB`); return; }
             if (!['image/jpeg','image/png','application/pdf'].includes(file.type)) { alert(`ไฟล์ ${file.name} ไม่ใช่ประเภทที่รองรับ (jpg, png, pdf)`); return; }
             const reader = new FileReader();
             reader.onload = (ev) => {
@@ -718,7 +718,7 @@ function FormV({fd,sFD,uf}){
         <div className="fc"><div className="fch">📎 เอกสารแนบ</div><div className="fcb">
           <div style={{marginBottom:12}}>
             <label className="btn btn-p btn-sm" style={{cursor:'pointer'}}>
-              📁 เลือกไฟล์ (JPG, PNG, PDF สูงสุด 20 MB)
+              📁 เลือกไฟล์ (JPG, PNG, PDF สูงสุด 10 MB)
               <input type="file" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" multiple onChange={e=>window.__handleFileAttach(e)} style={{display:'none'}}/>
             </label>
           </div>

@@ -710,49 +710,53 @@ function exportComplaintPDF(c){
   const status = getAutoStatus(c);
   const stsLabel = {investigating:"กำลังตรวจสอบ",in_progress:"กำลังดำเนินการ",resolved:"แก้ไขแล้ว"};
   const sevLabel = {1:"ระดับ 1 (บ่น/เสนอแนะ)",2:"ระดับ 2 (ตำหนิ/ร้องทุกข์)",3:"ระดับ 3 (รุนแรง)"};
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>รายงานข้อร้องเรียน ${c.id}</title>
-<style>body{font-family:'Sarabun',sans-serif;padding:40px;max-width:800px;margin:0 auto;color:#1e293b;font-size:14px}
-h1{font-size:20px;text-align:center;margin-bottom:4px}h2{font-size:14px;background:#f1f5f9;padding:8px 14px;margin:18px 0 10px;border-radius:6px}
-.sub{text-align:center;color:#64748b;font-size:13px;margin-bottom:24px}
-table{width:100%;border-collapse:collapse;margin-bottom:8px}td{padding:6px 10px;vertical-align:top;border-bottom:1px solid #f1f5f9}
-td:first-child{font-weight:600;width:180px;color:#475569}
-.badge{display:inline-block;padding:2px 12px;border-radius:12px;font-size:12px;font-weight:600}
-@media print{body{padding:20px}}</style></head><body>
-<h1>รายงานสรุปข้อร้องเรียน</h1><div class="sub">โรงพยาบาลมหาวิทยาลัยพะเยา | ${c.id}</div>
-<h2>1. ข้อมูลทั่วไป</h2><table>
-<tr><td>รหัส</td><td>${c.id}</td></tr>
-<tr><td>วันที่รับเรื่อง</td><td>${fmtDate(c.date)}</td></tr>
-<tr><td>ผู้ร้องเรียน</td><td>${c.name||"-"}</td></tr>
-<tr><td>สถานะผู้ร้อง</td><td>${c.cStatus||"-"}</td></tr>
-<tr><td>ช่องทาง</td><td>${c.channel||"-"}</td></tr>
-<tr><td>หน่วยงานที่ถูกร้องเรียน</td><td>${c.unit||"-"}</td></tr></table>
-<h2>2. เรื่องที่ร้องเรียน</h2><table>
-<tr><td>หัวข้อ</td><td>${c.subject||"-"}</td></tr>
-<tr><td>รายละเอียด</td><td>${c.detail||"-"}</td></tr>
-<tr><td>ระดับความรุนแรง</td><td>${sevLabel[c.severity]||"-"}</td></tr>
-<tr><td>สถานะ</td><td>${stsLabel[status]||status}</td></tr>
-<tr><td>ระยะเวลา</td><td>${daysSince(c.date)} วัน</td></tr></table>
-<h2>3. การดำเนินการศูนย์รับข้อร้องเรียน</h2><table>
-<tr><td>การดำเนินการ</td><td>${c.centerAction||"-"}</td></tr>
-<tr><td>ผู้บันทึก</td><td>${c.recorder||"-"}</td></tr>
-<tr><td>Tag หน่วยงาน</td><td>${(c.tagDepts||[]).join(", ")||"-"}</td></tr>
-<tr><td>Tag ผู้รับผิดชอบ</td><td>${(c.tagStaff||[]).join(", ")||"-"}</td></tr></table>
-${c.inv?`<h2>4. การสอบสวน</h2><table>
-<tr><td>ข้อเท็จจริง</td><td>${c.inv.facts||"-"}</td></tr>
-<tr><td>สาเหตุ</td><td>${c.inv.root||"-"}</td></tr>
-<tr><td>แนวทางแก้ไข</td><td>${c.inv.sol||"-"}</td></tr>
-<tr><td>ผู้ตรวจสอบ</td><td>${c.inv.resp||"-"}</td></tr></table>`:""}
-${c.res?`<h2>5. การแก้ไข</h2><table>
-<tr><td>สิ่งที่ดำเนินการ</td><td>${c.res.actions||"-"}</td></tr>
-<tr><td>ผลลัพธ์</td><td>${c.res.result||"-"}</td></tr>
-<tr><td>การป้องกัน</td><td>${c.res.preventive||"-"}</td></tr>
-<tr><td>วันที่เสร็จสิ้น</td><td>${c.res.done?fmtDate(c.res.done):"-"}</td></tr></table>`:""}
-<div style="margin-top:40px;text-align:right;font-size:12px;color:#94a3b8">พิมพ์เมื่อ ${new Date().toLocaleString("th-TH")}</div>
-</body></html>`;
-  const w = window.open("","_blank");
-  w.document.write(html);
+  var parts = [];
+  parts.push("<!DOCTYPE html><html><head><meta charset='utf-8'><title>รายงาน "+c.id+"<"+"/title>");
+  parts.push("<style>body{font-family:'Sarabun',sans-serif;padding:40px;max-width:800px;margin:0 auto;color:#1e293b;font-size:14px}");
+  parts.push("h1{font-size:20px;text-align:center;margin-bottom:4px}h2{font-size:14px;background:#f1f5f9;padding:8px 14px;margin:18px 0 10px;border-radius:6px}");
+  parts.push(".sub{text-align:center;color:#64748b;font-size:13px;margin-bottom:24px}");
+  parts.push("table{width:100%;border-collapse:collapse;margin-bottom:8px}td{padding:6px 10px;vertical-align:top;border-bottom:1px solid #f1f5f9}");
+  parts.push("td:first-child{font-weight:600;width:180px;color:#475569}");
+  parts.push("@media print{body{padding:20px}}<"+"/style><"+"/head><body>");
+  parts.push("<h1>รายงานสรุปข้อร้องเรียน<"+"/h1><div class='sub'>โรงพยาบาลมหาวิทยาลัยพะเยา | "+c.id+"<"+"/div>");
+  parts.push("<h2>1. ข้อมูลทั่วไป<"+"/h2><table>");
+  parts.push("<tr><td>รหัส<"+"/td><td>"+c.id+"<"+"/td><"+"/tr>");
+  parts.push("<tr><td>วันที่รับเรื่อง<"+"/td><td>"+fmtDate(c.date)+"<"+"/td><"+"/tr>");
+  parts.push("<tr><td>ผู้ร้องเรียน<"+"/td><td>"+(c.name||"-")+"<"+"/td><"+"/tr>");
+  parts.push("<tr><td>สถานะผู้ร้อง<"+"/td><td>"+(c.cStatus||"-")+"<"+"/td><"+"/tr>");
+  parts.push("<tr><td>ช่องทาง<"+"/td><td>"+(c.channel||"-")+"<"+"/td><"+"/tr>");
+  parts.push("<tr><td>หน่วยงานที่ถูกร้องเรียน<"+"/td><td>"+(c.unit||"-")+"<"+"/td><"+"/tr><"+"/table>");
+  parts.push("<h2>2. เรื่องที่ร้องเรียน<"+"/h2><table>");
+  parts.push("<tr><td>หัวข้อ<"+"/td><td>"+(c.subject||"-")+"<"+"/td><"+"/tr>");
+  parts.push("<tr><td>รายละเอียด<"+"/td><td>"+(c.detail||"-")+"<"+"/td><"+"/tr>");
+  parts.push("<tr><td>ระดับความรุนแรง<"+"/td><td>"+(sevLabel[c.severity]||"-")+"<"+"/td><"+"/tr>");
+  parts.push("<tr><td>สถานะ<"+"/td><td>"+(stsLabel[status]||status)+"<"+"/td><"+"/tr>");
+  parts.push("<tr><td>ระยะเวลา<"+"/td><td>"+daysSince(c.date)+" วัน<"+"/td><"+"/tr><"+"/table>");
+  parts.push("<h2>3. การดำเนินการศูนย์รับข้อร้องเรียน<"+"/h2><table>");
+  parts.push("<tr><td>การดำเนินการ<"+"/td><td>"+(c.centerAction||"-")+"<"+"/td><"+"/tr>");
+  parts.push("<tr><td>ผู้บันทึก<"+"/td><td>"+(c.recorder||"-")+"<"+"/td><"+"/tr>");
+  parts.push("<tr><td>Tag หน่วยงาน<"+"/td><td>"+((c.tagDepts||[]).join(", ")||"-")+"<"+"/td><"+"/tr>");
+  parts.push("<tr><td>Tag ผู้รับผิดชอบ<"+"/td><td>"+((c.tagStaff||[]).join(", ")||"-")+"<"+"/td><"+"/tr><"+"/table>");
+  if(c.inv){
+    parts.push("<h2>4. การสอบสวน<"+"/h2><table>");
+    parts.push("<tr><td>ข้อเท็จจริง<"+"/td><td>"+(c.inv.facts||"-")+"<"+"/td><"+"/tr>");
+    parts.push("<tr><td>สาเหตุ<"+"/td><td>"+(c.inv.root||"-")+"<"+"/td><"+"/tr>");
+    parts.push("<tr><td>แนวทางแก้ไข<"+"/td><td>"+(c.inv.sol||"-")+"<"+"/td><"+"/tr>");
+    parts.push("<tr><td>ผู้ตรวจสอบ<"+"/td><td>"+(c.inv.resp||"-")+"<"+"/td><"+"/tr><"+"/table>");
+  }
+  if(c.res){
+    parts.push("<h2>5. การแก้ไข<"+"/h2><table>");
+    parts.push("<tr><td>สิ่งที่ดำเนินการ<"+"/td><td>"+(c.res.actions||"-")+"<"+"/td><"+"/tr>");
+    parts.push("<tr><td>ผลลัพธ์<"+"/td><td>"+(c.res.result||"-")+"<"+"/td><"+"/tr>");
+    parts.push("<tr><td>การป้องกัน<"+"/td><td>"+(c.res.preventive||"-")+"<"+"/td><"+"/tr>");
+    parts.push("<tr><td>วันที่เสร็จสิ้น<"+"/td><td>"+(c.res.done?fmtDate(c.res.done):"-")+"<"+"/td><"+"/tr><"+"/table>");
+  }
+  parts.push("<div style='margin-top:40px;text-align:right;font-size:12px;color:#94a3b8'>พิมพ์เมื่อ "+new Date().toLocaleString("th-TH")+"<"+"/div>");
+  parts.push("<"+"/body><"+"/html>");
+  var w = window.open("","_blank");
+  w.document.write(parts.join("\n"));
   w.document.close();
-  setTimeout(()=>w.print(),400);
+  setTimeout(function(){w.print();},400);
 }
 
 function Reg({data,onView,user}){

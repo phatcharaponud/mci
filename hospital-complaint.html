@@ -84,7 +84,7 @@ const db = {
       fetch(CLOUD_URL, {
         method:"POST",
         headers:{"Content-Type":"text/plain"},
-        body: JSON.stringify({ action:"fullSync", data, user: db.getSession()?.email || "" })
+        body: JSON.stringify({ action:"fullSync", data, user: (db.getSession() && db.getSession().email) || "" })
       }).catch(()=>{});
     }
   },

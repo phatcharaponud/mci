@@ -32,6 +32,8 @@ input,select,textarea,button{font-family:'IBM Plex Sans Thai',sans-serif}
 // Global error handler - shows errors in DOM so user can see what went wrong
 window.addEventListener('error', function(e) {
   var msg = e.message || 'Unknown error';
+  // Bypass ResizeObserver loop error (harmless Recharts warning)
+  if(msg.indexOf('ResizeObserver') !== -1) return;
   var stack = (e.error && e.error.stack) || '';
   var root = document.getElementById('root');
   if(root) root.innerHTML = '<div style="padding:40px;max-width:900px;margin:0 auto;font-family:sans-serif"><h2 style="color:#dc2626;margin:0 0 12px">⚠️ เกิดข้อผิดพลาด</h2><p style="color:#64748b;margin:0 0 16px;font-size:13px">กรุณาลองรีเฟรชหน้า หรือเช็คการเชื่อมต่ออินเทอร์เน็ต</p><pre style="background:#fef2f2;padding:20px;border-radius:12px;overflow:auto;font-size:11px;color:#991b1b;border:1px solid #fecaca">'+msg.replace(/</g,'&lt;')+'\n\n'+stack.replace(/</g,'&lt;')+'</pre></div>';
@@ -325,6 +327,8 @@ function LoginPage({onLogin,dbData,setDbData}){
 }
 
 // ============ DASHBOARD ============
+const chartsReady = !!(ResponsiveContainer && BarChart && PieChart && LineChart);
+
 function Dash({data}){
   const total = data.length;
   const done = data.filter(c=>getAutoStatus(c)==="resolved").length;
@@ -336,6 +340,7 @@ function Dash({data}){
     const months = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
     const buckets = {};
     data.forEach(c=>{
+      if(!c.date) return;
       const p = c.date.split("-");
       if(p.length<3) return;
       const key = months[parseInt(p[1])-1];
@@ -390,6 +395,9 @@ function Dash({data}){
       <div style={{fontSize:48,marginBottom:12,opacity:.3}}>📋</div>
       <h3 style={{fontSize:16,fontWeight:600,color:"#64748b",margin:"0 0 6px"}}>ยังไม่มีข้อมูลข้อร้องเรียน</h3>
       <p style={{fontSize:13,color:"#94a3b8"}}>เริ่มต้นโดยการบันทึกข้อร้องเรียนใหม่</p>
+    </Card> : !chartsReady ? <Card style={{textAlign:"center",padding:48}}>
+      <div style={{fontSize:14,color:"#f59e0b",fontWeight:600,marginBottom:8}}>ไม่สามารถโหลดกราฟได้</div>
+      <p style={{fontSize:12,color:"#94a3b8"}}>ไลบรารี Recharts โหลดไม่สำเร็จ กรุณารีเฟรชหน้าหรือเช็คการเชื่อมต่ออินเทอร์เน็ต</p>
     </Card> : <>
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:20}}>
       <Card>

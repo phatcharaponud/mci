@@ -1,0 +1,59 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Users collection - ผู้ใช้อ่านข้อมูลตัวเอง, admin อ่านทั้งหมด
+    match /users/{userId} {
+      allow read: if request.auth != null && (request.auth.uid == userId || request.auth.token.email == 'phatcharapon.ud@up.ac.th');
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow update: if request.auth != null && (request.auth.uid == userId || request.auth.token.email == 'phatcharapon.ud@up.ac.th');
+    }
+
+    // RCA records - เจ้าของดู/แก้ไขได้, ผู้ร่วมแก้ไขดู/แก้ไขได้, admin ดูทั้งหมด
+    match /rca/{rcaId} {
+      allow read: if request.auth != null && (
+        resource.data.ownerUid == request.auth.uid ||
+        request.auth.uid in resource.data.collaborators ||
+        request.auth.token.email == 'phatcharapon.ud@up.ac.th'
+      );
+      allow create: if request.auth != null;
+      allow update: if request.auth != null && (
+        resource.data.ownerUid == request.auth.uid ||
+        request.auth.uid in resource.data.collaborators ||
+        request.auth.token.email == 'phatcharapon.ud@up.ac.th'
+      );
+      allow delete: if request.auth != null && request.auth.token.email == 'phatcharapon.ud@up.ac.th';
+    }
+
+    // Schedules - ผู้ใช้ที่อนุมัติแล้วอ่าน/เขียนได้
+    match /schedules/{scheduleId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Board posts - ผู้ใช้ที่อนุมัติแล้วอ่าน/เขียนได้
+    match /posts/{postId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null && (
+        resource.data.authorUid == request.auth.uid ||
+        request.auth.token.email == 'phatcharapon.ud@up.ac.th'
+      );
+
+      // Replies
+      match /replies/{replyId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null;
+        allow update, delete: if request.auth != null && (
+          resource.data.authorUid == request.auth.uid ||
+          request.auth.token.email == 'phatcharapon.ud@up.ac.th'
+        );
+      }
+    }
+
+    // Access logs
+    match /logs/{logId} {
+      allow create: if request.auth != null;
+      allow read: if request.auth != null && request.auth.token.email == 'phatcharapon.ud@up.ac.th';
+    }
+  }
+}

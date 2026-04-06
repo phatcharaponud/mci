@@ -329,7 +329,7 @@ function LoginPage({onLogin,dbData,setDbData}){
 // ============ DASHBOARD ============
 const chartsReady = !!(ResponsiveContainer && BarChart && PieChart && LineChart);
 
-function Dash({data}){
+function Dash({data,onNav}){
   const total = data.length;
   const done = data.filter(c=>getAutoStatus(c)==="resolved").length;
   const pend = total-done;
@@ -369,9 +369,9 @@ function Dash({data}){
   const PC = ["#6366f1","#8b5cf6","#ec4899","#f59e0b","#10b981","#64748b","#06b6d4","#84cc16"];
 
   const stats = [
-    {l:"ข้อร้องเรียนทั้งหมด",v:total,c:"#6366f1",bg:"linear-gradient(135deg,#eef2ff,#e0e7ff)"},
-    {l:"แก้ไขแล้ว",v:done,c:"#10b981",bg:"linear-gradient(135deg,#ecfdf5,#d1fae5)",sub:total?Math.round(done/total*100)+"%":""},
-    {l:"รอดำเนินการ",v:pend,c:"#f59e0b",bg:"linear-gradient(135deg,#fffbeb,#fef3c7)"},
+    {l:"ข้อร้องเรียนทั้งหมด",v:total,c:"#6366f1",bg:"linear-gradient(135deg,#eef2ff,#e0e7ff)",nav:{sf:""}},
+    {l:"แก้ไขแล้ว",v:done,c:"#10b981",bg:"linear-gradient(135deg,#ecfdf5,#d1fae5)",sub:total?Math.round(done/total*100)+"%":"",nav:{sf:"resolved"}},
+    {l:"รอดำเนินการ",v:pend,c:"#f59e0b",bg:"linear-gradient(135deg,#fffbeb,#fef3c7)",nav:{sf:"investigating"}},
     {l:"ระยะเวลาเฉลี่ย",v:avgDays,c:"#8b5cf6",bg:"linear-gradient(135deg,#faf5ff,#ede9fe)",unit:"วัน"},
   ];
 
@@ -380,9 +380,9 @@ function Dash({data}){
     <p style={{fontSize:13,color:"#94a3b8",margin:"0 0 24px"}}>สรุปสถิติข้อร้องเรียน</p>
 
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:16,marginBottom:24}}>
-      {stats.map((s,i)=><div key={i} style={{background:s.bg,borderRadius:18,padding:"22px 20px",position:"relative",overflow:"hidden"}}>
+      {stats.map((s,i)=><div key={i} onClick={()=>s.nav&&onNav&&onNav(s.nav)} style={{background:s.bg,borderRadius:18,padding:"22px 20px",position:"relative",overflow:"hidden",cursor:s.nav?"pointer":"default",transition:"transform .15s"}} onMouseEnter={e=>{if(s.nav)e.currentTarget.style.transform="translateY(-2px)";}} onMouseLeave={e=>e.currentTarget.style.transform="none"}>
         <div style={{position:"absolute",top:-10,right:-10,width:80,height:80,borderRadius:"50%",background:s.c+"0a"}}/>
-        <div style={{fontSize:11,fontWeight:600,color:s.c,letterSpacing:".06em",marginBottom:10}}>{s.l}</div>
+        <div style={{fontSize:11,fontWeight:600,color:s.c,letterSpacing:".06em",marginBottom:10}}>{s.l}{s.nav && <span style={{marginLeft:6,fontSize:10,opacity:.5}}>&#8250;</span>}</div>
         <div style={{display:"flex",alignItems:"baseline",gap:4}}>
           <span style={{fontSize:34,fontWeight:700,color:"#0f172a",lineHeight:1}}>{s.v}</span>
           {s.unit && <span style={{fontSize:14,color:"#64748b"}}>{s.unit}</span>}
@@ -769,17 +769,25 @@ function exportComplaintPDF(c){
   setTimeout(function(){w.print();},400);
 }
 
-function Reg({data,onView,user}){
+function Reg({data,onView,user,initFilter}){
   const [q,setQ] = useState("");
-  const [sf,setSf] = useState("");
+  const [sf,setSf] = useState((initFilter&&initFilter.sf)||"");
   const [lf,setLf] = useState("");
   const [df,setDf] = useState("");
+  const [dm,setDm] = useState(""); // date month filter YYYY-MM
+  const [dateFrom,setDateFrom] = useState("");
+  const [dateTo,setDateTo] = useState("");
+  const [dateMode,setDateMode] = useState("off"); // "off" | "month" | "range"
   const [viewMode,setViewMode] = useState("table"); // "table" | "card"
+
+  // รับ filter จาก Dashboard
+  useEffect(()=>{
+    if(initFilter && initFilter.sf !== undefined) setSf(initFilter.sf);
+  },[initFilter]);
 
   const list = useMemo(()=>{
     let l = data;
     if(user.role!=="admin" && user.role!=="crm"){
-      // role user: เห็นเฉพาะที่หน่วยงานหรือตัวเองถูก tag
       l = l.filter(c =>
         (c.tagDepts||[]).includes(user.dept) ||
         (c.tagStaff||[]).includes(user.name)
@@ -789,8 +797,16 @@ function Reg({data,onView,user}){
     if(sf) l = l.filter(c => getAutoStatus(c)===sf);
     if(lf) l = l.filter(c => c.severity===parseInt(lf));
     if(df) l = l.filter(c => c.dept===df);
+    // Date filters
+    if(dateMode==="month" && dm){
+      l = l.filter(c => c.date && c.date.substring(0,7)===dm);
+    }
+    if(dateMode==="range"){
+      if(dateFrom) l = l.filter(c => c.date && c.date >= dateFrom);
+      if(dateTo) l = l.filter(c => c.date && c.date <= dateTo);
+    }
     return l.sort((a,b)=>(b.createdAt||b.date).localeCompare(a.createdAt||a.date));
-  },[data,q,sf,lf,df,user]);
+  },[data,q,sf,lf,df,dm,dateFrom,dateTo,dateMode,user]);
 
   function canAct(c){
     return user.role==="admin" || user.role==="crm"
@@ -830,6 +846,21 @@ function Reg({data,onView,user}){
         <div style={{minWidth:180,flex:"0 0 auto"}}>
           <SearchSel value={df} onChange={v=>setDf(v)} options={DEPTS} placeholder="หน่วยงาน..."/>
         </div>
+      </div>
+      <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"center",marginTop:10}}>
+        <span style={{fontSize:12,fontWeight:600,color:"#64748b"}}>วันที่:</span>
+        <select value={dateMode} onChange={e=>{setDateMode(e.target.value);setDm("");setDateFrom("");setDateTo("");}} style={{...fltStyle,minWidth:100,padding:"8px 10px"}}>
+          <option value="off">ทั้งหมด</option>
+          <option value="month">เลือกเดือน</option>
+          <option value="range">ช่วงวัน</option>
+        </select>
+        {dateMode==="month" && <input type="month" value={dm} onChange={e=>setDm(e.target.value)} style={{...fltStyle,padding:"8px 10px"}}/>}
+        {dateMode==="range" && <>
+          <input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)} style={{...fltStyle,padding:"8px 10px"}}/>
+          <span style={{fontSize:12,color:"#94a3b8"}}>ถึง</span>
+          <input type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)} style={{...fltStyle,padding:"8px 10px"}}/>
+        </>}
+        {dateMode!=="off" && (dm||dateFrom||dateTo) && <button onClick={()=>{setDateMode("off");setDm("");setDateFrom("");setDateTo("");}} style={{padding:"6px 12px",borderRadius:8,border:"none",background:"#fef2f2",cursor:"pointer",fontSize:11,color:"#dc2626",fontWeight:600,fontFamily:"inherit"}}>ล้าง</button>}
       </div>
     </Card>
 
@@ -1048,6 +1079,7 @@ function App(){
   const [selC,setSelC] = useState(null);
   const [initTab,setInitTab] = useState("detail");
   const [col,setCol] = useState(false);
+  const [regFilter,setRegFilter] = useState(null);
 
   useEffect(()=>{
     // Reload data if session exists
@@ -1097,9 +1129,9 @@ function App(){
   function renderPage(){
     const complaints = dbData.complaints || [];
     switch(page){
-      case "dashboard": return <Dash data={complaints}/>;
+      case "dashboard": return <Dash data={complaints} onNav={f=>{setRegFilter(f);setPage("registry");}}/>;
       case "newForm": return <NewForm onSave={onSave} onBack={()=>setPage("registry")} user={user} dbData={dbData}/>;
-      case "registry": return <Reg data={complaints} onView={onView} user={user}/>;
+      case "registry": return <Reg data={complaints} onView={onView} user={user} initFilter={regFilter}/>;
       case "detail": return selC ? <Detail c={(dbData.complaints||[]).find(x=>x.id===selC.id)||selC} onBack={()=>setPage("registry")} onUpdate={onUp} user={user} initTab={initTab}/> : null;
       case "guide": return <Guide/>;
       case "line": return <LinePage dbData={dbData} setDbData={setDbData}/>;
@@ -1125,7 +1157,7 @@ function App(){
       <nav style={{flex:1,padding:"4px 10px",overflowY:"auto",position:"relative",zIndex:1}}>
         {menu.map(m=>{
           const active = page===m.id || (m.id==="registry" && page==="detail");
-          return <button key={m.id} onClick={()=>setPage(m.id)} title={col?m.l:""} style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:col?"11px 0":"11px 16px",borderRadius:12,border:"none",cursor:"pointer",background:active?"rgba(99,102,241,.15)":"transparent",color:active?"#a5b4fc":"rgba(255,255,255,.45)",fontSize:13,fontWeight:active?600:400,marginBottom:3,textAlign:"left",fontFamily:"inherit",justifyContent:col?"center":"flex-start",whiteSpace:"nowrap",overflow:"hidden",position:"relative"}}>
+          return <button key={m.id} onClick={()=>{if(m.id==="registry")setRegFilter(null);setPage(m.id);}} title={col?m.l:""} style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:col?"11px 0":"11px 16px",borderRadius:12,border:"none",cursor:"pointer",background:active?"rgba(99,102,241,.15)":"transparent",color:active?"#a5b4fc":"rgba(255,255,255,.45)",fontSize:13,fontWeight:active?600:400,marginBottom:3,textAlign:"left",fontFamily:"inherit",justifyContent:col?"center":"flex-start",whiteSpace:"nowrap",overflow:"hidden",position:"relative"}}>
             {active && <div style={{position:"absolute",left:0,top:"50%",transform:"translateY(-50%)",width:3,height:20,borderRadius:2,background:"#6366f1"}}/>}
             <span style={{flexShrink:0,display:"flex",opacity:active?1:.6}}><Ico name={m.ic} sz={18}/></span>
             {!col && <span>{m.l}</span>}

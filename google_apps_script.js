@@ -292,6 +292,13 @@ function sendLineMessage(message) {
   Logger.log('Line message sent: ' + message.substring(0, 50));
 }
 
+// Parse วันที่ DD/MM/YYYY (พ.ศ.) → Date object (ค.ศ. สำหรับเปรียบเทียบ)
+function parseDateBE(dateStr) {
+  var p = String(dateStr).split('/');
+  if (p.length !== 3) return null;
+  return new Date(parseInt(p[2], 10) - 543, parseInt(p[1], 10) - 1, parseInt(p[0], 10));
+}
+
 // ฟังก์ชันหลัก - เรียกจาก Daily Trigger
 function checkAndNotify() {
   var sheet = getOrCreateScheduleSheet();
@@ -312,7 +319,8 @@ function checkAndNotify() {
     var notified = data[i][6] || '';
 
     if (!dateStr) continue;
-    var rcaDate = new Date(dateStr);
+    var rcaDate = parseDateBE(dateStr);
+    if (!rcaDate) continue;
     rcaDate.setHours(0, 0, 0, 0);
 
     var diffDays = Math.round((rcaDate - today) / (1000 * 60 * 60 * 24));

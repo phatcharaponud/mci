@@ -1105,20 +1105,34 @@ function CalV({sch,sSch,st}){
   const[showForm,sSF]=useState(false);
   const[editId,sEI]=useState(null);
   const[f,sF]=useState({title:'',department:'',rcaDate:'',rcaTime:'',location:''});
+  // Date picker state (พ.ศ.)
+  const[dpDay,sDpDay]=useState('');
+  const[dpMon,sDpMon]=useState('');
+  const[dpYear,sDpYear]=useState('');
   const daysInMonth=new Date(cM.y,cM.m+1,0).getDate();
   const firstDay=new Date(cM.y,cM.m,1).getDay();
   const mNames=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+  const mNamesShort=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
   const prevM=()=>sCM(p=>p.m===0?{y:p.y-1,m:11}:{y:p.y,m:p.m-1});
   const nextM=()=>sCM(p=>p.m===11?{y:p.y+1,m:0}:{y:p.y,m:p.m+1});
   const pad=n=>String(n).padStart(2,'0');
   const getEvt=d=>{const ds=`${cM.y}-${pad(cM.m+1)}-${pad(d)}`;return sch.filter(s=>s.rcaDate===ds)};
-  const openNew=(d)=>{const ds=d?`${cM.y}-${pad(cM.m+1)}-${pad(d)}`:'';sEI(null);sF({title:'',department:'',rcaDate:ds,rcaTime:'',location:''});sSF(true)};
-  const openEdit=(s)=>{sEI(s.id);sF({title:s.title,department:s.department,rcaDate:s.rcaDate,rcaTime:s.rcaTime,location:s.location});sSF(true)};
-  const hSave=()=>{if(!f.title||!f.rcaDate)return st('กรุณาระบุเรื่องและวันที่');if(editId){sSch(p=>p.map(s=>s.id===editId?{...s,...f}:s))}else{sSch(p=>[...p,{id:schId(),...f,createdAt:new Date().toISOString()}])}sSF(false);st('บันทึกกำหนดการ RCA เรียบร้อย')};
+  // Convert dp fields to rcaDate (YYYY-MM-DD ค.ศ. for storage)
+  const dpToDate=()=>{if(!dpDay||!dpMon||!dpYear)return'';const ceY=parseInt(dpYear)-543;return`${ceY}-${pad(parseInt(dpMon))}-${pad(parseInt(dpDay))}`};
+  // Parse rcaDate to dp fields
+  const dateToDp=(ds)=>{if(!ds)return;const p=ds.split('-');if(p.length===3){sDpYear(String(parseInt(p[0])+543));sDpMon(String(parseInt(p[1])));sDpDay(String(parseInt(p[2])))}};
+  const openNew=(d)=>{const ds=d?`${cM.y}-${pad(cM.m+1)}-${pad(d)}`:'';sEI(null);sF({title:'',department:'',rcaDate:ds,rcaTime:'',location:''});if(d){sDpDay(String(d));sDpMon(String(cM.m+1));sDpYear(String(cM.y+543))}else{sDpDay('');sDpMon('');sDpYear('')}sSF(true)};
+  const openEdit=(s)=>{sEI(s.id);sF({title:s.title,department:s.department,rcaDate:s.rcaDate,rcaTime:s.rcaTime,location:s.location});dateToDp(s.rcaDate);sSF(true)};
+  const hSave=()=>{const dateVal=dpToDate();if(!f.title||!dateVal)return st('กรุณาระบุเรื่องและวันที่');const saveData={...f,rcaDate:dateVal};if(editId){sSch(p=>p.map(s=>s.id===editId?{...s,...saveData}:s))}else{sSch(p=>[...p,{id:schId(),...saveData,createdAt:new Date().toISOString()}])}sSF(false);st('บันทึกกำหนดการ RCA เรียบร้อย')};
   const hDel=(id)=>{if(confirm('ลบกำหนดการนี้?'))sSch(p=>p.filter(s=>s.id!==id))};
   const today=new Date();const todayStr=`${today.getFullYear()}-${pad(today.getMonth()+1)}-${pad(today.getDate())}`;
   const upcoming=sch.filter(s=>s.rcaDate>=todayStr).sort((a,b)=>a.rcaDate.localeCompare(b.rcaDate)).slice(0,5);
   const days=[];for(let i=0;i<firstDay;i++)days.push(null);for(let d=1;d<=daysInMonth;d++)days.push(d);
+  // Year options (พ.ศ.)
+  const curBEYear=new Date().getFullYear()+543;
+  const yearOpts=[];for(let y=curBEYear-1;y<=curBEYear+3;y++)yearOpts.push(y);
+  // Days in selected month
+  const dpDaysInMon=dpMon&&dpYear?new Date(parseInt(dpYear)-543,parseInt(dpMon),0).getDate():31;
   return<div>
     <div className="fc"><div className="fch" style={{justifyContent:'space-between'}}>
       <button className="btn btn-sm" style={{background:'rgba(255,255,255,0.2)',color:'#fff',border:'none'}} onClick={prevM}>◀ ก่อนหน้า</button>
@@ -1159,7 +1173,13 @@ function CalV({sch,sSch,st}){
         <div className="fg"><label className="fl">หัวข้อเรื่อง <span className="rq">*</span></label><input className="fi" value={f.title} onChange={e=>sF(p=>({...p,title:e.target.value}))} placeholder="ระบุหัวข้อเรื่อง RCA"/></div>
         <div className="fg"><label className="fl">หน่วยงานที่เกี่ยวข้อง</label><input className="fi" value={f.department} onChange={e=>sF(p=>({...p,department:e.target.value}))} placeholder="ระบุหน่วยงาน"/></div>
         <div className="fr">
-          <div className="fg"><label className="fl">วันที่ (ปี พ.ศ.) <span className="rq">*</span></label><input className="fi" type="date" value={f.rcaDate} onChange={e=>sF(p=>({...p,rcaDate:e.target.value}))}/></div>
+          <div className="fg"><label className="fl">วันที่ (พ.ศ.) <span className="rq">*</span></label>
+            <div style={{display:'flex',gap:6}}>
+              <select className="fs" value={dpDay} onChange={e=>sDpDay(e.target.value)} style={{flex:1}}><option value="">วัน</option>{Array.from({length:dpDaysInMon},(_,i)=>i+1).map(d=><option key={d} value={d}>{d}</option>)}</select>
+              <select className="fs" value={dpMon} onChange={e=>sDpMon(e.target.value)} style={{flex:2}}><option value="">เดือน</option>{mNamesShort.map((m,i)=><option key={i} value={i+1}>{m}</option>)}</select>
+              <select className="fs" value={dpYear} onChange={e=>sDpYear(e.target.value)} style={{flex:1.5}}><option value="">ปี พ.ศ.</option>{yearOpts.map(y=><option key={y} value={y}>{y}</option>)}</select>
+            </div>
+          </div>
           <div className="fg"><label className="fl">เวลา</label><input className="fi" type="time" value={f.rcaTime} onChange={e=>sF(p=>({...p,rcaTime:e.target.value}))}/></div>
         </div>
         <div className="fg"><label className="fl">สถานที่</label><input className="fi" value={f.location} onChange={e=>sF(p=>({...p,location:e.target.value}))} placeholder="ระบุสถานที่"/></div>

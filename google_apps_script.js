@@ -292,6 +292,17 @@ function sendLineMessage(message) {
   Logger.log('Line message sent: ' + message.substring(0, 50));
 }
 
+// แปลงวันที่เป็นรูปแบบ วัน/เดือน/ปี พ.ศ.
+function fmtDateTH(dateStr) {
+  if (!dateStr) return '-';
+  var d = new Date(dateStr);
+  if (isNaN(d)) return dateStr;
+  var dd = ('0' + d.getDate()).slice(-2);
+  var mm = ('0' + (d.getMonth() + 1)).slice(-2);
+  var yyyy = d.getFullYear() + 543;
+  return dd + '/' + mm + '/' + yyyy;
+}
+
 // ฟังก์ชันหลัก - เรียกจาก Daily Trigger
 function checkAndNotify() {
   var sheet = getOrCreateScheduleSheet();
@@ -322,7 +333,7 @@ function checkAndNotify() {
       var msg = '📅 แจ้งเตือน: กำหนดทำ RCA อีก 3 วัน\n\n'
         + '📋 เรื่อง: ' + title + '\n'
         + '🏥 หน่วยงาน: ' + dept + '\n'
-        + '📆 วันที่: ' + dateStr + '\n'
+        + '📆 วันที่: ' + fmtDateTH(dateStr) + '\n'
         + (time ? '⏰ เวลา: ' + time + '\n' : '')
         + (location ? '📍 สถานที่: ' + location + '\n' : '')
         + '\nกรุณาเตรียมข้อมูลและผู้เข้าร่วมให้พร้อม';

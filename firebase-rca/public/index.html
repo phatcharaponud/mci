@@ -1116,17 +1116,22 @@ function CalV({sch,sSch,st}){
   const prevM=()=>sCM(p=>p.m===0?{y:p.y-1,m:11}:{y:p.y,m:p.m-1});
   const nextM=()=>sCM(p=>p.m===11?{y:p.y+1,m:0}:{y:p.y,m:p.m+1});
   const pad=n=>String(n).padStart(2,'0');
-  const getEvt=d=>{const ds=`${cM.y}-${pad(cM.m+1)}-${pad(d)}`;return sch.filter(s=>s.rcaDate===ds)};
-  // Convert dp fields to rcaDate (YYYY-MM-DD ค.ศ. for storage)
-  const dpToDate=()=>{if(!dpDay||!dpMon||!dpYear)return'';const ceY=parseInt(dpYear)-543;return`${ceY}-${pad(parseInt(dpMon))}-${pad(parseInt(dpDay))}`};
-  // Parse rcaDate to dp fields
-  const dateToDp=(ds)=>{if(!ds)return;const p=ds.split('-');if(p.length===3){sDpYear(String(parseInt(p[0])+543));sDpMon(String(parseInt(p[1])));sDpDay(String(parseInt(p[2])))}};
-  const openNew=(d)=>{const ds=d?`${cM.y}-${pad(cM.m+1)}-${pad(d)}`:'';sEI(null);sF({title:'',department:'',rcaDate:ds,rcaTime:'',location:''});if(d){sDpDay(String(d));sDpMon(String(cM.m+1));sDpYear(String(cM.y+543))}else{sDpDay('');sDpMon('');sDpYear('')}sSF(true)};
+  // Store dates as DD/MM/YYYY พ.ศ. (e.g., 02/04/2569)
+  const makeDateStr=(d,m,y)=>pad(d)+'/'+pad(m)+'/'+y; // y is already พ.ศ.
+  const getEvt=d=>{const ds=makeDateStr(d,cM.m+1,cM.y+543);return sch.filter(s=>s.rcaDate===ds)};
+  // Convert dp fields to rcaDate DD/MM/YYYY พ.ศ.
+  const dpToDate=()=>{if(!dpDay||!dpMon||!dpYear)return'';return pad(parseInt(dpDay))+'/'+pad(parseInt(dpMon))+'/'+dpYear};
+  // Parse rcaDate DD/MM/YYYY to dp fields
+  const dateToDp=(ds)=>{if(!ds)return;const p=ds.split('/');if(p.length===3){sDpDay(String(parseInt(p[0])));sDpMon(String(parseInt(p[1])));sDpYear(p[2])}};
+  const openNew=(d)=>{const ds=d?makeDateStr(d,cM.m+1,cM.y+543):'';sEI(null);sF({title:'',department:'',rcaDate:ds,rcaTime:'',location:''});if(d){sDpDay(String(d));sDpMon(String(cM.m+1));sDpYear(String(cM.y+543))}else{sDpDay('');sDpMon('');sDpYear('')}sSF(true)};
   const openEdit=(s)=>{sEI(s.id);sF({title:s.title,department:s.department,rcaDate:s.rcaDate,rcaTime:s.rcaTime,location:s.location});dateToDp(s.rcaDate);sSF(true)};
   const hSave=()=>{const dateVal=dpToDate();if(!f.title||!dateVal)return st('กรุณาระบุเรื่องและวันที่');const saveData={...f,rcaDate:dateVal};if(editId){sSch(p=>p.map(s=>s.id===editId?{...s,...saveData}:s))}else{sSch(p=>[...p,{id:schId(),...saveData,createdAt:new Date().toISOString()}])}sSF(false);st('บันทึกกำหนดการ RCA เรียบร้อย')};
   const hDel=(id)=>{if(confirm('ลบกำหนดการนี้?'))sSch(p=>p.filter(s=>s.id!==id))};
-  const today=new Date();const todayStr=`${today.getFullYear()}-${pad(today.getMonth()+1)}-${pad(today.getDate())}`;
-  const upcoming=sch.filter(s=>s.rcaDate>=todayStr).sort((a,b)=>a.rcaDate.localeCompare(b.rcaDate)).slice(0,5);
+  const today=new Date();const todayStr=makeDateStr(today.getDate(),today.getMonth()+1,today.getFullYear()+543);
+  // Compare dates for upcoming: parse DD/MM/YYYY to sortable number
+  const dateToNum=(ds)=>{if(!ds)return 0;const p=ds.split('/');return p.length===3?parseInt(p[2])*10000+parseInt(p[1])*100+parseInt(p[0]):0};
+  const todayNum=dateToNum(todayStr);
+  const upcoming=sch.filter(s=>dateToNum(s.rcaDate)>=todayNum).sort((a,b)=>dateToNum(a.rcaDate)-dateToNum(b.rcaDate)).slice(0,5);
   const days=[];for(let i=0;i<firstDay;i++)days.push(null);for(let d=1;d<=daysInMonth;d++)days.push(d);
   // Year options (พ.ศ.)
   const curBEYear=new Date().getFullYear()+543;
@@ -1152,7 +1157,7 @@ function CalV({sch,sSch,st}){
     <div className="fc" style={{marginTop:16}}><div className="fch" style={{background:'linear-gradient(135deg,#e67e22,#f39c12)'}}>📅 กำหนดการ RCA ที่จะถึง</div><div className="fcb">
       {upcoming.length===0?<div style={{color:'var(--text-light)',fontSize:13,padding:8}}>ไม่มีกำหนดการที่จะถึง</div>:
       <div style={{display:'flex',flexDirection:'column',gap:8}}>{upcoming.map(s=><div key={s.id} style={{background:'#fff8e1',border:'1px solid #ffc107',borderRadius:8,padding:12,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-        <div><strong style={{color:'var(--primary)',fontSize:13}}>{s.title}</strong><div style={{fontSize:12,color:'var(--text-light)',marginTop:2}}>{s.department} | {fmtDate(s.rcaDate)} {s.rcaTime?'เวลา '+s.rcaTime:''} {s.location?'| '+s.location:''}</div></div>
+        <div><strong style={{color:'var(--primary)',fontSize:13}}>{s.title}</strong><div style={{fontSize:12,color:'var(--text-light)',marginTop:2}}>{s.department} | {s.rcaDate} {s.rcaTime?'เวลา '+s.rcaTime:''} {s.location?'| '+s.location:''}</div></div>
         <div style={{display:'flex',gap:4}}><button className="btn btn-sm btn-p" onClick={()=>openEdit(s)}>แก้ไข</button><button className="btn btn-sm btn-d" onClick={()=>hDel(s.id)}>ลบ</button></div>
       </div>)}</div>}
     </div></div>

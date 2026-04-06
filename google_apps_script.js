@@ -323,7 +323,18 @@ function checkAndNotify() {
     var notified = data[i][6] || '';
 
     if (!dateStr) continue;
-    var rcaDate = new Date(dateStr);
+    // Parse DD/MM/YYYY (พ.ศ.) format
+    var dateParts = String(dateStr).split('/');
+    var rcaDate;
+    if (dateParts.length === 3) {
+      var dd = parseInt(dateParts[0], 10);
+      var mm = parseInt(dateParts[1], 10) - 1;
+      var beYear = parseInt(dateParts[2], 10);
+      var ceYear = beYear - 543;
+      rcaDate = new Date(ceYear, mm, dd);
+    } else {
+      rcaDate = new Date(dateStr); // fallback for old format
+    }
     rcaDate.setHours(0, 0, 0, 0);
 
     var diffDays = Math.round((rcaDate - today) / (1000 * 60 * 60 * 24));
@@ -333,7 +344,7 @@ function checkAndNotify() {
       var msg = '📅 แจ้งเตือน: กำหนดทำ RCA อีก 3 วัน\n\n'
         + '📋 เรื่อง: ' + title + '\n'
         + '🏥 หน่วยงาน: ' + dept + '\n'
-        + '📆 วันที่: ' + fmtDateTH(dateStr) + '\n'
+        + '📆 วันที่: ' + dateStr + '\n'
         + (time ? '⏰ เวลา: ' + time + '\n' : '')
         + (location ? '📍 สถานที่: ' + location + '\n' : '')
         + '\nกรุณาเตรียมข้อมูลและผู้เข้าร่วมให้พร้อม';

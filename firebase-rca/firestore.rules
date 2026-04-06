@@ -55,5 +55,23 @@ service cloud.firestore {
       allow create: if request.auth != null;
       allow read: if request.auth != null && request.auth.token.email == 'phatcharapon.ud@up.ac.th';
     }
+
+    // RCA ID counter - atomic sequential ID generation (multi-device safe)
+    match /counters/{counterId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Document locks - prevents concurrent edits on the same document
+    match /locks/{lockId} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null;
+      allow delete: if request.auth != null;
+    }
+
+    // Device presence tracking - tracks active online devices
+    match /presence/{deviceId} {
+      allow read: if request.auth != null;
+      allow create, update, delete: if request.auth != null;
+    }
   }
 }

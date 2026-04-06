@@ -156,6 +156,7 @@ body{font-family:'Sarabun','Noto Sans Thai',sans-serif;background:var(--bg);colo
 @keyframes slu{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
 .lsp{display:inline-block;width:18px;height:18px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:sp 0.6s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
 .tp-wrap{position:relative;display:inline-block}
 .tp-wrap .tp-box{visibility:hidden;opacity:0;position:absolute;bottom:calc(100% + 10px);left:0;background:#1a3a52;color:#fff;padding:10px 14px;border-radius:8px;font-size:12px;line-height:1.6;width:360px;z-index:200;box-shadow:0 4px 16px rgba(0,0,0,0.25);pointer-events:none;transition:opacity 0.2s,visibility 0.2s;font-weight:400;text-align:left;white-space:normal}
 .tp-wrap .tp-box::after{content:'';position:absolute;top:100%;left:16px;border:6px solid transparent;border-top-color:#1a3a52}
@@ -200,6 +201,103 @@ googleProvider.setCustomParameters({hd: 'up.ac.th'});
 const ADMIN_EMAIL = 'phatcharapon.ud@up.ac.th';
 const GAS_URL='https://script.google.com/macros/s/AKfycbw99ZlV1OaTqG1Mp5C_Xc0Bnvmvr_7rp6lp9f9_Abc45_ivkc9ZAyKz3Bh_40LdzZk1/exec';
 async function syncSchToSheet(schedules){if(!GAS_URL)return;try{await fetch(GAS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'schedules',data:schedules})})}catch(e){}}
+
+// ===== Multi-Device Concurrent Access System =====
+// Generate unique device ID per browser session (persisted in sessionStorage)
+const DEVICE_ID=(()=>{let id=sessionStorage.getItem('mci_device_id');if(!id){id='dev_'+Date.now()+'_'+Math.random().toString(36).substr(2,9);sessionStorage.setItem('mci_device_id',id)}return id})();
+const LOCK_TIMEOUT=5*60*1000; // 5 minutes - lock expires if device stops heartbeat
+
+// Atomic RCA ID generation using Firestore transaction
+async function generateRcaId(){
+  const counterRef=db.collection('counters').doc('rca');
+  return db.runTransaction(async(tx)=>{
+    const counterDoc=await tx.get(counterRef);
+    let nextNum=1;
+    if(counterDoc.exists){
+      nextNum=counterDoc.data().lastNumber+1;
+    }else{
+      // Initialize counter from existing docs
+      const snap=await db.collection('rca').get();
+      snap.forEach(d=>{const m=d.id.match(/^RCA-(\d+)$/);if(m){const n=parseInt(m[1],10);if(n>=nextNum)nextNum=n+1}});
+    }
+    tx.set(counterRef,{lastNumber:nextNum,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+    return 'RCA-'+String(nextNum).padStart(3,'0');
+  });
+}
+
+// Document lock management - prevents concurrent edits on the same document
+async function acquireLock(docId,uid,displayName){
+  const lockRef=db.collection('locks').doc(docId);
+  try{
+    return await db.runTransaction(async(tx)=>{
+      const lockDoc=await tx.get(lockRef);
+      const now=Date.now();
+      if(lockDoc.exists){
+        const lock=lockDoc.data();
+        // Lock belongs to another device and hasn't expired
+        if(lock.deviceId!==DEVICE_ID&&lock.uid!==uid&&(now-lock.heartbeat)<LOCK_TIMEOUT){
+          return {acquired:false,holder:lock.displayName||lock.uid,heldSince:lock.acquiredAt};
+        }
+      }
+      tx.set(lockRef,{deviceId:DEVICE_ID,uid:uid,displayName:displayName||uid,acquiredAt:new Date().toISOString(),heartbeat:now});
+      return {acquired:true};
+    });
+  }catch(e){console.error('Lock error:',e);return {acquired:true}} // Fail-open to not block users
+}
+
+async function releaseLock(docId){
+  try{
+    const lockRef=db.collection('locks').doc(docId);
+    const lockDoc=await lockRef.get();
+    if(lockDoc.exists&&lockDoc.data().deviceId===DEVICE_ID){
+      await lockRef.delete();
+    }
+  }catch(e){console.error('Release lock error:',e)}
+}
+
+async function refreshLock(docId){
+  try{
+    const lockRef=db.collection('locks').doc(docId);
+    const lockDoc=await lockRef.get();
+    if(lockDoc.exists&&lockDoc.data().deviceId===DEVICE_ID){
+      await lockRef.update({heartbeat:Date.now()});
+    }
+  }catch(e){console.error('Refresh lock error:',e)}
+}
+
+// Optimistic concurrency check - uses _version field
+async function saveWithVersionCheck(docId,docData,isNew){
+  if(isNew){
+    docData._version=1;
+    docData._lastDevice=DEVICE_ID;
+    docData._lastSavedAt=new Date().toISOString();
+    await db.collection('rca').doc(docId).set(docData);
+    return {success:true,version:1};
+  }
+  // Existing doc: use transaction to check version
+  const docRef=db.collection('rca').doc(docId);
+  return db.runTransaction(async(tx)=>{
+    const existing=await tx.get(docRef);
+    if(!existing.exists){
+      docData._version=1;
+      docData._lastDevice=DEVICE_ID;
+      docData._lastSavedAt=new Date().toISOString();
+      tx.set(docRef,docData);
+      return {success:true,version:1};
+    }
+    const currentVersion=existing.data()._version||0;
+    const expectedVersion=docData._version||0;
+    // If versions don't match, someone else saved in between
+    if(expectedVersion>0&&currentVersion>expectedVersion){
+      return {success:false,conflict:true,currentVersion:currentVersion,serverData:existing.data()};
+    }
+    docData._version=currentVersion+1;
+    docData._lastDevice=DEVICE_ID;
+    docData._lastSavedAt=new Date().toISOString();
+    tx.set(docRef,docData,{merge:true});
+    return {success:true,version:docData._version};
+  });
+}
 
 // ===== Data Constants =====
 const SEV_L=['A','B','C','D','E','F','G','H','I'], SEV_N=['1','2','3','4','5'];
@@ -1245,7 +1343,14 @@ function App(){
   const[sch,sSch]=useState([]);
   const[unreadCount,setUnreadCount]=useState(0);
 
-  const st=m=>{sT(m);setTimeout(()=>sT(null),3000)};
+  // Multi-device concurrent access state
+  const[docVersion,setDocVersion]=useState(0);
+  const[conflictData,setConflictData]=useState(null); // {serverData, localData} when conflict
+  const[lockHolder,setLockHolder]=useState(null); // name of user holding lock on current doc
+  const[activeDevices,setActiveDevices]=useState(0);
+  const lockHeartbeatRef=useRef(null);
+
+  const st=m=>{sT(m);setTimeout(()=>sT(null),5000)};
   const uf=(f,v)=>sFD(p=>({...p,[f]:v}));
   const isAdmin=user&&user.email===ADMIN_EMAIL;
 
@@ -1380,13 +1485,22 @@ function App(){
     if(confirm('ปฏิเสธผู้ใช้นี้?'))await db.collection('users').doc(uid).update({status:'rejected'});
   };
 
-  // Logout
-  const handleLogout=()=>{auth.signOut().then(()=>{setUser(null);setUserData(undefined)})};
+  // Logout - release locks and presence before signing out
+  const handleLogout=()=>{
+    if(ci){releaseLock(ci);clearInterval(lockHeartbeatRef.current)}
+    db.collection('presence').doc(DEVICE_ID).delete().catch(()=>{});
+    auth.signOut().then(()=>{setUser(null);setUserData(undefined)});
+  };
 
-  // RCA actions
-  const hNew=()=>{sCI(null);sFD({...DF,ta:mkTD()});sN('form')};
-  const hSave=async()=>{
-    sSaving(true);
+  // RCA actions - Multi-device concurrent access safe
+  const hNew=()=>{
+    // Release lock on previous document
+    if(ci){releaseLock(ci);clearInterval(lockHeartbeatRef.current)}
+    sCI(null);sFD({...DF,ta:mkTD()});setDocVersion(0);setLockHolder(null);setConflictData(null);sN('form');
+  };
+
+  const hSave=async(forceOverwrite=false)=>{
+    sSaving(true);setConflictData(null);
     // Deep clean: remove undefined values recursively for Firestore compatibility
     const cleanForFirestore=(obj)=>{
       if(obj===undefined)return null;
@@ -1414,36 +1528,111 @@ function App(){
       }
     }
     const docData=cleanForFirestore({...fd,attachments:uploadedAttachments,savedAt:new Date().toISOString(),status:'draft',ownerUid:user.uid,ownerEmail:user.email,ownerName:userData.fullName});
+    // Carry version for conflict detection (reset if force overwrite)
+    if(!forceOverwrite){docData._version=docVersion}else{docData._version=undefined}
     try{
       if(ci){
-        await db.collection('rca').doc(ci).set(docData,{merge:true});
+        // Update existing document with version check
+        const result=await saveWithVersionCheck(ci,docData,false);
+        if(!result.success&&result.conflict){
+          sSaving(false);
+          setConflictData({serverData:result.serverData,localData:docData,docId:ci});
+          st('⚠️ ข้อมูลถูกแก้ไขจากเครื่องอื่น กรุณาเลือกว่าจะใช้ข้อมูลชุดไหน');
+          return;
+        }
+        setDocVersion(result.version);
+        sFD(p=>({...p,_version:result.version}));
       }else{
-        // Generate sequential RCA ID: RCA-001, RCA-002, ...
-        let maxNum=0;
-        const snap=await db.collection('rca').get();
-        snap.forEach(d=>{const id=d.id;const m=id.match(/^RCA-(\d+)$/);if(m){const n=parseInt(m[1],10);if(n>maxNum)maxNum=n}});
-        const newId='RCA-'+String(maxNum+1).padStart(3,'0');
+        // Generate sequential RCA ID atomically (safe for 5+ concurrent devices)
+        const newId=await generateRcaId();
         docData.adminViewed=false;
-        await db.collection('rca').doc(newId).set(docData);
+        const result=await saveWithVersionCheck(newId,docData,true);
         sCI(newId);
+        setDocVersion(result.version);
+        // Acquire lock on the new document
+        await acquireLock(newId,user.uid,userData.fullName);
+        lockHeartbeatRef.current=setInterval(()=>refreshLock(newId),2*60*1000);
       }
-      sSaving(false);st('✅ บันทึก RCA เรียบร้อยแล้ว');
+      sSaving(false);st('✅ บันทึก RCA เรียบร้อยแล้ว (v'+docVersion+', Device: '+DEVICE_ID.substr(-6)+')');
     }catch(e){
       sSaving(false);st('เกิดข้อผิดพลาด: '+e.message);
     }
   };
-  const hLoad=r=>{sCI(r.id);sFD({...DF,...r,ta:(r.ta||mkTD()).map(migTier)});sN('form');if(isAdmin&&r.adminViewed===false){db.collection('rca').doc(r.id).update({adminViewed:true}).catch(()=>{})}};
+
+  // Force overwrite - used when user chooses to keep their local version
+  const hForceOverwrite=async()=>{
+    if(!conflictData)return;
+    setConflictData(null);
+    await hSave(true);
+  };
+  // Accept server version - used when user chooses to keep the server version
+  const hAcceptServer=()=>{
+    if(!conflictData)return;
+    const sd=conflictData.serverData;
+    sFD({...DF,...sd,ta:(sd.ta||mkTD()).map(migTier)});
+    setDocVersion(sd._version||0);
+    setConflictData(null);
+    st('โหลดข้อมูลจากเซิร์ฟเวอร์แล้ว');
+  };
+
+  const hLoad=async(r)=>{
+    // Release lock on previous document
+    if(ci){await releaseLock(ci);clearInterval(lockHeartbeatRef.current)}
+    // Try to acquire lock on new document
+    const lockResult=await acquireLock(r.id,user.uid,userData.fullName);
+    if(!lockResult.acquired){
+      setLockHolder(lockResult.holder);
+      if(!confirm('⚠️ เอกสารนี้กำลังถูกแก้ไขโดย '+lockResult.holder+'\nต้องการเปิดแบบอ่านอย่างเดียวหรือไม่?')){return}
+    }else{
+      setLockHolder(null);
+      // Start heartbeat to keep lock alive
+      lockHeartbeatRef.current=setInterval(()=>refreshLock(r.id),2*60*1000);
+    }
+    sCI(r.id);
+    sFD({...DF,...r,ta:(r.ta||mkTD()).map(migTier)});
+    setDocVersion(r._version||0);
+    setConflictData(null);
+    sN('form');
+    if(isAdmin&&r.adminViewed===false){db.collection('rca').doc(r.id).update({adminViewed:true}).catch(()=>{})}
+  };
   const hExp=f2=>{const w=window.open('','_blank');w.document.write(bExp(fd,f2));w.document.close();st(f2==='pdf'?'เปิดหน้า PDF':'เปิด Word')};
 
-  // Auto-save every 5 minutes when editing RCA form
+  // Release lock when navigating away from form or unmounting
+  useEffect(()=>{
+    if(nav!=='form'&&ci){releaseLock(ci);clearInterval(lockHeartbeatRef.current);setLockHolder(null)}
+    return()=>{if(ci){releaseLock(ci);clearInterval(lockHeartbeatRef.current)}};
+  },[nav]);
+
+  // Release lock on page unload (browser close/refresh)
+  useEffect(()=>{
+    const cleanup=()=>{if(ci){navigator.sendBeacon&&db.collection('locks').doc(ci)}};
+    window.addEventListener('beforeunload',cleanup);
+    return()=>window.removeEventListener('beforeunload',cleanup);
+  },[ci]);
+
+  // Track active devices count via presence system
+  useEffect(()=>{
+    if(!user)return;
+    const presRef=db.collection('presence').doc(DEVICE_ID);
+    presRef.set({uid:user.uid,name:userData?.fullName||user.email,lastSeen:firebase.firestore.FieldValue.serverTimestamp(),deviceId:DEVICE_ID}).catch(()=>{});
+    const interval=setInterval(()=>{presRef.update({lastSeen:firebase.firestore.FieldValue.serverTimestamp()}).catch(()=>{})},60*1000);
+    const unsub=db.collection('presence').onSnapshot(snap=>{
+      const now=Date.now();
+      const active=snap.docs.filter(d=>{const ls=d.data().lastSeen;return ls&&(now-ls.toMillis())<3*60*1000});
+      setActiveDevices(active.length);
+    },()=>{});
+    return()=>{clearInterval(interval);presRef.delete().catch(()=>{});unsub()};
+  },[user,userData]);
+
+  // Auto-save every 5 minutes when editing RCA form (respects locks)
   const autoSaveRef=useRef(null);
   useEffect(()=>{
     if(nav!=='form'||!user){clearInterval(autoSaveRef.current);return}
     autoSaveRef.current=setInterval(()=>{
-      if(fd.title||fd.whatHappened||fd.department){hSave().then(()=>{}).catch(()=>{})}
+      if((fd.title||fd.whatHappened||fd.department)&&!lockHolder){hSave().then(()=>{}).catch(()=>{})}
     },5*60*1000);
     return()=>clearInterval(autoSaveRef.current);
-  },[nav,user,fd]);
+  },[nav,user,fd,lockHolder]);
 
   // Schedule actions (Firestore)
   const schSave=(newSch)=>{
@@ -1522,6 +1711,8 @@ function App(){
           <span><strong>{userData.fullName}</strong> ({userData.department}){isAdmin&&<span className="admin-badge">ADMIN</span>}</span>
         </div>
         <div style={{display:'flex',gap:8,alignItems:'center'}}>
+          <span style={{fontSize:11,color:'var(--success)',display:'flex',alignItems:'center',gap:4}} title={'อุปกรณ์ออนไลน์ | Device: '+DEVICE_ID.substr(-6)}><span style={{width:8,height:8,borderRadius:'50%',background:'#27ae60',display:'inline-block',animation:'pulse 2s infinite'}}></span> {activeDevices} เครื่องออนไลน์</span>
+          {lockHolder&&<span style={{fontSize:11,color:'var(--accent)',fontWeight:600}}>🔒 ล็อคโดย {lockHolder}</span>}
           <span style={{fontSize:12,color:'var(--text-light)'}}>{user.email}</span>
           <button className="btn btn-sm btn-o" onClick={handleLogout}>ออกจากระบบ</button>
         </div>
@@ -1574,6 +1765,38 @@ function App(){
           <div style={{width:48,height:48,border:'4px solid #dce1e8',borderTopColor:'var(--primary)',borderRadius:'50%',animation:'sp 0.8s linear infinite',margin:'0 auto 16px'}}></div>
           <div style={{fontSize:16,fontWeight:700,color:'var(--primary)'}}>ระบบกำลังบันทึก...</div>
           <div style={{fontSize:13,color:'var(--text-light)',marginTop:4}}>กรุณารอสักครู่</div>
+        </div>
+      </div>}
+      {/* Conflict Resolution Modal - Multi-device concurrent access */}
+      {conflictData&&<div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.7)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000}}>
+        <div style={{background:'#fff',borderRadius:16,padding:32,width:520,maxWidth:'90vw',maxHeight:'80vh',overflow:'auto',boxShadow:'0 8px 32px rgba(0,0,0,0.3)'}}>
+          <h3 style={{color:'var(--accent)',marginBottom:8,fontSize:18}}>⚠️ ข้อมูลขัดแย้ง (Conflict Detected)</h3>
+          <p style={{fontSize:13,color:'var(--text-light)',marginBottom:16}}>เอกสารนี้ถูกแก้ไขจากเครื่องอื่นพร้อมกัน กรุณาเลือกว่าจะใช้ข้อมูลชุดไหน</p>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:20}}>
+            <div style={{border:'2px solid var(--primary)',borderRadius:8,padding:12}}>
+              <div style={{fontWeight:700,color:'var(--primary)',marginBottom:8,fontSize:13}}>📱 ข้อมูลของคุณ (เครื่องนี้)</div>
+              <div style={{fontSize:12,color:'var(--text-light)'}}>
+                <div>เรื่อง: {conflictData.localData?.title||'-'}</div>
+                <div>แผนก: {conflictData.localData?.department||'-'}</div>
+                <div>บันทึกล่าสุด: {conflictData.localData?.savedAt||'-'}</div>
+              </div>
+            </div>
+            <div style={{border:'2px solid var(--accent-warm)',borderRadius:8,padding:12}}>
+              <div style={{fontWeight:700,color:'var(--accent-warm)',marginBottom:8,fontSize:13}}>☁️ ข้อมูลบนเซิร์ฟเวอร์ (เครื่องอื่น)</div>
+              <div style={{fontSize:12,color:'var(--text-light)'}}>
+                <div>เรื่อง: {conflictData.serverData?.title||'-'}</div>
+                <div>แผนก: {conflictData.serverData?.department||'-'}</div>
+                <div>บันทึกล่าสุด: {conflictData.serverData?.savedAt||'-'}</div>
+                <div>โดย: {conflictData.serverData?.ownerName||conflictData.serverData?.ownerEmail||'-'}</div>
+                <div>Version: {conflictData.serverData?._version||0}</div>
+              </div>
+            </div>
+          </div>
+          <div style={{display:'flex',gap:8,justifyContent:'center'}}>
+            <button className="btn btn-p" onClick={hForceOverwrite} style={{flex:1}}>✅ ใช้ข้อมูลของฉัน (เขียนทับ)</button>
+            <button className="btn btn-w" onClick={hAcceptServer} style={{flex:1,background:'var(--accent-warm)',color:'#fff'}}>☁️ ใช้ข้อมูลเซิร์ฟเวอร์</button>
+            <button className="btn btn-o" onClick={()=>setConflictData(null)} style={{flex:0.5}}>ยกเลิก</button>
+          </div>
         </div>
       </div>}
       {toast&&<div className="toast">{toast}</div>}

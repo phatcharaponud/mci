@@ -355,7 +355,7 @@ function Dash({data,onNav}){
   // By dept
   const deptPie = useMemo(()=>{
     const m = {};
-    data.forEach(c=>{ m[c.dept] = (m[c.dept]||0)+1; });
+    data.forEach(c=>{ const d = c.unit || c.dept; if(d) m[d] = (m[d]||0)+1; });
     return Object.entries(m).map(([name,value])=>({ name, value }));
   },[data]);
 

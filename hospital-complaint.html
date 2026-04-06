@@ -1132,8 +1132,8 @@ function App(){
     menu.push({id:"newForm",l:"บันทึกข้อร้องเรียน",ic:"form"});
   }
   menu.push({id:"registry",l:"ทะเบียนข้อร้องเรียน",ic:"list"});
+  menu.push({id:"guide",l:"แนวปฏิบัติ",ic:"book"});
   if(user.role==="admin" || user.role==="crm") {
-    menu.push({id:"guide",l:"แนวปฏิบัติ",ic:"book"});
     menu.push({id:"line",l:"LINE แจ้งเตือน",ic:"msg"});
   }
   if(user.role==="admin") menu.push({id:"users",l:"จัดการผู้ใช้งาน",ic:"users"});

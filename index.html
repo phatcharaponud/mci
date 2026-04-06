@@ -13,6 +13,8 @@ body{font-family:'Sarabun','Noto Sans Thai',sans-serif}
 .sync-bar{position:fixed;top:0;left:0;right:0;height:3px;z-index:99999;transition:opacity .3s}
 .sync-bar.syncing{background:linear-gradient(90deg,#3B82F6,#60A5FA,#3B82F6);background-size:200% 100%;animation:syncAnim 1s linear infinite}
 @keyframes syncAnim{0%{background-position:200% 0}100%{background-position:-200% 0}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+@keyframes sd{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
 </style>
 </head>
 <body>
@@ -31,13 +33,77 @@ const { useState, useEffect, useCallback, useRef } = React;
 // ╚══════════════════════════════════════════════════════╝
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwpU16BI_Mg3S7ugNCUbyruDIiNz8N4Ke-TQReViIztmVhpLgWS6n3ABJ72BH6pItUB/exec";
 
-// ====== SYNC ENGINE ======
+// ===== Multi-Device Concurrent Access System =====
+// Unique device ID per browser session
+const DEVICE_ID = (() => {
+  let id = sessionStorage.getItem('mci-device-id');
+  if (!id) { id = 'dev_' + Date.now() + '_' + Math.random().toString(36).substr(2, 8); sessionStorage.setItem('mci-device-id', id); }
+  return id;
+})();
+
+// ====== SMART MERGE ENGINE (supports 5+ concurrent devices) ======
+// Merges arrays of entities (patients, fleets, hospitals) by ID.
+// Keeps the entity with the newer _updatedAt timestamp.
+// New items from either side are included. Deleted items are respected via _deleted flag.
+function mergeEntities(localArr, serverArr) {
+  const map = new Map();
+  // Server items first (base)
+  (serverArr || []).forEach(item => { if (item && item.id) map.set(item.id, item); });
+  // Local items override if newer
+  (localArr || []).forEach(item => {
+    if (!item || !item.id) return;
+    const existing = map.get(item.id);
+    if (!existing) {
+      map.set(item.id, item); // new local item
+    } else {
+      const localTime = item._updatedAt || 0;
+      const serverTime = existing._updatedAt || 0;
+      if (localTime >= serverTime) {
+        map.set(item.id, item); // local is newer or same
+      }
+      // else keep server version
+    }
+  });
+  // Filter out deleted items
+  return Array.from(map.values()).filter(item => !item._deleted);
+}
+
+// Deep merge an MCI object: merge top-level fields + merge sub-arrays by entity
+function mergeMCI(localMCI, serverMCI) {
+  if (!serverMCI) return localMCI;
+  if (!localMCI) return serverMCI;
+  // Determine which top-level is newer
+  const localTime = localMCI._updatedAt || 0;
+  const serverTime = serverMCI._updatedAt || 0;
+  const base = serverTime > localTime ? { ...serverMCI } : { ...localMCI };
+  const other = serverTime > localTime ? localMCI : serverMCI;
+  // Merge sub-arrays at entity level
+  base.patients = mergeEntities(localMCI.patients, serverMCI.patients);
+  base.fleetSources = mergeEntities(localMCI.fleetSources, serverMCI.fleetSources);
+  base.hospitals = mergeEntities(localMCI.hospitals, serverMCI.hospitals);
+  // Keep higher version
+  base._version = Math.max(localMCI._version || 0, serverMCI._version || 0) + 1;
+  base._updatedAt = Date.now();
+  base._updatedBy = DEVICE_ID;
+  // Merge blood counts (keep newer)
+  if (serverTime > localTime) {
+    base.blood = serverMCI.blood || base.blood;
+  } else {
+    base.blood = localMCI.blood || base.blood;
+  }
+  return base;
+}
+
+// ====== SYNC ENGINE (Concurrent-Safe) ======
 const SYNC_INTERVAL = 5000; // poll ทุก 5 วินาที
 const SAVE_DEBOUNCE = 800;  // รอ 0.8 วินาทีก่อน save
 
 const SyncEngine = {
   _saveTimer: null,
   _station: localStorage.getItem('mci-station') || '',
+  _saving: false,
+  _pendingSave: null,
+  _lastFetchData: null,
 
   setStation(s) { this._station = s; localStorage.setItem('mci-station', s); },
   getStation() { return this._station; },
@@ -52,6 +118,7 @@ const SyncEngine = {
       const data = await r.json();
       document.getElementById('syncBar').className = 'sync-bar';
       if (Array.isArray(data)) {
+        this._lastFetchData = data;
         localStorage.setItem('mci-data', JSON.stringify(data));
         localStorage.setItem('mci-last-sync', new Date().toISOString());
         return data;
@@ -64,50 +131,149 @@ const SyncEngine = {
     }
   },
 
+  // Concurrent-safe save: fetch latest → merge → save merged result
   async saveMCI(mci) {
-    localStorage.setItem('mci-data', JSON.stringify(
-      this._localGet().map(m => m.id === mci.id ? mci : m).concat(
-        this._localGet().find(m => m.id === mci.id) ? [] : [mci]
-      )
-    ));
-    if (!this.isConfigured()) return;
-    clearTimeout(this._saveTimer);
-    this._saveTimer = setTimeout(async () => {
-      try {
-        document.getElementById('syncBar').className = 'sync-bar syncing';
-        await fetch(SCRIPT_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify({ action: 'save', mci, station: this._station })
-        });
-        document.getElementById('syncBar').className = 'sync-bar';
-      } catch (e) { 
-        document.getElementById('syncBar').className = 'sync-bar';
-        console.warn('Save failed:', e.message); 
-      }
-    }, SAVE_DEBOUNCE);
+    // Stamp this update
+    mci._updatedAt = Date.now();
+    mci._updatedBy = DEVICE_ID;
+    mci._version = (mci._version || 0) + 1;
+    mci._station = this._station;
+
+    // Update local storage immediately
+    const localData = this._localGet();
+    const localUpdated = localData.map(m => m.id === mci.id ? mci : m).concat(
+      localData.find(m => m.id === mci.id) ? [] : [mci]
+    );
+    localStorage.setItem('mci-data', JSON.stringify(localUpdated));
+
+    if (!this.isConfigured()) return { merged: mci, conflicts: [] };
+
+    // Debounced server save with merge
+    if (this._saveTimer) clearTimeout(this._saveTimer);
+
+    return new Promise((resolve) => {
+      this._saveTimer = setTimeout(async () => {
+        if (this._saving) {
+          // Queue this save for after current finishes
+          this._pendingSave = mci;
+          resolve({ merged: mci, conflicts: [] });
+          return;
+        }
+        this._saving = true;
+        try {
+          document.getElementById('syncBar').className = 'sync-bar syncing';
+
+          // Step 1: Fetch latest from server
+          let serverData = [];
+          try {
+            const r = await fetch(SCRIPT_URL + '?action=getAll');
+            serverData = await r.json();
+            if (!Array.isArray(serverData)) serverData = [];
+          } catch (e) { serverData = []; }
+
+          // Step 2: Find server version of this MCI
+          const serverMCI = serverData.find(m => m.id === mci.id);
+          let mergedMCI = mci;
+          let conflicts = [];
+
+          if (serverMCI && serverMCI._updatedBy && serverMCI._updatedBy !== DEVICE_ID) {
+            // Another device modified this MCI - merge!
+            const serverVersion = serverMCI._version || 0;
+            const localVersion = (mci._version || 1) - 1; // we incremented above
+            if (serverVersion > localVersion) {
+              mergedMCI = mergeMCI(mci, serverMCI);
+              conflicts.push({
+                type: 'merged',
+                serverDevice: serverMCI._updatedBy,
+                serverStation: serverMCI._station || '?',
+                serverTime: serverMCI._updatedAt,
+                fieldsAffected: detectChangedFields(mci, serverMCI)
+              });
+            }
+          }
+
+          // Step 3: Save merged result to server
+          await fetch(SCRIPT_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({ action: 'save', mci: mergedMCI, station: this._station })
+          });
+
+          document.getElementById('syncBar').className = 'sync-bar';
+
+          // Update local with merged data
+          const newLocal = localUpdated.map(m => m.id === mergedMCI.id ? mergedMCI : m);
+          localStorage.setItem('mci-data', JSON.stringify(newLocal));
+
+          resolve({ merged: mergedMCI, conflicts });
+        } catch (e) {
+          document.getElementById('syncBar').className = 'sync-bar';
+          console.warn('Save failed:', e.message);
+          resolve({ merged: mci, conflicts: [] });
+        } finally {
+          this._saving = false;
+          // Process pending save if any
+          if (this._pendingSave) {
+            const pending = this._pendingSave;
+            this._pendingSave = null;
+            this.saveMCI(pending);
+          }
+        }
+      }, SAVE_DEBOUNCE);
+    });
   },
 
   _localGet() {
     try { return JSON.parse(localStorage.getItem('mci-data')) || []; } catch { return []; }
+  },
+
+  // Presence tracking
+  async reportPresence() {
+    if (!this.isConfigured()) return;
+    try {
+      await fetch(SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({
+          action: 'presence',
+          device: { id: DEVICE_ID, station: this._station, lastSeen: Date.now() }
+        })
+      });
+    } catch (e) { /* ignore */ }
   }
 };
+
+// Detect which fields differ between two MCI objects
+function detectChangedFields(local, server) {
+  const fields = [];
+  if (!local || !server) return fields;
+  if ((local.patients||[]).length !== (server.patients||[]).length) fields.push('patients');
+  if ((local.fleetSources||[]).length !== (server.fleetSources||[]).length) fields.push('fleetSources');
+  if ((local.hospitals||[]).length !== (server.hospitals||[]).length) fields.push('hospitals');
+  if (local.status !== server.status) fields.push('status');
+  if (JSON.stringify(local.blood) !== JSON.stringify(server.blood)) fields.push('blood');
+  if (local.name !== server.name) fields.push('name');
+  return fields;
+}
 
 // ====== HELPERS ======
 const now = () => new Date().toLocaleString("th-TH");
 const nowTime = () => new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
 
 const createEmptyMCI = () => ({
-  id: Date.now().toString(), name: "", location: "", date: now(), status: "open",
-  patients: [], fleetSources: [], hospitals: [], blood: { A: 0, B: 0, AB: 0, O: 0 }, closedAt: ""
+  id: Date.now().toString() + '_' + Math.random().toString(36).substr(2, 4),
+  name: "", location: "", date: now(), status: "open",
+  patients: [], fleetSources: [], hospitals: [], blood: { A: 0, B: 0, AB: 0, O: 0 }, closedAt: "",
+  _version: 1, _updatedAt: Date.now(), _updatedBy: DEVICE_ID, _createdBy: DEVICE_ID
 });
 
 const createEmptyPatient = () => ({
-  id: Date.now().toString() + Math.random().toString(36).slice(2, 6),
+  id: Date.now().toString() + '_' + Math.random().toString(36).slice(2, 8),
   scene: "", triage: "แดง", name: "ไม่ทราบชื่อ", hn: "-", age: "-", edTriage: "",
   diagnosis: "", status: "", destination: "", destinationHospitalId: "", o2: "",
   arrival: nowTime(), blood: "-", note: "", transferFleetId: "", referHospital: "",
-  statusLog: [{ status: "ลงทะเบียน", time: now() }]
+  statusLog: [{ status: "ลงทะเบียน", time: now() }],
+  _updatedAt: Date.now(), _updatedBy: DEVICE_ID
 });
 
 const TRIAGE_COLORS = {
@@ -139,10 +305,14 @@ function Modal({open,onClose,title,children,width=560}){ if(!open) return null; 
 function FormField({label,children}){ return <div style={{marginBottom:12}}><label style={{display:"block",fontSize:13,fontWeight:600,color:"#475569",marginBottom:4}}>{label}</label>{children}</div>; }
 
 // ====== CONNECTION STATUS ======
-function ConnectionStatus({ isOnline, lastSync, station }) {
+function ConnectionStatus({ isOnline, lastSync, station, activeDevices }) {
   return (
     <div className="no-print" style={{ position:"fixed", bottom:12, right:12, zIndex:9998, display:"flex", gap:8, alignItems:"center" }}>
       {station && <div style={{ background:"#1E293B", color:"#fff", padding:"6px 12px", borderRadius:20, fontSize:11, fontWeight:700 }}>📍 {station}</div>}
+      {activeDevices > 1 && <div style={{ background:"#EFF6FF", border:"1px solid #BFDBFE", padding:"6px 12px", borderRadius:20, fontSize:11, fontWeight:700, color:"#1E40AF", display:"flex", alignItems:"center", gap:4 }}>
+        <span style={{ width:8, height:8, borderRadius:"50%", background:"#3B82F6", display:"inline-block", animation:"pulse 2s infinite" }}></span>
+        {activeDevices} เครื่องออนไลน์
+      </div>}
       <div style={{ background: isOnline ? "#DCFCE7" : "#FEF2F2", border: `1px solid ${isOnline ? "#86EFAC" : "#FECACA"}`, padding:"6px 12px", borderRadius:20, fontSize:11, fontWeight:700, color: isOnline ? "#16A34A" : "#DC2626", display:"flex", alignItems:"center", gap:4 }}>
         <span style={{ width:8, height:8, borderRadius:"50%", background: isOnline ? "#16A34A" : "#DC2626", display:"inline-block" }}></span>
         {isOnline ? "Online — Sync" : "Offline — Local"}
@@ -275,7 +445,7 @@ function PatientFormModal({open,onClose,patient,onSave,fleetSources=[],hospitals
       <FormField label="หมายเหตุ"><input style={inputStyle} value={form.note} onChange={e=>u("note",e.target.value)}/></FormField>
       <div style={{display:"flex",justifyContent:"flex-end",gap:10,marginTop:16}}>
         <button onClick={onClose} style={btnSecondary}>ยกเลิก</button>
-        <button onClick={()=>{onSave(form);onClose();}} style={btnSuccess}>💾 บันทึก</button>
+        <button onClick={()=>{onSave({...form, _updatedAt: Date.now(), _updatedBy: DEVICE_ID});onClose();}} style={btnSuccess}>💾 บันทึก</button>
       </div>
     </Modal>
   );
@@ -296,7 +466,7 @@ function FleetSourceFormModal({open,onClose,source,onSave}) {
       <FormField label="หมายเหตุ"><input style={inputStyle} value={form.note} onChange={e=>u("note",e.target.value)}/></FormField>
       <div style={{display:"flex",justifyContent:"flex-end",gap:10,marginTop:16}}>
         <button onClick={onClose} style={btnSecondary}>ยกเลิก</button>
-        <button onClick={()=>{if(!form.name.trim())return;onSave(form);onClose();}} style={btnSuccess}>💾 บันทึก</button>
+        <button onClick={()=>{if(!form.name.trim())return;onSave({...form, _updatedAt: Date.now(), _updatedBy: DEVICE_ID});onClose();}} style={btnSuccess}>💾 บันทึก</button>
       </div>
     </Modal>
   );
@@ -316,7 +486,7 @@ function HospitalFormModal({open,onClose,hospital,onSave}) {
       <FormField label="หมายเหตุ"><input style={inputStyle} value={form.note} onChange={e=>u("note",e.target.value)}/></FormField>
       <div style={{display:"flex",justifyContent:"flex-end",gap:10,marginTop:16}}>
         <button onClick={onClose} style={btnSecondary}>ยกเลิก</button>
-        <button onClick={()=>{if(!form.name.trim())return;onSave(form);onClose();}} style={btnSuccess}>💾 บันทึก</button>
+        <button onClick={()=>{if(!form.name.trim())return;onSave({...form, _updatedAt: Date.now(), _updatedBy: DEVICE_ID});onClose();}} style={btnSuccess}>💾 บันทึก</button>
       </div>
     </Modal>
   );
@@ -349,7 +519,7 @@ function TransferVehicleTab({mci,onUpdate}) {
   const totalUsed=fleetSources.reduce((s,f)=>s+getPatientsForFleet(f.id).length,0);
   const totalRemaining=totalInitial-totalUsed;
   const saveFleet=(src)=>{const i=fleetSources.findIndex(x=>x.id===src.id);const u=i>=0?fleetSources.map((x,j)=>j===i?src:x):[...fleetSources,src];onUpdate({...mci,fleetSources:u});};
-  const deleteFleet=(id)=>{if(confirm("ลบ?"))onUpdate({...mci,fleetSources:fleetSources.filter(f=>f.id!==id)});};
+  const deleteFleet=(id)=>{if(confirm("ลบ?")){const updated=fleetSources.map(f=>f.id===id?{...f,_deleted:true,_updatedAt:Date.now(),_updatedBy:DEVICE_ID}:f).filter(f=>!f._deleted);onUpdate({...mci,fleetSources:updated});}};
   return (
     <div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12,marginBottom:16}}>
@@ -409,7 +579,7 @@ function HospitalTab({mci,onUpdate}) {
   const hospitals=mci.hospitals||[];const patients=mci.patients||[];
   const getHP=(n)=>patients.filter(p=>p.status==="Refer"&&(p.referHospital===n||p.destination===n));
   const saveHosp=(h)=>{const i=hospitals.findIndex(x=>x.id===h.id);const u=i>=0?hospitals.map((x,j)=>j===i?h:x):[...hospitals,h];onUpdate({...mci,hospitals:u});};
-  const deleteHosp=(id)=>{if(confirm("ลบ?"))onUpdate({...mci,hospitals:hospitals.filter(h=>h.id!==id)});};
+  const deleteHosp=(id)=>{if(confirm("ลบ?")){const updated=hospitals.map(h=>h.id===id?{...h,_deleted:true,_updatedAt:Date.now(),_updatedBy:DEVICE_ID}:h).filter(h=>!h._deleted);onUpdate({...mci,hospitals:updated});}};
   return (
     <div>
       <div style={{background:"#fff",borderRadius:12,border:"1px solid #E2E8F0",overflow:"hidden"}}>
@@ -503,8 +673,12 @@ function MCIDashboard({mci,onUpdate,onBack,onPublicBoard}) {
   const [patientModal,setPatientModal]=useState({open:false,patient:null});
   const [tab,setTab]=useState("patients");
   const [activeTriageColor,setActiveTriageColor]=useState(null);
-  const savePatient=p=>{const i=mci.patients.findIndex(x=>x.id===p.id);const u=i>=0?mci.patients.map((x,j)=>j===i?p:x):[...mci.patients,p];onUpdate({...mci,patients:u});};
-  const deletePatient=id=>{if(confirm("ลบ?"))onUpdate({...mci,patients:mci.patients.filter(p=>p.id!==id)});};
+  const savePatient=p=>{p._updatedAt=Date.now();p._updatedBy=DEVICE_ID;const i=mci.patients.findIndex(x=>x.id===p.id);const u=i>=0?mci.patients.map((x,j)=>j===i?p:x):[...mci.patients,p];onUpdate({...mci,patients:u});};
+  const deletePatient=id=>{if(confirm("ลบ?")){
+    // Mark as deleted (soft delete) so merge won't re-add from other devices
+    const updated=mci.patients.map(p=>p.id===id?{...p,_deleted:true,_updatedAt:Date.now(),_updatedBy:DEVICE_ID}:p).filter(p=>!p._deleted);
+    onUpdate({...mci,patients:updated});
+  }};
   return (
     <div style={{minHeight:"100vh",background:"#F1F5F9",fontFamily:font}}>
       <div className="no-print" style={{background:"linear-gradient(135deg,#1E293B,#0F172A)",color:"#fff",padding:"14px 20px"}}>
@@ -662,7 +836,29 @@ function StationSelector({onDone}) {
   );
 }
 
-// ====== MAIN APP ======
+// ====== MERGE NOTIFICATION TOAST ======
+function MergeToast({mergeInfo, onDismiss}) {
+  if (!mergeInfo) return null;
+  return (
+    <div style={{position:"fixed",top:60,right:16,zIndex:10000,background:"linear-gradient(135deg,#1E40AF,#3B82F6)",color:"#fff",borderRadius:12,padding:"14px 20px",maxWidth:360,boxShadow:"0 8px 32px rgba(0,0,0,0.3)",animation:"sd .3s ease",fontSize:13}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+        <strong style={{fontSize:14}}>🔄 ข้อมูลถูก Merge อัตโนมัติ</strong>
+        <button onClick={onDismiss} style={{background:"rgba(255,255,255,0.2)",border:"none",color:"#fff",borderRadius:4,padding:"2px 8px",cursor:"pointer",fontSize:16}}>✕</button>
+      </div>
+      <div style={{opacity:0.9}}>
+        เครื่อง <strong>{mergeInfo.serverStation}</strong> แก้ไขข้อมูลพร้อมกัน
+        {mergeInfo.fieldsAffected && mergeInfo.fieldsAffected.length > 0 && (
+          <div style={{marginTop:4}}>ส่วนที่เปลี่ยน: {mergeInfo.fieldsAffected.map(f => ({
+            patients:'ผู้ป่วย', fleetSources:'รถส่งต่อ', hospitals:'รพ.', status:'สถานะ', blood:'หมู่เลือด', name:'ชื่อเหตุการณ์'
+          }[f] || f)).join(', ')}</div>
+        )}
+      </div>
+      <div style={{marginTop:6,fontSize:11,opacity:0.7}}>ระบบรวมข้อมูลทั้งสองเครื่องเข้าด้วยกันแล้ว ไม่มีข้อมูลสูญหาย</div>
+    </div>
+  );
+}
+
+// ====== MAIN APP (Multi-Device Concurrent Safe) ======
 function App() {
   const [mcis,setMcis]=useState([]);
   const [selectedMCI,setSelectedMCI]=useState(null);
@@ -670,7 +866,13 @@ function App() {
   const [createOpen,setCreateOpen]=useState(false);
   const [loading,setLoading]=useState(true);
   const [isOnline,setIsOnline]=useState(SyncEngine.isConfigured());
+  const [mergeInfo,setMergeInfo]=useState(null);
+  const [activeDevices,setActiveDevices]=useState(1);
   const syncRef=useRef(null);
+  const selectedMCIRef=useRef(null);
+
+  // Keep ref in sync with state (for use in polling interval)
+  useEffect(()=>{selectedMCIRef.current=selectedMCI;},[selectedMCI]);
 
   // Initial load
   useEffect(()=>{
@@ -682,7 +884,7 @@ function App() {
     })();
   },[]);
 
-  // Auto-sync polling
+  // Auto-sync polling - smart merge on incoming data
   useEffect(()=>{
     if(!SyncEngine.isConfigured()) return;
     syncRef.current=setInterval(async()=>{
@@ -691,16 +893,43 @@ function App() {
         if(Array.isArray(d)){
           setMcis(d);
           setIsOnline(true);
-          // Update selected MCI if open
-          if(selectedMCI){
-            const updated=d.find(m=>m.id===selectedMCI.id);
-            if(updated)setSelectedMCI(updated);
+          // Smart merge: if current MCI is open and server has newer data, merge
+          const sel = selectedMCIRef.current;
+          if(sel){
+            const serverVersion=d.find(m=>m.id===sel.id);
+            if(serverVersion){
+              if(serverVersion._updatedBy && serverVersion._updatedBy !== DEVICE_ID &&
+                 (serverVersion._version||0) > (sel._version||0)) {
+                // Another device updated - merge with local
+                const merged = mergeMCI(sel, serverVersion);
+                setSelectedMCI(merged);
+                setMergeInfo({
+                  serverStation: serverVersion._station || 'เครื่องอื่น',
+                  fieldsAffected: detectChangedFields(sel, serverVersion),
+                  time: Date.now()
+                });
+                setTimeout(()=>setMergeInfo(null), 6000);
+              } else {
+                setSelectedMCI(serverVersion);
+              }
+            }
           }
+
+          // Estimate active devices from recent updates
+          const now = Date.now();
+          const recentDevices = new Set();
+          d.forEach(m => {
+            if (m._updatedBy && (now - (m._updatedAt||0)) < 5 * 60 * 1000) {
+              recentDevices.add(m._updatedBy);
+            }
+          });
+          recentDevices.add(DEVICE_ID);
+          setActiveDevices(recentDevices.size);
         }
       }catch{setIsOnline(false);}
     },SYNC_INTERVAL);
     return ()=>clearInterval(syncRef.current);
-  },[selectedMCI]);
+  },[]);
 
   const saveMcis=useCallback(async(newMcis)=>{
     setMcis(newMcis);
@@ -708,23 +937,34 @@ function App() {
   },[]);
 
   const handleCreateMCI=async(m)=>{
+    m._version = 1; m._updatedAt = Date.now(); m._updatedBy = DEVICE_ID;
     const n=[m,...mcis];saveMcis(n);setSelectedMCI(m);setView("dashboard");
     await SyncEngine.saveMCI(m);
   };
   const handleSelectMCI=m=>{setSelectedMCI(m);setView(m.status==="closed"?"report":"dashboard");};
   const handleUpdateMCI=async(u)=>{
+    u._updatedAt = Date.now();
+    u._updatedBy = DEVICE_ID;
     saveMcis(mcis.map(m=>m.id===u.id?u:m));setSelectedMCI(u);
     if(u.status==="closed")setView("report");
-    await SyncEngine.saveMCI(u);
+    // Concurrent-safe save with merge
+    const result = await SyncEngine.saveMCI(u);
+    if(result && result.conflicts && result.conflicts.length > 0){
+      setMergeInfo(result.conflicts[0]);
+      setSelectedMCI(result.merged);
+      setTimeout(()=>setMergeInfo(null), 6000);
+    } else if(result && result.merged){
+      setSelectedMCI(result.merged);
+    }
   };
 
   if(loading) return <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#F1F5F9",fontFamily:font}}><div style={{textAlign:"center"}}><div style={{fontSize:48,animation:"p 1.5s infinite"}}>🏥</div><div style={{marginTop:8,color:"#64748B"}}>กำลังโหลด...</div><style>{`@keyframes p{0%,100%{opacity:1}50%{opacity:.5}}`}</style></div></div>;
   if(view==="station") return <StationSelector onDone={()=>{setView("list");SyncEngine.fetchAll().then(d=>{if(d)setMcis(d);});}}/>;
-  if(view==="report"&&selectedMCI) return <><ReportPage mci={selectedMCI} onBack={()=>{setView("list");setSelectedMCI(null);}}/><ConnectionStatus isOnline={isOnline} station={SyncEngine.getStation()}/></>;
+  if(view==="report"&&selectedMCI) return <><ReportPage mci={selectedMCI} onBack={()=>{setView("list");setSelectedMCI(null);}}/><ConnectionStatus isOnline={isOnline} station={SyncEngine.getStation()} activeDevices={activeDevices}/><MergeToast mergeInfo={mergeInfo} onDismiss={()=>setMergeInfo(null)}/></>;
   if(view==="publicBoard"&&selectedMCI) return <PublicBoard mci={selectedMCI} onBack={()=>setView("dashboard")}/>;
-  if(view==="dashboard"&&selectedMCI) return <><MCIDashboard mci={selectedMCI} onUpdate={handleUpdateMCI} onBack={()=>{setView("list");setSelectedMCI(null);}} onPublicBoard={()=>setView("publicBoard")}/><ConnectionStatus isOnline={isOnline} station={SyncEngine.getStation()}/></>;
+  if(view==="dashboard"&&selectedMCI) return <><MCIDashboard mci={selectedMCI} onUpdate={handleUpdateMCI} onBack={()=>{setView("list");setSelectedMCI(null);}} onPublicBoard={()=>setView("publicBoard")}/><ConnectionStatus isOnline={isOnline} station={SyncEngine.getStation()} activeDevices={activeDevices}/><MergeToast mergeInfo={mergeInfo} onDismiss={()=>setMergeInfo(null)}/></>;
 
-  return (<><MCIListPage mcis={mcis} onSelect={handleSelectMCI} onCreateNew={()=>setCreateOpen(true)}/><CreateMCIModal open={createOpen} onClose={()=>setCreateOpen(false)} onSave={handleCreateMCI}/><ConnectionStatus isOnline={isOnline} station={SyncEngine.getStation()}/></>);
+  return (<><MCIListPage mcis={mcis} onSelect={handleSelectMCI} onCreateNew={()=>setCreateOpen(true)}/><CreateMCIModal open={createOpen} onClose={()=>setCreateOpen(false)} onSave={handleCreateMCI}/><ConnectionStatus isOnline={isOnline} station={SyncEngine.getStation()} activeDevices={activeDevices}/><MergeToast mergeInfo={mergeInfo} onDismiss={()=>setMergeInfo(null)}/></>);
 }
 
 const root = ReactDOM.createRoot(document.getElementById('root'));

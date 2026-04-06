@@ -49,7 +49,7 @@ const ResponsiveContainer = Recharts.ResponsiveContainer, PieChart = Recharts.Pi
 const Cell = Recharts.Cell, LineChart = Recharts.LineChart, Line = Recharts.Line;
 
 // ============ CONFIG ============
-const DEPTS = ["แผนกเภสัชกรรม","แผนกผู้ป่วยนอก (OPD)","แผนกผู้ป่วยใน (IPD)","แผนกฉุกเฉิน (ER)","แผนกรังสีวิทยา","แผนกเวชระเบียน","แผนกการเงิน","แผนกห้องปฏิบัติการ (LAB)","แผนกกายภาพบำบัด","แผนกโภชนาการ","แผนกซักฟอก","แผนกยานพาหนะ","แผนกบริหารทั่วไป","แผนกเทคโนโลยีสารสนเทศ (IT)","แผนกพัสดุ","แผนกซ่อมบำรุง","แผนกประชาสัมพันธ์"];
+const DEPTS = ["งานพยาบาลแผนก ER","งานพยาบาลผู้ป่วยนอก (OPD)","งานพยาบาลแผนก IPD 1/1 (ผู้ป่วยในสามัญ)","งานพยาบาลแผนก IPD3 (ผู้ป่วยในพิเศษ)","งานพยาบาลแผนก ICU","งานพยาบาลห้องผ่าตัด","งานพยาบาลห้องคลอด","งานพยาบาลคลินิกพิเศษ","งานพยาบาลแผนกไตเทียม","งานวิสัญญี","งานธาลัสซีเมีย","งานปฐมภูมิและเสริมสร้างสุขภาพ","งานเภสัชกรรม","งานเทคนิคการแพทย์","งานธนาคารเลือด","งานรังสี","งานกายภาพบำบัด","งานเทคโนโลยีสารสนเทศและนวัตกรรมดิจิทัลทางการแพทย์","งานเวชระเบียนและเวชสถิติ","งานการเงินและบัญชี","งานประกันสุขภาพ","งานบริหารบุคคล","งานพัสดุ","งานโครงสร้างพื้นฐานและวิศวกรรมทางการแพทย์","งานควบคุมและป้องกันการติดเชื้อ (IC)","งานวิชาการ"];
 const STAFF_INIT = [];
 const SEV = [
   {level:1,label:"ระดับ 1",desc:"บ่น/เสนอแนะ/เล่าให้ฟัง",color:"#10b981",impact:"ไม่รุนแรง",time:"ภายใน 3 วันทำการ"},
@@ -356,7 +356,7 @@ function Dash({data}){
   const deptPie = useMemo(()=>{
     const m = {};
     data.forEach(c=>{ m[c.dept] = (m[c.dept]||0)+1; });
-    return Object.entries(m).map(([name,value])=>({ name:name.replace("แผนก","").replace(/\s*\([^)]*\)/g,""), value }));
+    return Object.entries(m).map(([name,value])=>({ name, value }));
   },[data]);
 
   // Severity
@@ -619,7 +619,8 @@ function Detail({c,onBack,onUpdate,user,initTab}){
   const [inv,setInv] = useState(c.inv||{facts:"",root:"",sol:"",resp:user.name});
   const [res,setRes] = useState(c.res||{actions:"",result:"",preventive:"",done:""});
 
-  const isTagged = user.role==="admin"
+  // user สามารถแก้ไขส่วนตรวจสอบ/แก้ไขได้ ถ้าถูก tag หรือเป็นหน่วยงานเดียวกัน
+  const isTagged = user.role==="admin" || user.role==="crm"
     || (c.tagDepts||[]).includes(user.dept)
     || (c.tagStaff||[]).includes(user.name)
     || c.responsible===user.name
@@ -777,12 +778,11 @@ function Reg({data,onView,user}){
 
   const list = useMemo(()=>{
     let l = data;
-    if(user.role!=="admin"){
+    if(user.role!=="admin" && user.role!=="crm"){
+      // role user: เห็นเฉพาะที่หน่วยงานหรือตัวเองถูก tag
       l = l.filter(c =>
         (c.tagDepts||[]).includes(user.dept) ||
-        (c.tagStaff||[]).includes(user.name) ||
-        c.responsible===user.name ||
-        c.by===user.email
+        (c.tagStaff||[]).includes(user.name)
       );
     }
     if(q){ const s=q.toLowerCase(); l = l.filter(c => c.subject.toLowerCase().includes(s) || c.detail.toLowerCase().includes(s) || c.id.toLowerCase().includes(s)); }
@@ -793,7 +793,7 @@ function Reg({data,onView,user}){
   },[data,q,sf,lf,df,user]);
 
   function canAct(c){
-    return user.role==="admin"
+    return user.role==="admin" || user.role==="crm"
       || (c.tagDepts||[]).includes(user.dept)
       || (c.tagStaff||[]).includes(user.name)
       || c.responsible===user.name;
@@ -1068,11 +1068,15 @@ function App(){
 
   const menu = [
     {id:"dashboard",l:"Dashboard",ic:"dashboard"},
-    {id:"newForm",l:"บันทึกข้อร้องเรียน",ic:"form"},
-    {id:"registry",l:"ทะเบียนข้อร้องเรียน",ic:"list"},
-    {id:"guide",l:"แนวปฏิบัติ",ic:"book"},
-    {id:"line",l:"LINE แจ้งเตือน",ic:"msg"}
   ];
+  if(user.role==="admin" || user.role==="crm") {
+    menu.push({id:"newForm",l:"บันทึกข้อร้องเรียน",ic:"form"});
+  }
+  menu.push({id:"registry",l:"ทะเบียนข้อร้องเรียน",ic:"list"});
+  if(user.role==="admin" || user.role==="crm") {
+    menu.push({id:"guide",l:"แนวปฏิบัติ",ic:"book"});
+    menu.push({id:"line",l:"LINE แจ้งเตือน",ic:"msg"});
+  }
   if(user.role==="admin") menu.push({id:"users",l:"จัดการผู้ใช้งาน",ic:"users"});
 
   function onSave(c){

@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>แบบสอบถาม การมีส่วนร่วมในการพัฒนาและรับรองคุณภาพโรงพยาบาล</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📋</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Sarabun',sans-serif;background:#f0f4f8;color:#1e293b;line-height:1.6}
+.container{max-width:800px;margin:0 auto;padding:16px}
+.header{background:linear-gradient(135deg,#1e3a5f,#2563eb);color:#fff;border-radius:16px;padding:32px 24px;text-align:center;margin-bottom:24px;box-shadow:0 4px 20px rgba(37,99,235,.3)}
+.header h1{font-size:1.3rem;font-weight:700;margin-bottom:8px}
+.header h2{font-size:1rem;font-weight:400;opacity:.9}
+.info-box{background:#fff;border-radius:12px;padding:20px;margin-bottom:24px;border-left:4px solid #2563eb;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.info-box h3{color:#1e3a5f;margin-bottom:8px;font-size:1rem}
+.info-box p{font-size:.9rem;color:#475569}
+.section{background:#fff;border-radius:12px;padding:24px;margin-bottom:20px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.section-title{background:linear-gradient(135deg,#1e3a5f,#2563eb);color:#fff;padding:12px 20px;border-radius:8px;margin:-24px -24px 20px;font-size:1.05rem;font-weight:600}
+.question-group{margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid #e2e8f0}
+.question-group:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0}
+.q-label{font-weight:600;margin-bottom:10px;font-size:.95rem}
+.q-number{display:inline-block;background:#2563eb;color:#fff;width:26px;height:26px;border-radius:50%;text-align:center;line-height:26px;font-size:.8rem;margin-right:6px}
+.options{display:flex;flex-wrap:wrap;gap:8px}
+.option-label{display:flex;align-items:center;gap:6px;padding:8px 14px;border:2px solid #e2e8f0;border-radius:8px;cursor:pointer;transition:all .2s;font-size:.9rem;background:#fafbfc}
+.option-label:hover{border-color:#93c5fd;background:#eff6ff}
+.option-label input{display:none}
+.option-label.selected{border-color:#2563eb;background:#eff6ff;color:#1e40af;font-weight:600}
+.option-dot{width:18px;height:18px;border:2px solid #cbd5e1;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s}
+.option-label.selected .option-dot{border-color:#2563eb;background:#2563eb}
+.option-label.selected .option-dot::after{content:'';width:8px;height:8px;background:#fff;border-radius:50%}
+.sub-title{background:#f1f5f9;padding:10px 16px;border-radius:8px;margin:16px 0 12px;font-weight:700;color:#1e3a5f;border-left:4px solid #2563eb;font-size:.95rem}
+.likert-table{width:100%;border-collapse:collapse;margin-top:8px;font-size:.85rem}
+.likert-table thead{background:#f8fafc}
+.likert-table th{padding:10px 4px;text-align:center;font-weight:600;color:#475569;font-size:.8rem;border-bottom:2px solid #e2e8f0}
+.likert-table th:first-child{text-align:left;width:40%}
+.likert-table td{padding:12px 4px;text-align:center;border-bottom:1px solid #f1f5f9}
+.likert-table td:first-child{text-align:left;font-size:.88rem;padding-right:8px}
+.likert-table tr:hover{background:#f8fafc}
+.likert-radio{width:20px;height:20px;cursor:pointer;accent-color:#2563eb}
+.likert-table tr.selected-row{background:#eff6ff}
+textarea{width:100%;border:2px solid #e2e8f0;border-radius:8px;padding:12px;font-family:inherit;font-size:.9rem;resize:vertical;min-height:100px;transition:border-color .2s}
+textarea:focus{outline:none;border-color:#2563eb}
+.btn-submit{display:block;width:100%;padding:16px;background:linear-gradient(135deg,#1e3a5f,#2563eb);color:#fff;border:none;border-radius:12px;font-size:1.1rem;font-weight:700;cursor:pointer;transition:all .3s;font-family:inherit;margin-top:8px}
+.btn-submit:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(37,99,235,.4)}
+.btn-submit:disabled{background:#94a3b8;cursor:not-allowed;transform:none;box-shadow:none}
+.progress-bar{position:fixed;top:0;left:0;height:4px;background:linear-gradient(90deg,#2563eb,#60a5fa);z-index:999;transition:width .3s}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:14px 28px;border-radius:12px;color:#fff;font-weight:600;z-index:9999;animation:slideUp .3s;font-size:.95rem;box-shadow:0 4px 20px rgba(0,0,0,.2)}
+.toast.success{background:#059669}
+.toast.error{background:#dc2626}
+@keyframes slideUp{from{opacity:0;transform:translateX(-50%) translateY(20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:9999}
+.modal{background:#fff;border-radius:16px;padding:40px;text-align:center;max-width:420px;width:90%;animation:popIn .3s}
+.modal h2{color:#059669;font-size:1.4rem;margin-bottom:12px}
+.modal p{color:#475569;margin-bottom:20px}
+.modal button{padding:10px 32px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-size:1rem;font-weight:600;cursor:pointer;font-family:inherit}
+@keyframes popIn{from{transform:scale(.8);opacity:0}to{transform:scale(1);opacity:1}}
+.required{color:#dc2626}
+.validation-error{color:#dc2626;font-size:.8rem;margin-top:4px}
+@media(max-width:600px){
+  .container{padding:10px}
+  .header{padding:24px 16px}
+  .header h1{font-size:1.1rem}
+  .section{padding:16px}
+  .section-title{margin:-16px -16px 16px;padding:10px 16px;font-size:.95rem}
+  .options{flex-direction:column}
+  .likert-table{font-size:.75rem}
+  .likert-table th{padding:6px 2px;font-size:.7rem}
+  .likert-table td{padding:8px 2px}
+  .likert-radio{width:16px;height:16px}
+}
+</style>
+</head>
+<body>
+
+<div class="progress-bar" id="progressBar" style="width:0%"></div>
+<div class="container" id="app"></div>
+
+<script>
+// ╔══════════════════════════════════════════════════════════╗
+// ║  ใส่ URL ของ Google Apps Script Web App ตรงนี้            ║
+// ╚══════════════════════════════════════════════════════════╝
+const SCRIPT_URL = "";
+
+// ====== DATA ======
+const formData = {};
+let submitted = false;
+
+const LIKERT_OPTIONS = [
+  { value: '5', label: 'มากที่สุด' },
+  { value: '4', label: 'มาก' },
+  { value: '3', label: 'ปานกลาง' },
+  { value: '2', label: 'น้อย' },
+  { value: '1', label: 'น้อยที่สุด' },
+  { value: '0', label: 'ไม่สามารถประเมินได้' }
+];
+
+const PART2_SECTIONS = [
+  {
+    title: 'ด้านการมีส่วนร่วม',
+    questions: [
+      { num: 1, text: 'โรงพยาบาลมีการมอบหมายงานอย่างชัดเจน' },
+      { num: 2, text: 'มีการกำหนดเกณฑ์มาตรฐานในการปฏิบัติงานชัดเจน' },
+      { num: 3, text: 'ขั้นตอนในการทำงานมีความยุ่งยาก' },
+      { num: 4, text: 'บุคลากรมีส่วนร่วมเสนอความคิดเห็นในที่ประชุมการพัฒนาคุณภาพของหน่วยงาน' },
+      { num: 5, text: 'บุคลากรมีส่วนร่วมวางแผนในการกำหนดมาตรการป้องกันความเสี่ยงในการปฏิบัติงานในหน่วยงาน' },
+      { num: 6, text: 'บุคลากรมีส่วนร่วมตัดสินใจในการปฏิบัติกิจกรรมต่าง ๆ ในโครงการพัฒนาคุณภาพ' },
+      { num: 7, text: 'บุคลากรมีส่วนร่วมแก้ไขข้อบกพร่องต่างๆ ในการปฏิบัติกิจกรรมพัฒนาคุณภาพ' },
+      { num: 8, text: 'บุคลากรมีส่วนร่วมประเมินผลงานตามตัวชี้วัดที่กำหนดตามพันธกิจของหน่วยงาน' },
+      { num: 9, text: 'บุคลากรรู้และเข้าใจวัตถุประสงค์ในการพัฒนาคุณภาพ' },
+      { num: 10, text: 'หน่วยงานมีการปรับปรุงการปฏิบัติงานอย่างต่อเนื่อง' }
+    ]
+  },
+  {
+    title: 'ด้านภาวะผู้นำ',
+    questions: [
+      { num: 11, text: 'ผู้บริหารเป็นผู้นำในการทำกิจกรรมพัฒนาคุณภาพในหน่วยงาน' },
+      { num: 12, text: 'ผู้บริหารจัดให้มีการประชุมและรายงานผลความก้าวหน้าของการพัฒนาคุณภาพอย่างสม่ำเสมอ' },
+      { num: 13, text: 'ผู้บริหารสนับสนุนบุคลากรให้มีการทำงานเป็นทีม' },
+      { num: 14, text: 'ผู้บริหารมีการสนับสนุนให้มีการประชุมร่วมกันเพื่อการปรับปรุงแก้ไขการปฏิบัติงานอย่างสม่ำเสมอ' },
+      { num: 15, text: 'ผู้บริหารรับฟังข้อคิดเห็นหรือข้อเสนอแนะของบุคลากรในเรื่องการทำงาน' },
+      { num: 16, text: 'ผู้บริหารสนับสนุนทรัพยากรแก่ผู้ปฏิบัติเพื่อสร้างความพึงพอใจแก่ผู้รับบริการ' },
+      { num: 17, text: 'ผู้บริหารสนับสนุนการนำเทคโนโลยีที่ทันสมัยมาใช้ในการปฏิบัติงาน' },
+      { num: 18, text: 'ผู้บริหารสนับสนุนการนำความคิดสร้างสรรค์และความคิดริเริ่มมาใช้ประโยชน์ในการปฏิบัติงาน' },
+      { num: 19, text: 'ผู้บริหารสนับสนุนการทำงานเชิงรุก' },
+      { num: 20, text: 'ผู้บริหารทำงานอย่างมีเป้าหมายชัดเจน' },
+      { num: 21, text: 'ผู้บริหารสนับสนุนงบประมาณในการดำเนินงานคุณภาพ' }
+    ]
+  },
+  {
+    title: 'ด้านการศึกษาและการฝึกอบรม',
+    questions: [
+      { num: 22, text: 'มีการสนับสนุนบุคลากรให้มีการฝึกอบรมเกี่ยวกับการพัฒนาคุณภาพ' },
+      { num: 23, text: 'มีการสนับสนุนบุคลากรให้ไปดูงานทั้งภายในและภายนอกหน่วยงาน' },
+      { num: 24, text: 'การจัดมหกรรมคุณภาพสะท้อนให้เห็นว่าองค์กรให้ความสำคัญในเรื่องการพัฒนาคุณภาพ' },
+      { num: 25, text: 'บุคลากรมีโอกาสเข้าร่วมประชุมเกี่ยวกับการดำเนินงานเพื่อการพัฒนาคุณภาพโรงพยาบาล' }
+    ]
+  },
+  {
+    title: 'ด้านการได้รับพลังอำนาจและแรงจูงใจในการทำงาน',
+    questions: [
+      { num: 26, text: 'มีการมอบหมายงานที่ท้าทาย' },
+      { num: 27, text: 'หน่วยงานให้อำนาจในการตัดสินใจในการพัฒนางาน' },
+      { num: 28, text: 'องค์กรให้ความสำคัญต่อบุคลากรที่ทำงานสำเร็จตามวัตถุประสงค์ของการพัฒนาคุณภาพ' },
+      { num: 29, text: 'มีการให้รางวัลแก่บุคลากรที่ดำเนินกิจกรรมคุณภาพดีเด่น' },
+      { num: 30, text: 'มีระบบสนับสนุนสวัสดิการให้บุคลากรอย่างเพียงพอ' }
+    ]
+  }
+];
+
+const PART3_QUESTIONS = [
+  { num: 31, text: 'บุคลากรได้รับบาดเจ็บจากของมีคม (เข็มตำ มีดบาด) ลดลง' },
+  { num: 32, text: 'บุคลากรเสี่ยงต่อการติดเชื้อจากผู้ป่วยลดลง' },
+  { num: 33, text: 'บุคลากรเสี่ยงต่อการถูกทำร้ายร่างกายจากผู้ป่วยลดลง' },
+  { num: 34, text: 'บุคลากรมีการสื่อสารกับผู้ป่วยอย่างมีประสิทธิภาพมากขึ้น' },
+  { num: 35, text: 'หน่วยงานของท่านมีอุปกรณ์เพียงพอเมื่อเกิดอัคคีภัย' },
+  { num: 36, text: 'หน่วยงานของท่านมีทางหนีไฟที่มีความปลอดภัยเมื่อเกิดอัคคีภัย' },
+  { num: 37, text: 'หน่วยงานของท่านมีแสงสว่างเพียงพอในการทำงาน' },
+  { num: 38, text: 'หน่วยงานของท่านมีการประเมินความรู้ความสามารถในการปฏิบัติงาน (Competency) อย่างต่อเนื่อง' },
+  { num: 39, text: 'บุคลากรในหน่วยงานของท่านมีความรู้ความสามารถในการปฏิบัติงานตามจำนวนปีที่ทำงาน' }
+];
+
+// ====== RENDER ======
+function render() {
+  const app = document.getElementById('app');
+
+  if (submitted) {
+    app.innerHTML = `
+      <div class="modal-overlay">
+        <div class="modal">
+          <div style="font-size:3rem;margin-bottom:16px">✅</div>
+          <h2>ส่งแบบสอบถามเรียบร้อย</h2>
+          <p>ขอขอบคุณท่านที่สละเวลาและให้ความร่วมมือในการตอบแบบสอบถาม</p>
+          <button onclick="location.reload()">ตอบแบบสอบถามใหม่</button>
+        </div>
+      </div>`;
+    return;
+  }
+
+  app.innerHTML = `
+    <div class="header">
+      <h1>แบบสอบถาม</h1>
+      <h2>เรื่อง การมีส่วนร่วมในการพัฒนาและรับรองคุณภาพโรงพยาบาล<br>ของบุคลากรโรงพยาบาลมหาวิทยาลัยพะเยา</h2>
+    </div>
+
+    <div class="info-box">
+      <h3>คำชี้แจง</h3>
+      <p>1. แบบสอบถามฉบับนี้จัดทำขึ้นตามวัตถุประสงค์ในการศึกษา เรื่อง การมีส่วนร่วมในการพัฒนาและรับรองคุณภาพโรงพยาบาลของบุคลากรโรงพยาบาลมหาวิทยาลัยพะเยา</p>
+      <p style="margin-top:8px">2. แบบสอบถามชุดนี้ใช้สำหรับเก็บรวบรวมข้อมูล และนำผลลัพธ์ไปใช้ในการศึกษาการมีส่วนร่วมในการพัฒนาและรับรองคุณภาพโรงพยาบาลของบุคลากรโรงพยาบาลมหาวิทยาลัยพะเยา โดยไม่มีผลกระทบต่อหน้าที่และการปฏิบัติงานของท่าน</p>
+      <p style="margin-top:8px">3. แบบสอบถามแบ่งออก เป็น 4 ส่วน</p>
+    </div>
+
+    <!-- ส่วนที่ 1 -->
+    <div class="section" id="section1">
+      <div class="section-title">ส่วนที่ 1 ข้อมูลเกี่ยวกับสถานภาพทั่วไปของผู้ตอบแบบสอบถามและหน่วยงาน</div>
+      ${renderDemographics()}
+    </div>
+
+    <!-- ส่วนที่ 2 -->
+    <div class="section" id="section2">
+      <div class="section-title">ส่วนที่ 2 ข้อมูลเกี่ยวกับการมีส่วนร่วมในการพัฒนาและรับรองคุณภาพโรงพยาบาล (HA)</div>
+      <p style="font-size:.9rem;color:#475569;margin-bottom:16px">โปรดเลือกช่องที่ใกล้เคียงกับความคิดเห็นของท่านมากที่สุด</p>
+      ${PART2_SECTIONS.map(s => renderLikertSection(s)).join('')}
+    </div>
+
+    <!-- ส่วนที่ 3 -->
+    <div class="section" id="section3">
+      <div class="section-title">ส่วนที่ 3 ข้อมูลเกี่ยวกับประโยชน์ที่ได้รับจากการพัฒนาและรับรองคุณภาพโรงพยาบาล (HA)</div>
+      <p style="font-size:.9rem;color:#475569;margin-bottom:16px">โปรดเลือกช่องที่ใกล้เคียงกับความคิดเห็นของท่านมากที่สุดเกี่ยวกับประโยชน์ที่ได้รับ</p>
+      ${renderLikertTable(PART3_QUESTIONS)}
+    </div>
+
+    <!-- ส่วนที่ 4 -->
+    <div class="section" id="section4">
+      <div class="section-title">ส่วนที่ 4 ความคิดเห็นอื่น ๆ และข้อเสนอแนะ</div>
+      <div class="question-group">
+        <div class="q-label"><span class="q-number">1</span> สิ่งที่ท่านคิดว่าเป็นปัจจัยที่เป็นปัญหา/อุปสรรคต่อการพัฒนาและรับรองคุณภาพโรงพยาบาล</div>
+        <textarea id="problems" placeholder="กรุณาระบุ (ถ้ามี)" oninput="formData.problems=this.value;updateProgress()"></textarea>
+      </div>
+      <div class="question-group">
+        <div class="q-label"><span class="q-number">2</span> ข้อเสนอแนะ/แนวทางแก้ไขในการพัฒนาและรับรองคุณภาพโรงพยาบาล</div>
+        <textarea id="suggestions" placeholder="กรุณาระบุ (ถ้ามี)" oninput="formData.suggestions=this.value;updateProgress()"></textarea>
+      </div>
+    </div>
+
+    <div class="section" style="padding:20px">
+      <div id="validationMsg" class="validation-error" style="text-align:center;margin-bottom:12px;display:none"></div>
+      <button class="btn-submit" id="btnSubmit" onclick="submitForm()">ส่งแบบสอบถาม</button>
+    </div>
+
+    <div style="text-align:center;padding:16px;color:#94a3b8;font-size:.8rem">
+      ขอขอบคุณท่านที่สละเวลาและให้ความร่วมมือในการตอบแบบสอบถาม<br>
+      หากมีข้อสงสัยสามารถสอบถามได้ที่ นายพัฒนพงศ์ สมุทรหล้า โทรภายใน 7301
+    </div>
+  `;
+
+  updateProgress();
+}
+
+function renderDemographics() {
+  const fields = [
+    {
+      key: 'gender', label: 'เพศ', required: true,
+      options: ['หญิง', 'ชาย', 'LGBTQ+', 'อื่น ๆ', 'ไม่ต้องการระบุ']
+    },
+    {
+      key: 'age', label: 'อายุ', required: true,
+      options: ['ไม่เกิน 25 ปี', '26-30 ปี', '31-35 ปี', '36-40 ปี', '41-45 ปี', 'มากกว่า 45 ปี']
+    },
+    {
+      key: 'education', label: 'วุฒิการศึกษา', required: true,
+      options: ['ต่ำกว่าปริญญาตรี', 'ปริญญาตรี', 'สูงกว่าปริญญาตรี']
+    },
+    {
+      key: 'position', label: 'ตำแหน่งงานปัจจุบัน', required: true,
+      options: ['พนักงานมหาวิทยาลัย', 'ลูกจ้างมหาวิทยาลัย', 'ลูกจ้างหน่วยงาน']
+    },
+    {
+      key: 'department', label: 'หน่วยงานที่ปฏิบัติงาน', required: true,
+      options: [
+        'ฝ่ายอำนวยการ',
+        'ฝ่ายบริการปฐมภูมิและเสริมสุขภาพ',
+        'ฝ่ายการพยาบาล',
+        'ฝ่ายบริการทุติยภูมิและตติยภูมิ',
+        'ฝ่ายพัฒนาและสนับสนุนระบบบริการสุขภาพ'
+      ]
+    },
+    {
+      key: 'experience', label: 'ประสบการณ์การทำงานที่โรงพยาบาล', required: true,
+      options: ['น้อยกว่า 6 เดือน', 'มากกว่า 6 เดือน – 5 ปี', 'มากกว่า 5 ปี – 10 ปี', 'มากกว่า 10 ปี']
+    }
+  ];
+
+  return fields.map((f, idx) => `
+    <div class="question-group">
+      <div class="q-label">
+        <span class="q-number">${idx + 1}</span> ${f.label} ${f.required ? '<span class="required">*</span>' : ''}
+      </div>
+      <div class="options">
+        ${f.options.map(opt => `
+          <label class="option-label ${formData[f.key] === opt ? 'selected' : ''}" onclick="selectOption('${f.key}','${opt.replace(/'/g, "\\'")}',this)">
+            <input type="radio" name="${f.key}" value="${opt}">
+            <span class="option-dot"></span>
+            ${opt}
+          </label>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderLikertSection(section) {
+  return `
+    <div class="sub-title">${section.title}</div>
+    ${renderLikertTable(section.questions)}
+  `;
+}
+
+function renderLikertTable(questions) {
+  return `
+    <div style="overflow-x:auto">
+    <table class="likert-table">
+      <thead>
+        <tr>
+          <th>ข้อความ</th>
+          <th>มากที่สุด<br>(5)</th>
+          <th>มาก<br>(4)</th>
+          <th>ปานกลาง<br>(3)</th>
+          <th>น้อย<br>(2)</th>
+          <th>น้อยที่สุด<br>(1)</th>
+          <th>ไม่สามารถ<br>ประเมินได้</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${questions.map(q => `
+          <tr id="row_q${q.num}" class="${formData['q'+q.num] ? 'selected-row' : ''}">
+            <td>${q.num}. ${q.text}</td>
+            ${LIKERT_OPTIONS.map(o => `
+              <td>
+                <input type="radio" name="q${q.num}" value="${o.value}" class="likert-radio"
+                  ${formData['q'+q.num] === o.value ? 'checked' : ''}
+                  onchange="selectLikert('q${q.num}','${o.value}',${q.num})">
+              </td>
+            `).join('')}
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+    </div>
+  `;
+}
+
+function selectOption(key, value, el) {
+  formData[key] = value;
+  const parent = el.closest('.options');
+  parent.querySelectorAll('.option-label').forEach(l => l.classList.remove('selected'));
+  el.classList.add('selected');
+  updateProgress();
+}
+
+function selectLikert(key, value, num) {
+  formData[key] = value;
+  const row = document.getElementById('row_q' + num);
+  if (row) row.classList.add('selected-row');
+  updateProgress();
+}
+
+function updateProgress() {
+  const totalRequired = 6 + 39; // 6 demographic + 39 likert
+  let filled = 0;
+  ['gender','age','education','position','department','experience'].forEach(k => { if (formData[k]) filled++; });
+  for (let i = 1; i <= 39; i++) { if (formData['q'+i]) filled++; }
+  const pct = Math.round((filled / totalRequired) * 100);
+  document.getElementById('progressBar').style.width = pct + '%';
+}
+
+function validate() {
+  const missing = [];
+  const demoFields = [
+    { key: 'gender', label: 'เพศ' },
+    { key: 'age', label: 'อายุ' },
+    { key: 'education', label: 'วุฒิการศึกษา' },
+    { key: 'position', label: 'ตำแหน่งงาน' },
+    { key: 'department', label: 'หน่วยงาน' },
+    { key: 'experience', label: 'ประสบการณ์' }
+  ];
+  demoFields.forEach(f => { if (!formData[f.key]) missing.push(f.label); });
+
+  const unansweredLikert = [];
+  for (let i = 1; i <= 39; i++) {
+    if (!formData['q'+i]) unansweredLikert.push(i);
+  }
+
+  if (missing.length > 0 || unansweredLikert.length > 0) {
+    let msg = '';
+    if (missing.length > 0) msg += 'กรุณาตอบ: ' + missing.join(', ');
+    if (unansweredLikert.length > 0) {
+      if (msg) msg += '<br>';
+      msg += 'กรุณาตอบข้อ: ' + unansweredLikert.join(', ');
+    }
+    return msg;
+  }
+  return null;
+}
+
+function showToast(msg, type) {
+  const existing = document.querySelector('.toast');
+  if (existing) existing.remove();
+  const t = document.createElement('div');
+  t.className = 'toast ' + type;
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+async function submitForm() {
+  const err = validate();
+  const valMsg = document.getElementById('validationMsg');
+  if (err) {
+    valMsg.innerHTML = err;
+    valMsg.style.display = 'block';
+    return;
+  }
+  valMsg.style.display = 'none';
+
+  const btn = document.getElementById('btnSubmit');
+  btn.disabled = true;
+  btn.textContent = 'กำลังส่งข้อมูล...';
+
+  const payload = {
+    responseId: 'R' + Date.now(),
+    ...formData
+  };
+
+  if (!SCRIPT_URL) {
+    console.log('Survey data:', payload);
+    showToast('ยังไม่ได้ตั้งค่า SCRIPT_URL (ข้อมูลแสดงใน Console)', 'error');
+    btn.disabled = false;
+    btn.textContent = 'ส่งแบบสอบถาม';
+    return;
+  }
+
+  try {
+    await fetch(SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    submitted = true;
+    render();
+  } catch (e) {
+    showToast('เกิดข้อผิดพลาด กรุณาลองใหม่', 'error');
+    btn.disabled = false;
+    btn.textContent = 'ส่งแบบสอบถาม';
+  }
+}
+
+// Init
+render();
+</script>
+</body>
+</html>

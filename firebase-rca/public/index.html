@@ -1384,8 +1384,11 @@ function App(){
   const handleLogout=async()=>{
     try{await auth.signOut()}catch(e){}
     setUser(null);setUserData(undefined);
-    // Logout from Google itself to clear session, then return to app
-    window.location.href='https://accounts.google.com/Logout?continue='+encodeURIComponent(window.location.origin);
+    // Open Google logout in a hidden popup to clear Google session, then reload
+    try{
+      const w=window.open('https://accounts.google.com/Logout','_blank','width=400,height=300');
+      setTimeout(()=>{if(w)w.close();window.location.reload()},1500);
+    }catch(e){window.location.reload()}
   };
 
   // RCA actions

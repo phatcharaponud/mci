@@ -1381,7 +1381,12 @@ function App(){
   };
 
   // Logout
-  const handleLogout=()=>{auth.signOut().then(()=>{setUser(null);setUserData(undefined)})};
+  const handleLogout=async()=>{
+    try{await auth.signOut()}catch(e){}
+    setUser(null);setUserData(undefined);
+    // Logout from Google itself to clear session, then return to app
+    window.location.href='https://accounts.google.com/Logout?continue='+encodeURIComponent(window.location.origin);
+  };
 
   // RCA actions
   const hNew=()=>{sCI(null);sFD({...DF,ta:mkTD()});sN('form')};

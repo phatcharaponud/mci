@@ -1331,7 +1331,7 @@ function App(){
 
   // Login - force account selection every time
   const handleLogin=async()=>{
-    googleProvider.setCustomParameters({hd:'up.ac.th',prompt:'login'});
+    googleProvider.setCustomParameters({hd:'up.ac.th',prompt:'consent select_account'});
     setError('');
     try{
       const result=await auth.signInWithPopup(googleProvider);

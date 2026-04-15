@@ -245,11 +245,18 @@ function SearchSel({label,value,onChange,options,required,placeholder,disabled})
   </div>);
 }
 
-function TagSel({label,options,selected,onChange,placeholder}){
+function TagSel({label,options,selected,onChange,placeholder,allowCustom}){
   const [open,setOpen] = useState(false);
   const [q,setQ] = useState("");
   const ref = useRef(null);
   const filtered = useMemo(()=>{ const s=q.toLowerCase(); return options.filter(o=>o.toLowerCase().includes(s) && !selected.includes(o)); },[options,q,selected]);
+  function addCustom(){
+    var val = q.trim();
+    if(val && !selected.includes(val)){
+      onChange([].concat(selected,[val]));
+      setQ("");
+    }
+  }
   useEffect(()=>{
     function h(e){ if(ref.current && !ref.current.contains(e.target)) setOpen(false); }
     document.addEventListener("mousedown",h);
@@ -260,9 +267,10 @@ function TagSel({label,options,selected,onChange,placeholder}){
     {selected.length>0 && <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:8}}>
       {selected.map(s=><span key={s} style={{display:"inline-flex",alignItems:"center",gap:4,padding:"4px 12px",borderRadius:8,background:"#eef2ff",color:"#4338ca",fontSize:12,fontWeight:600}}>{s}<span onClick={()=>onChange(selected.filter(x=>x!==s))} style={{cursor:"pointer",fontSize:14,lineHeight:1}}>×</span></span>)}
     </div>}
-    <input value={q} onChange={e=>{ setQ(e.target.value); if(!open) setOpen(true); }} onFocus={()=>setOpen(true)} placeholder={placeholder||"พิมพ์เพื่อค้นหาและเพิ่ม..."} style={{width:"100%",padding:"11px 16px",borderRadius:12,border:"1.5px solid "+(open?"#6366f1":"#e2e8f0"),fontSize:14,background:"#fff",color:"#0f172a",outline:"none",boxSizing:"border-box",fontFamily:"inherit"}}/>
-    {open && filtered.length>0 && <div style={{position:"absolute",left:0,right:0,zIndex:50,background:"#fff",border:"1px solid #e2e8f0",borderRadius:12,boxShadow:"0 8px 24px rgba(0,0,0,.1)",maxHeight:180,overflowY:"auto",marginTop:4}}>
-      {filtered.map(o=><div key={o} onClick={()=>{ onChange([...selected,o]); setQ(""); }} style={{padding:"10px 16px",fontSize:13,cursor:"pointer",color:"#334155"}} onMouseEnter={e=>e.target.style.background="#f8fafc"} onMouseLeave={e=>e.target.style.background="transparent"}>{o}</div>)}
+    <input value={q} onChange={e=>{ setQ(e.target.value); if(!open) setOpen(true); }} onFocus={()=>setOpen(true)} onKeyDown={function(e){if(e.key==="Enter"&&q.trim()){e.preventDefault();if(filtered.length>0){onChange([].concat(selected,[filtered[0]]));setQ("");}else if(allowCustom){addCustom();}}}} placeholder={placeholder||"พิมพ์เพื่อค้นหาและเพิ่ม..."} style={{width:"100%",padding:"11px 16px",borderRadius:12,border:"1.5px solid "+(open?"#6366f1":"#e2e8f0"),fontSize:14,background:"#fff",color:"#0f172a",outline:"none",boxSizing:"border-box",fontFamily:"inherit"}}/>
+    {open && (filtered.length>0 || (allowCustom && q.trim())) && <div style={{position:"absolute",left:0,right:0,zIndex:50,background:"#fff",border:"1px solid #e2e8f0",borderRadius:12,boxShadow:"0 8px 24px rgba(0,0,0,.1)",maxHeight:180,overflowY:"auto",marginTop:4}}>
+      {filtered.map(o=><div key={o} onClick={()=>{ onChange([].concat(selected,[o])); setQ(""); }} style={{padding:"10px 16px",fontSize:13,cursor:"pointer",color:"#334155"}} onMouseEnter={e=>e.target.style.background="#f8fafc"} onMouseLeave={e=>e.target.style.background="transparent"}>{o}</div>)}
+      {allowCustom && q.trim() && !filtered.includes(q.trim()) && !selected.includes(q.trim()) && <div onClick={addCustom} style={{padding:"10px 16px",fontSize:13,cursor:"pointer",color:"#6366f1",fontWeight:600,borderTop:filtered.length?"1px solid #f1f5f9":"none"}} onMouseEnter={e=>e.target.style.background="#eef2ff"} onMouseLeave={e=>e.target.style.background="transparent"}>+ เพิ่ม "{q.trim()}"</div>}
     </div>}
   </div>);
 }
@@ -854,7 +862,7 @@ function NewForm({onSave,onBack,user,dbData}){
         <Inp label="รายละเอียดการดำเนินการ" value={f.centerAction} onChange={e=>u("centerAction",e.target.value)} multi={true} rows={3} placeholder="ระบุการดำเนินการของศูนย์รับข้อร้องเรียน..." disabled={!canEditCenter}/>
         <Inp label="เจ้าหน้าที่ศูนย์รับข้อร้องเรียน ผู้บันทึก" value={f.recorder} onChange={e=>u("recorder",e.target.value)} placeholder="ระบุชื่อเจ้าหน้าที่ผู้บันทึก..." disabled={!canEditCenter}/>
         <TagSel label="Tag หน่วยงาน (แจ้งให้ทราบ)" options={DEPTS} selected={f.tagDepts} onChange={v=>u("tagDepts",v)} placeholder="พิมพ์ชื่อหน่วยงานเพื่อ tag..." disabled={!canEditCenter}/>
-        <TagSel label="Tag ผู้รับผิดชอบ (แจ้งให้ทราบ)" options={staffList} selected={f.tagStaff} onChange={v=>u("tagStaff",v)} placeholder="พิมพ์ชื่อผู้รับผิดชอบเพื่อ tag..." disabled={!canEditCenter}/>
+        <TagSel label="Tag ผู้รับผิดชอบ (แจ้งให้ทราบ)" options={staffList} selected={f.tagStaff} onChange={v=>u("tagStaff",v)} placeholder="พิมพ์ชื่อผู้รับผิดชอบเพื่อ tag..." disabled={!canEditCenter} allowCustom={true}/>
       </div>
 
       <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:20}}>
@@ -868,7 +876,7 @@ function NewForm({onSave,onBack,user,dbData}){
 // ============ DETAIL ============
 function Detail({c,onBack,onUpdate,user,initTab}){
   const [tab,setTab] = useState(initTab||"detail");
-  const [inv,setInv] = useState(c.inv||{facts:"",root:"",sol:"",resp:user.name});
+  const [inv,setInv] = useState(c.inv||{facts:"",root:"",sol:"",resp:user.name,invDate:""});
   const [res,setRes] = useState(c.res||{actions:"",result:"",preventive:"",done:""});
 
   // user สามารถแก้ไขส่วนตรวจสอบ/แก้ไขได้ ถ้าถูก tag หรือเป็นหน่วยงานเดียวกัน
@@ -945,6 +953,7 @@ function Detail({c,onBack,onUpdate,user,initTab}){
       <Inp label="2. วิเคราะห์สาเหตุ (Root cause analysis)" value={inv.root} onChange={e=>setInv({...inv,root:e.target.value})} multi={true} rows={3} disabled={!isTagged}/>
       <Inp label="3. แนวทางแก้ไขและป้องกัน" value={inv.sol} onChange={e=>setInv({...inv,sol:e.target.value})} multi={true} rows={3} disabled={!isTagged}/>
       <Inp label="ผู้ตอบ" value={inv.resp} onChange={e=>setInv({...inv,resp:e.target.value})} disabled={!isTagged}/>
+      <ThaiDatePicker label="วันที่ตรวจสอบ/ตอบกลับ" value={inv.invDate||""} onChange={function(v){setInv(Object.assign({},inv,{invDate:v}));}} />
       {isTagged ? <div style={{display:"flex",justifyContent:"flex-end",marginTop:12}}><Btn variant="success" onClick={saveInv}>บันทึกผลการตรวจสอบ</Btn></div>
         : <div style={{padding:"10px 14px",background:"#fef2f2",borderRadius:10,fontSize:12,color:"#991b1b",marginTop:8}}>คุณไม่มีสิทธิ์แก้ไขรายการนี้ (ไม่ได้อยู่ในหน่วยงานหรือผู้ที่ถูก tag)</div>}
     </Card>}
@@ -960,7 +969,7 @@ function Detail({c,onBack,onUpdate,user,initTab}){
       <Inp label="การดำเนินการแก้ไข" value={res.actions} onChange={e=>setRes({...res,actions:e.target.value})} multi={true} rows={3} disabled={!isTagged}/>
       <Inp label="ผลการแก้ไข" value={res.result} onChange={e=>setRes({...res,result:e.target.value})} multi={true} rows={3} disabled={!isTagged}/>
       <Inp label="มาตรการป้องกันการเกิดซ้ำ" value={res.preventive} onChange={e=>setRes({...res,preventive:e.target.value})} multi={true} rows={3} disabled={!isTagged}/>
-      <Inp label="วันที่แก้ไขแล้วเสร็จ" type="date" value={res.done} onChange={e=>setRes({...res,done:e.target.value})} disabled={!isTagged}/>
+      <ThaiDatePicker label="วันที่แก้ไขแล้วเสร็จ" value={res.done||""} onChange={function(v){setRes(Object.assign({},res,{done:v}));}}/>
       {isTagged ? <div style={{display:"flex",justifyContent:"flex-end",marginTop:12}}><Btn variant="success" onClick={saveRes}>บันทึกผลการแก้ไข</Btn></div>
         : <div style={{padding:"10px 14px",background:"#fef2f2",borderRadius:10,fontSize:12,color:"#991b1b",marginTop:8}}>คุณไม่มีสิทธิ์แก้ไขรายการนี้</div>}
     </Card>}
@@ -1694,7 +1703,7 @@ function UsersPage({dbData,setDbData,currentUser}){
         <Inp label="การดำเนินการศูนย์" value={ecForm.centerAction} onChange={function(e){setEcForm(Object.assign({},ecForm,{centerAction:e.target.value}));}} multi={true} rows={2}/>
         <Inp label="เจ้าหน้าที่ผู้บันทึก" value={ecForm.recorder} onChange={function(e){setEcForm(Object.assign({},ecForm,{recorder:e.target.value}));}}/>
         <TagSel label="Tag หน่วยงาน (แจ้งให้ทราบ)" options={DEPTS} selected={ecForm.tagDepts} onChange={function(v){setEcForm(Object.assign({},ecForm,{tagDepts:v}));}} placeholder="พิมพ์ชื่อหน่วยงานเพื่อ tag..."/>
-        <TagSel label="Tag ผู้รับผิดชอบ (แจ้งให้ทราบ)" options={staffList} selected={ecForm.tagStaff} onChange={function(v){setEcForm(Object.assign({},ecForm,{tagStaff:v}));}} placeholder="พิมพ์ชื่อผู้รับผิดชอบเพื่อ tag..."/>
+        <TagSel label="Tag ผู้รับผิดชอบ (แจ้งให้ทราบ)" options={staffList} selected={ecForm.tagStaff} onChange={function(v){setEcForm(Object.assign({},ecForm,{tagStaff:v}));}} placeholder="พิมพ์ชื่อผู้รับผิดชอบเพื่อ tag..." allowCustom={true}/>
         <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:8}}>
           <Btn variant="secondary" size="sm" onClick={function(){setEditC(null);setEcForm(null);}}>ยกเลิก</Btn>
           <Btn variant="primary" size="sm" onClick={saveEditComplaint}>บันทึก</Btn>

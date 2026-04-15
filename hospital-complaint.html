@@ -279,7 +279,8 @@ function Ico({name,sz=18}){
     logout:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
     chevL:'<polyline points="15 18 9 12 15 6"/>',
     chevR:'<polyline points="9 18 15 12 9 6"/>',
-    plus:'<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>'
+    plus:'<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+    calendar:'<rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>'
   };
   return <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" dangerouslySetInnerHTML={{__html:P[name]||""}}/>;
 }
@@ -1215,6 +1216,166 @@ function Guide(){
   </div>);
 }
 
+// ============ CALENDAR ============
+function CalendarPage({dbData,setDbData,user}){
+  const [curDate,setCurDate] = useState(function(){var d=new Date();return{y:d.getFullYear()+543,m:d.getMonth()};});
+  const [showForm,setShowForm] = useState(false);
+  const [mt,setMt] = useState({title:"",date:"",time:"",location:""});
+  const [selDay,setSelDay] = useState(null);
+
+  var complaints = dbData.complaints || [];
+  var meetings = dbData.meetings || [];
+  var months = ["มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน","กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"];
+  var days = ["อา","จ","อ","พ","พฤ","ศ","ส"];
+  var ceYear = curDate.y - 543;
+
+  // สร้างวันในเดือน
+  var firstDay = new Date(ceYear, curDate.m, 1).getDay();
+  var daysInMonth = new Date(ceYear, curDate.m + 1, 0).getDate();
+  var cells = [];
+  for(var i=0;i<firstDay;i++) cells.push(null);
+  for(var d=1;d<=daysInMonth;d++) cells.push(d);
+
+  // หาข้อร้องเรียน/ประชุมในแต่ละวัน
+  function getEventsForDay(day){
+    if(!day) return {complaints:[],meetings:[]};
+    var dateStr = ceYear+"-"+String(curDate.m+1).padStart(2,"0")+"-"+String(day).padStart(2,"0");
+    var dateStrBE = curDate.y+"-"+String(curDate.m+1).padStart(2,"0")+"-"+String(day).padStart(2,"0");
+    var c = complaints.filter(function(x){return x.date===dateStr || x.date===dateStrBE;});
+    var m = meetings.filter(function(x){return x.date===dateStr || x.date===dateStrBE;});
+    return {complaints:c,meetings:m};
+  }
+
+  function prevMonth(){setCurDate(function(p){var m=p.m-1,y=p.y;if(m<0){m=11;y--;}return{y:y,m:m};});}
+  function nextMonth(){setCurDate(function(p){var m=p.m+1,y=p.y;if(m>11){m=0;y++;}return{y:y,m:m};});}
+
+  function saveMeeting(){
+    if(!mt.title||!mt.date){alert("กรุณากรอกหัวข้อและวันที่");return;}
+    var newMeeting = {id:"MTG-"+Date.now(),title:mt.title,date:mt.date,time:mt.time,location:mt.location,createdBy:user.email,createdAt:new Date().toISOString()};
+    var newMeetings = [newMeeting].concat(meetings);
+    var newDb = Object.assign({},dbData,{meetings:newMeetings});
+    setDbData(newDb); db.save(newDb);
+    // ส่งแจ้งเตือนผ่าน GAS
+    if(CLOUD_URL){
+      fetch(CLOUD_URL, {
+        method:"POST", headers:{"Content-Type":"text/plain"},
+        body: JSON.stringify({action:"saveMeeting",data:newMeeting,user:user.email||""})
+      }).catch(function(){});
+    }
+    setMt({title:"",date:"",time:"",location:""});
+    setShowForm(false);
+  }
+
+  function deleteMeeting(id){
+    if(!confirm("ต้องการลบนัดประชุมนี้ใช่หรือไม่?")) return;
+    var newDb = Object.assign({},dbData,{meetings:meetings.filter(function(m){return m.id!==id;})});
+    setDbData(newDb); db.save(newDb);
+  }
+
+  var selEvents = selDay ? getEventsForDay(selDay) : null;
+  var canEdit = user.role==="admin" || user.role==="crm";
+
+  return(<div style={{animation:"fadeUp .4s ease"}}>
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20,flexWrap:"wrap",gap:10}}>
+      <div>
+        <h2 style={{fontSize:22,fontWeight:700,margin:"0 0 4px",color:"#0f172a"}}>ปฏิทิน</h2>
+        <p style={{fontSize:13,color:"#94a3b8",margin:0}}>ข้อร้องเรียนและกำหนดการประชุม</p>
+      </div>
+      {canEdit && <Btn variant="primary" size="sm" onClick={function(){setShowForm(!showForm);}}><Ico name="plus" sz={15}/> นัดประชุม</Btn>}
+    </div>
+
+    {showForm && canEdit && <Card style={{marginBottom:16}}>
+      <h3 style={{fontSize:14,fontWeight:700,color:"#3730a3",margin:"0 0 14px"}}>เพิ่มนัดประชุม</h3>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 14px"}}>
+        <Inp label="หัวข้อเรื่อง" value={mt.title} onChange={function(e){setMt(Object.assign({},mt,{title:e.target.value}));}} required placeholder="เรื่องที่ประชุม"/>
+        <Inp label="สถานที่" value={mt.location} onChange={function(e){setMt(Object.assign({},mt,{location:e.target.value}));}} placeholder="ห้องประชุม..."/>
+        <Inp label="วันที่" type="date" value={mt.date} onChange={function(e){setMt(Object.assign({},mt,{date:e.target.value}));}} required/>
+        <Inp label="เวลา" type="time" value={mt.time} onChange={function(e){setMt(Object.assign({},mt,{time:e.target.value}));}}/>
+      </div>
+      <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+        <Btn variant="secondary" size="sm" onClick={function(){setShowForm(false);}}>ยกเลิก</Btn>
+        <Btn variant="primary" size="sm" onClick={saveMeeting}>บันทึก</Btn>
+      </div>
+    </Card>}
+
+    <Card style={{marginBottom:16}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+        <Btn variant="ghost" size="sm" onClick={prevMonth}><Ico name="chevL" sz={16}/></Btn>
+        <h3 style={{fontSize:16,fontWeight:700,color:"#1e293b",margin:0}}>{months[curDate.m]} {curDate.y}</h3>
+        <Btn variant="ghost" size="sm" onClick={nextMonth}><Ico name="chevR" sz={16}/></Btn>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2}}>
+        {days.map(function(d){return <div key={d} style={{textAlign:"center",fontSize:11,fontWeight:600,color:"#94a3b8",padding:"8px 0"}}>{d}</div>;})}
+        {cells.map(function(day,i){
+          if(!day) return <div key={"e"+i} style={{padding:8}}/>;
+          var ev = getEventsForDay(day);
+          var hasC = ev.complaints.length > 0;
+          var hasM = ev.meetings.length > 0;
+          var isToday = (function(){var t=new Date();return t.getDate()===day && t.getMonth()===curDate.m && (t.getFullYear()+543)===curDate.y;})();
+          var isSel = selDay===day;
+          return <div key={day} onClick={function(){setSelDay(isSel?null:day);}} style={{padding:"6px 4px",textAlign:"center",borderRadius:10,cursor:"pointer",background:isSel?"#eef2ff":isToday?"#f0fdf4":"transparent",border:isSel?"2px solid #6366f1":isToday?"2px solid #10b981":"2px solid transparent",minHeight:48,transition:"all .15s"}}>
+            <div style={{fontSize:13,fontWeight:isToday||isSel?700:400,color:isSel?"#4338ca":isToday?"#166534":"#334155"}}>{day}</div>
+            <div style={{display:"flex",gap:2,justifyContent:"center",marginTop:3}}>
+              {hasC && <div style={{width:6,height:6,borderRadius:"50%",background:"#f59e0b"}}/>}
+              {hasM && <div style={{width:6,height:6,borderRadius:"50%",background:"#6366f1"}}/>}
+            </div>
+          </div>;
+        })}
+      </div>
+      <div style={{display:"flex",gap:16,marginTop:12,fontSize:11,color:"#94a3b8"}}>
+        <div style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:8,height:8,borderRadius:"50%",background:"#f59e0b"}}/> ข้อร้องเรียน</div>
+        <div style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:8,height:8,borderRadius:"50%",background:"#6366f1"}}/> ประชุม</div>
+      </div>
+    </Card>
+
+    {selDay && selEvents && <Card>
+      <h3 style={{fontSize:14,fontWeight:700,color:"#1e293b",margin:"0 0 12px"}}>
+        วันที่ {selDay} {months[curDate.m]} {curDate.y}
+      </h3>
+      {selEvents.complaints.length===0 && selEvents.meetings.length===0 && <div style={{textAlign:"center",padding:20,color:"#94a3b8",fontSize:13}}>ไม่มีรายการในวันนี้</div>}
+
+      {selEvents.complaints.length>0 && <>
+        <div style={{fontSize:12,fontWeight:600,color:"#f59e0b",marginBottom:8}}>ข้อร้องเรียน ({selEvents.complaints.length})</div>
+        {selEvents.complaints.map(function(c){
+          return <div key={c.id} style={{padding:"10px 14px",background:"#fffbeb",borderRadius:10,marginBottom:6,border:"1px solid #fde68a"}}>
+            <div style={{fontSize:13,fontWeight:600,color:"#92400e"}}>{c.id} - {c.subject}</div>
+            <div style={{fontSize:11,color:"#a16207",marginTop:2}}>{c.unit||c.dept||"-"} | ระดับ {c.severity}</div>
+          </div>;
+        })}
+      </>}
+
+      {selEvents.meetings.length>0 && <>
+        <div style={{fontSize:12,fontWeight:600,color:"#6366f1",marginBottom:8,marginTop:selEvents.complaints.length?12:0}}>ประชุม ({selEvents.meetings.length})</div>
+        {selEvents.meetings.map(function(m){
+          return <div key={m.id} style={{padding:"10px 14px",background:"#eef2ff",borderRadius:10,marginBottom:6,border:"1px solid #c7d2fe",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <div>
+              <div style={{fontSize:13,fontWeight:600,color:"#3730a3"}}>{m.title}</div>
+              <div style={{fontSize:11,color:"#6366f1",marginTop:2}}>
+                {m.time ? m.time+" น." : ""}{m.location ? " | "+m.location : ""}
+              </div>
+            </div>
+            {canEdit && <button onClick={function(){deleteMeeting(m.id);}} style={{background:"none",border:"none",cursor:"pointer",color:"#94a3b8",fontSize:16,padding:4}}>x</button>}
+          </div>;
+        })}
+      </>}
+    </Card>}
+
+    {/* รายการประชุมที่กำลังจะมาถึง */}
+    {meetings.length>0 && <Card style={{marginTop:16}}>
+      <h3 style={{fontSize:14,fontWeight:700,color:"#1e293b",margin:"0 0 12px"}}>กำหนดการประชุมทั้งหมด</h3>
+      {meetings.sort(function(a,b){return(a.date+a.time).localeCompare(b.date+b.time);}).map(function(m){
+        return <div key={m.id} style={{padding:"10px 14px",borderBottom:"1px solid #f1f5f9",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <div>
+            <div style={{fontSize:13,fontWeight:600,color:"#1e293b"}}>{m.title}</div>
+            <div style={{fontSize:11,color:"#64748b"}}>{fmtDate(m.date)} {m.time?" | "+m.time+" น.":""}{m.location?" | "+m.location:""}</div>
+          </div>
+          {canEdit && <button onClick={function(){deleteMeeting(m.id);}} style={{background:"none",border:"none",cursor:"pointer",color:"#dc2626",fontSize:11,fontWeight:600,padding:"4px 8px"}}>ลบ</button>}
+        </div>;
+      })}
+    </Card>}
+  </div>);
+}
+
 // ============ LINE SETTINGS ============
 function LinePage({dbData,setDbData}){
   const cfg = dbData.lineConfig || { token:"", notif:{ newComplaint:true, statusChange:true, meeting:true, overdue:true } };
@@ -1514,6 +1675,7 @@ function App(){
   }
   menu.push({id:"registry",l:"ทะเบียนข้อร้องเรียน",ic:"list"});
   menu.push({id:"guide",l:"แนวปฏิบัติ",ic:"book"});
+  menu.push({id:"calendar",l:"ปฏิทิน",ic:"calendar"});
   if(user.role==="admin") menu.push({id:"users",l:"จัดการผู้ใช้งาน",ic:"users"});
 
   function onSave(c){
@@ -1553,7 +1715,7 @@ function App(){
       case "registry": return <Reg data={complaints} onView={onView} user={user} initFilter={regFilter}/>;
       case "detail": return selC ? <Detail c={(dbData.complaints||[]).find(x=>x.id===selC.id)||selC} onBack={()=>setPage("registry")} onUpdate={onUp} user={user} initTab={initTab}/> : null;
       case "guide": return <Guide/>;
-      // LINE settings removed - ตั้งค่าที่ Google Apps Script
+      case "calendar": return <CalendarPage dbData={dbData} setDbData={setDbData} user={user}/>;
       case "users": return <UsersPage dbData={dbData} setDbData={setDbData} currentUser={user}/>;
       default: return <Dash data={complaints}/>;
     }

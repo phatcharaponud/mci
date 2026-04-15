@@ -18,15 +18,14 @@
 // =====================================================
 
 // ===== CONFIGURATION =====
-// วิธีสร้าง LINE Notify Token:
-// 1. ไปที่ https://notify-bot.line.me/
-// 2. Login ด้วย LINE account
-// 3. กด "Generate token"
-// 4. ตั้งชื่อ เช่น "ระบบข้อร้องเรียน รพ.มพ."
-// 5. เลือกกลุ่ม LINE ที่ต้องการรับแจ้งเตือน (หรือ "1-on-1 chat" สำหรับตัวเอง)
-// 6. คัดลอก Token มาวางด้านล่าง
-// 7. เชิญ "LINE Notify" เข้ากลุ่ม LINE ที่เลือก
-var LINE_NOTIFY_TOKEN = '';  // ← วาง LINE Notify Token ตรงนี้
+// วิธีตั้งค่า LINE Messaging API:
+// 1. ไปที่ https://developers.line.biz/ → สร้าง Provider + Channel (Messaging API)
+// 2. ไปที่ Channel settings → Messaging API → Issue Channel Access Token (long-lived)
+// 3. คัดลอก Token มาวางด้านล่าง
+// 4. ได้ Group ID โดย: เชิญ Bot เข้ากลุ่ม → ใช้ Webhook หรือดูที่ LINE OA Manager
+// 5. หรือใส่ User ID ของตัวเอง (ส่งแชทส่วนตัว) → ดูที่ LINE Developers → Channel → Basic settings → Your user ID
+var LINE_CHANNEL_TOKEN = '';  // ← วาง LINE Channel Access Token ตรงนี้
+var LINE_TARGET_ID = '';      // ← วาง Group ID หรือ User ID ตรงนี้
 
 // ===== SHEET NAMES =====
 var SHEET_COMPLAINTS = 'Complaints';
@@ -578,6 +577,12 @@ function doPost(e) {
         addLog(user, 'บันทึกการตั้งค่า LINE', '');
         return jsonResp({ status: 'ok', result: lineResult });
 
+      // ----- Meeting -----
+      case 'saveMeeting':
+        addLog(user, 'นัดประชุม', data.title + ' - ' + data.date);
+        notifyNewMeeting(data);
+        return jsonResp({ status: 'ok', result: 'meeting saved' });
+
       // ----- Full Sync (ส่งข้อมูลทั้งหมดจาก localStorage ไป Sheets) -----
       case 'fullSync':
         var results = {};
@@ -601,23 +606,27 @@ function doPost(e) {
 // =====================================================
 
 function sendLineMessage(message) {
-  if (!LINE_NOTIFY_TOKEN) return;
+  if (!LINE_CHANNEL_TOKEN || !LINE_TARGET_ID) return;
   try {
-    UrlFetchApp.fetch('https://notify-api.line.me/api/notify', {
+    UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push', {
       method: 'post',
       headers: {
-        'Authorization': 'Bearer ' + LINE_NOTIFY_TOKEN
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + LINE_CHANNEL_TOKEN
       },
-      payload: { message: message }
+      payload: JSON.stringify({
+        to: LINE_TARGET_ID,
+        messages: [{ type: 'text', text: message }]
+      })
     });
-    Logger.log('LINE Notify sent: ' + message.substring(0, 50));
+    Logger.log('LINE message sent: ' + message.substring(0, 50));
   } catch (e) {
-    Logger.log('LINE Notify error: ' + e.message);
+    Logger.log('LINE send error: ' + e.message);
   }
 }
 
 function notifyNewComplaint(c) {
-  if (!LINE_NOTIFY_TOKEN) return;
+  if (!LINE_CHANNEL_TOKEN) return;
   var sevDesc = { 1: 'ระดับ 1 (บ่น/เสนอแนะ)', 2: 'ระดับ 2 (ตำหนิ/ร้องทุกข์)', 3: 'ระดับ 3 (รุนแรง)' };
   var msg = '\n🚨 เรื่องร้องเรียนใหม่\n\n'
     + '📋 ID: ' + (c.id || '-') + '\n'
@@ -630,7 +639,7 @@ function notifyNewComplaint(c) {
 }
 
 function notifyStatusChange(c) {
-  if (!LINE_NOTIFY_TOKEN) return;
+  if (!LINE_CHANNEL_TOKEN) return;
   var status = getAutoStatus(c);
   var statusLabels = {
     investigating: 'กำลังตรวจสอบ',
@@ -750,10 +759,65 @@ function testInsertSampleData() {
   Logger.log('✅ Sample data inserted!');
 }
 
+// แจ้งเตือนนัดประชุมใหม่
+function notifyNewMeeting(m) {
+  if (!LINE_CHANNEL_TOKEN) return;
+  var msg = '📅 นัดประชุมใหม่\n\n'
+    + '📋 เรื่อง: ' + (m.title || '-') + '\n'
+    + '📆 วันที่: ' + fmtDateThai(m.date) + '\n'
+    + (m.time ? '⏰ เวลา: ' + m.time + ' น.\n' : '')
+    + (m.location ? '📍 สถานที่: ' + m.location + '\n' : '')
+    + '\nกรุณาเตรียมข้อมูลและผู้เข้าร่วมให้พร้อม';
+  sendLineMessage(msg);
+}
+
+// ตรวจสอบประชุมที่จะมาถึงใน 2 วัน (ตั้ง Daily Trigger)
+// วิธีตั้ง: Apps Script > Triggers > Add Trigger
+//   - Function: checkUpcomingMeetings
+//   - Event source: Time-driven
+//   - Type: Day timer
+//   - Time: 08:00 - 09:00
+function checkUpcomingMeetings() {
+  if (!LINE_CHANNEL_TOKEN) return;
+  // อ่าน meetings จาก Complaints sheet (JSON_Data)
+  var complaints = getAllComplaints();
+  var now = new Date();
+  now.setHours(0, 0, 0, 0);
+
+  // เช็คข้อร้องเรียนที่เกินกำหนด
+  var overdueList = [];
+  for (var i = 0; i < complaints.length; i++) {
+    var c = complaints[i];
+    if (getAutoStatus(c) === 'resolved') continue;
+    var created = new Date(c.createdAt || c.date);
+    var diffHours = (now - created) / (1000 * 60 * 60);
+    var isOverdue = false;
+    if (c.severity === 3 && diffHours > 6) isOverdue = true;
+    else if (c.severity === 2 && diffHours > 72) isOverdue = true;
+    else if (c.severity === 1 && diffHours > 72) isOverdue = true;
+    if (isOverdue) overdueList.push(c);
+  }
+
+  if (overdueList.length > 0) {
+    var msg = '⏰ เรื่องร้องเรียนเกินกำหนด ' + overdueList.length + ' เรื่อง\n\n';
+    for (var j = 0; j < Math.min(overdueList.length, 5); j++) {
+      msg += '• ' + overdueList[j].id + ' - ' + overdueList[j].subject + ' (ระดับ ' + overdueList[j].severity + ')\n';
+    }
+    if (overdueList.length > 5) msg += '...และอีก ' + (overdueList.length - 5) + ' เรื่อง';
+    sendLineMessage(msg);
+  }
+
+  // หมายเหตุ: ข้อมูล meetings เก็บใน localStorage/Firestore ของ frontend
+  // ถ้าต้องการแจ้งเตือนประชุม 2 วันล่วงหน้า
+  // ให้ frontend ส่ง meetings มาพร้อม fullSync หรือ saveMeeting
+  // แล้ว GAS จะตรวจสอบจาก Sheet
+  Logger.log('Daily check completed. Overdue: ' + overdueList.length);
+}
+
 function testLineNotification() {
-  if (!LINE_NOTIFY_TOKEN) { Logger.log('กรุณาใส่ LINE_NOTIFY_TOKEN ก่อน'); return; }
-  sendLineMessage('\n🔔 ทดสอบแจ้งเตือน\nระบบจัดการข้อร้องเรียน รพ.มหาวิทยาลัยพะเยา\nระบบแจ้งเตือนทำงานปกติ ✅');
-  Logger.log('LINE Notify sent - check LINE app');
+  if (!LINE_CHANNEL_TOKEN) { Logger.log('กรุณาใส่ LINE_CHANNEL_TOKEN ก่อน'); return; }
+  sendLineMessage('🔔 ทดสอบแจ้งเตือน\nระบบจัดการข้อร้องเรียน รพ.มหาวิทยาลัยพะเยา\nระบบแจ้งเตือนทำงานปกติ ✅');
+  Logger.log('LINE message sent - check LINE app');
 }
 
 function testDashboardStats() {

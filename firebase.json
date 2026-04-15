@@ -1,0 +1,17 @@
+{
+  "hosting": {
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "**/node_modules/**",
+      ".git/**",
+      "firebase-rca/**"
+    ],
+    "rewrites": [
+      {
+        "source": "/",
+        "destination": "/hospital-complaint.html"
+      }
+    ]
+  }
+}

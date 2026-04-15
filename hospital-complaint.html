@@ -1161,7 +1161,7 @@ function Reg({data,onView,user,initFilter}){
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
           <thead>
             <tr style={{background:"#fafafe"}}>
-              {["รหัส","วันที่","เรื่อง","หน่วยงาน","ระดับ","สถานะ","ระยะเวลา","ผู้รับผิดชอบ","ดำเนินการ","สรุปรายงาน"].map(h=>
+              {["รหัส","วันที่","เรื่อง","หน่วยงานที่ถูกร้องเรียน","ระดับ","สถานะ","ระยะเวลา","ผู้รับผิดชอบ","ดำเนินการ","สรุปรายงาน"].map(h=>
                 <th key={h} style={{padding:"13px 14px",textAlign:"left",fontWeight:600,borderBottom:"1px solid #e2e8f0",whiteSpace:"nowrap",color:"#64748b",fontSize:11,letterSpacing:".04em"}}>{h}</th>
               )}
             </tr>
@@ -1177,11 +1177,11 @@ function Reg({data,onView,user,initFilter}){
                 <td style={{padding:"12px 14px",fontWeight:700,color:"#6366f1"}}>{c.id}</td>
                 <td style={{padding:"12px 14px",whiteSpace:"nowrap",color:"#64748b"}}>{fmtDate(c.date)}</td>
                 <td style={{padding:"12px 14px",maxWidth:200,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontWeight:500,color:"#1e293b"}}>{c.subject}</td>
-                <td style={{padding:"12px 14px",whiteSpace:"nowrap",fontSize:12,color:"#64748b"}}>{c.dept||c.unit||"-"}</td>
+                <td style={{padding:"12px 14px",whiteSpace:"nowrap",fontSize:12,color:"#64748b"}}>{c.unit||c.dept||"-"}</td>
                 <td style={{padding:"12px 14px"}}><LBadge level={c.severity}/></td>
                 <td style={{padding:"12px 14px"}}><SBadge status={st}/></td>
                 <td style={{padding:"12px 14px",textAlign:"center",fontWeight:600,color:"#334155"}}>{daysSince(c.date)} <span style={{fontSize:11,color:"#94a3b8",fontWeight:400}}>วัน</span></td>
-                <td style={{padding:"12px 14px",whiteSpace:"nowrap",fontSize:12,color:"#64748b"}}>{c.responsible||"-"}</td>
+                <td style={{padding:"12px 14px",whiteSpace:"nowrap",fontSize:12,color:"#64748b"}}>{(c.tagStaff&&c.tagStaff.length>0)?c.tagStaff.join(", "):(c.responsible||"-")}</td>
                 <td style={{padding:"12px 14px"}} onClick={e=>e.stopPropagation()}>
                   {ca ? <div style={{display:"flex",gap:5}}>
                     <button onClick={e=>{e.stopPropagation();onView(c,"inv");}} style={{padding:"6px 12px",borderRadius:8,border:"none",background:"#fffbeb",cursor:"pointer",fontSize:11,color:"#d97706",fontWeight:600,fontFamily:"inherit"}}>ตรวจสอบ</button>
@@ -1925,13 +1925,20 @@ function App(){
     const complaints = dbData.complaints || [];
     const newC = { ...c, id: nextId(complaints) };
     const newDb = { ...dbData, complaints:[newC,...complaints] };
-    setDbData(newDb); db.save(newDb);
-    // ส่ง LINE แจ้งเตือนผ่าน GAS
+    setDbData(newDb);
+    // บันทึก localStorage ก่อน (ไม่ส่ง cloud sync ทันที)
+    localStorage.setItem(DB_KEY, JSON.stringify(newDb));
+    // ส่ง LINE แจ้งเตือนผ่าน GAS (เรียก saveComplaint เพียงอันเดียว)
     if(CLOUD_URL){
       fetch(CLOUD_URL, {
         method:"POST", headers:{"Content-Type":"text/plain"},
         body: JSON.stringify({ action:"saveComplaint", data:newC, user:user.email||"" })
-      }).catch(function(){});
+      }).then(function(){
+        // หลังส่ง LINE สำเร็จ ค่อย sync ข้อมูลทั้งหมด
+        db.save(newDb);
+      }).catch(function(){ db.save(newDb); });
+    }else{
+      db.save(newDb);
     }
     setPage("registry");
   }

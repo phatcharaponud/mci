@@ -1549,6 +1549,8 @@ function UsersPage({dbData,setDbData,currentUser}){
   const users = fbDb ? fbUsers : (dbData.users||[]);
   var complaints = dbData.complaints || [];
   var meetings = dbData.meetings || [];
+  var staffList = (dbData.users||[]).filter(function(u){return u.status==="approved";}).map(function(u){return u.name||u.fullName||"";}).filter(Boolean);
+  staffList = staffList.filter(function(v,i,a){return a.indexOf(v)===i;});
 
   function fbUpdate(uid,changes){
     if(fbDb){
@@ -1583,12 +1585,12 @@ function UsersPage({dbData,setDbData,currentUser}){
   }
 
   function startEditComplaint(c){
-    setEcForm({subject:c.subject||"",detail:c.detail||"",unit:c.unit||"",severity:c.severity||1,centerAction:c.centerAction||"",recorder:c.recorder||""});
+    setEcForm({subject:c.subject||"",detail:c.detail||"",unit:c.unit||"",severity:c.severity||1,centerAction:c.centerAction||"",recorder:c.recorder||"",tagDepts:c.tagDepts||[],tagStaff:c.tagStaff||[]});
     setEditC(c);
   }
   function saveEditComplaint(){
     if(!editC||!ecForm) return;
-    var updated = Object.assign({},editC,{subject:ecForm.subject,detail:ecForm.detail,unit:ecForm.unit,severity:parseInt(ecForm.severity),centerAction:ecForm.centerAction,recorder:ecForm.recorder});
+    var updated = Object.assign({},editC,{subject:ecForm.subject,detail:ecForm.detail,unit:ecForm.unit,severity:parseInt(ecForm.severity),centerAction:ecForm.centerAction,recorder:ecForm.recorder,tagDepts:ecForm.tagDepts,tagStaff:ecForm.tagStaff});
     var newComplaints = complaints.map(function(c){return c.id===editC.id?updated:c;});
     var newDb = Object.assign({},dbData,{complaints:newComplaints});
     setDbData(newDb); db.save(newDb);
@@ -1691,6 +1693,8 @@ function UsersPage({dbData,setDbData,currentUser}){
         </div>
         <Inp label="การดำเนินการศูนย์" value={ecForm.centerAction} onChange={function(e){setEcForm(Object.assign({},ecForm,{centerAction:e.target.value}));}} multi={true} rows={2}/>
         <Inp label="เจ้าหน้าที่ผู้บันทึก" value={ecForm.recorder} onChange={function(e){setEcForm(Object.assign({},ecForm,{recorder:e.target.value}));}}/>
+        <TagSel label="Tag หน่วยงาน (แจ้งให้ทราบ)" options={DEPTS} selected={ecForm.tagDepts} onChange={function(v){setEcForm(Object.assign({},ecForm,{tagDepts:v}));}} placeholder="พิมพ์ชื่อหน่วยงานเพื่อ tag..."/>
+        <TagSel label="Tag ผู้รับผิดชอบ (แจ้งให้ทราบ)" options={staffList} selected={ecForm.tagStaff} onChange={function(v){setEcForm(Object.assign({},ecForm,{tagStaff:v}));}} placeholder="พิมพ์ชื่อผู้รับผิดชอบเพื่อ tag..."/>
         <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:8}}>
           <Btn variant="secondary" size="sm" onClick={function(){setEditC(null);setEcForm(null);}}>ยกเลิก</Btn>
           <Btn variant="primary" size="sm" onClick={saveEditComplaint}>บันทึก</Btn>

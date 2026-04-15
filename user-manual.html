@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<title>คู่มือการใช้งานระบบจัดการข้อร้องเรียน</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'IBM Plex Sans Thai',sans-serif;color:#1e293b;line-height:1.8;padding:40px;max-width:800px;margin:0 auto;font-size:14px}
+h1{font-size:24px;font-weight:700;text-align:center;color:#4338ca;margin-bottom:4px}
+.subtitle{text-align:center;color:#64748b;font-size:13px;margin-bottom:8px}
+.org{text-align:center;color:#94a3b8;font-size:12px;margin-bottom:40px}
+h2{font-size:18px;font-weight:700;color:#1e293b;margin:32px 0 12px;padding:10px 16px;background:#eef2ff;border-radius:8px;border-left:4px solid #6366f1}
+h3{font-size:15px;font-weight:600;color:#334155;margin:20px 0 8px}
+p{margin:0 0 12px}
+ul,ol{margin:0 0 14px 24px}
+li{margin-bottom:6px}
+.step{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px;margin:10px 0 14px}
+.step-num{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:#6366f1;color:#fff;font-size:12px;font-weight:700;margin-right:8px}
+.note{background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;font-size:12px;color:#92400e;margin:10px 0 14px}
+.note b{color:#78350f}
+.tip{background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px;padding:10px 14px;font-size:12px;color:#065f46;margin:10px 0 14px}
+.role-badge{display:inline-block;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:600}
+.role-admin{background:#f3e8ff;color:#7c3aed}
+.role-crm{background:#ecfeff;color:#0891b2}
+.role-user{background:#eef2ff;color:#4338ca}
+table{width:100%;border-collapse:collapse;margin:10px 0 16px;font-size:13px}
+th{background:#f1f5f9;padding:10px 12px;text-align:left;font-weight:600;color:#475569;border-bottom:2px solid #e2e8f0}
+td{padding:8px 12px;border-bottom:1px solid #f1f5f9;vertical-align:top}
+.footer{text-align:center;margin-top:40px;padding-top:20px;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8}
+@media print{
+  body{padding:20px;font-size:12px}
+  h2{break-before:auto;page-break-before:auto}
+  .step,.note,.tip{break-inside:avoid}
+}
+</style>
+</head>
+<body>
+
+<h1>คู่มือการใช้งานระบบจัดการข้อร้องเรียน</h1>
+<div class="subtitle">Hospital Complaint Management System</div>
+<div class="org">โรงพยาบาลมหาวิทยาลัยพะเยา</div>
+
+<!-- สารบัญ -->
+<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:18px 24px;margin-bottom:30px">
+<h3 style="margin-top:0;margin-bottom:10px">สารบัญ</h3>
+<ol style="margin-bottom:0">
+<li>การ Login เข้าใช้งานระบบ</li>
+<li>การบันทึกข้อร้องเรียนใหม่</li>
+<li>การบันทึกการตรวจสอบ/ตอบกลับ และผลการแก้ไข</li>
+<li>การใช้งานทะเบียนข้อร้องเรียน</li>
+<li>การใช้งานปฏิทิน</li>
+<li>การใช้งาน Dashboard</li>
+</ol>
+</div>
+
+<!-- บทบาทผู้ใช้งาน -->
+<div style="margin-bottom:30px">
+<h3>บทบาทผู้ใช้งานในระบบ</h3>
+<table>
+<tr><th>บทบาท</th><th>สิทธิ์การใช้งาน</th></tr>
+<tr><td><span class="role-badge role-admin">Admin</span></td><td>จัดการผู้ใช้, บันทึกข้อร้องเรียน, ดูข้อมูลทั้งหมด, ลบ/แก้ไขข้อมูล, จัดการระบบ</td></tr>
+<tr><td><span class="role-badge role-crm">CRM</span></td><td>บันทึกข้อร้องเรียน, ดูข้อมูลทั้งหมด, บันทึกการดำเนินการศูนย์, นัดประชุม</td></tr>
+<tr><td><span class="role-badge role-user">User</span></td><td>ดู Dashboard, ดูทะเบียนเฉพาะที่ถูก Tag, บันทึกการตรวจสอบ/แก้ไข</td></tr>
+</table>
+</div>
+
+<!-- ========== หมวดที่ 1 ========== -->
+<h2>1. การ Login เข้าใช้งานระบบ</h2>
+
+<p>ระบบใช้การยืนยันตัวตนผ่าน <b>Google Account</b> ที่เป็นอีเมล <b>@up.ac.th</b> เท่านั้น พร้อมระบบ <b>PIN</b> สำหรับความปลอดภัยเพิ่มเติม</p>
+
+<h3>1.1 การเข้าสู่ระบบครั้งแรก (ลงทะเบียน)</h3>
+<div class="step">
+<p><span class="step-num">1</span>เปิดเว็บไซต์ระบบที่ <b>cm-uph.web.app</b></p>
+<p><span class="step-num">2</span>กดปุ่ม <b>"เข้าสู่ระบบด้วยอีเมล @up.ac.th"</b></p>
+<p><span class="step-num">3</span>เลือก Google Account ที่เป็น @up.ac.th</p>
+<p><span class="step-num">4</span>ระบบจะแสดงหน้าลงทะเบียน กรอกข้อมูล:</p>
+<ul>
+<li><b>ชื่อ</b> — ชื่อจริง</li>
+<li><b>นามสกุล</b> — นามสกุล</li>
+<li><b>หน่วยงาน</b> — พิมพ์ค้นหาหน่วยงานจากรายการ</li>
+</ul>
+<p><span class="step-num">5</span>กดปุ่ม <b>"ลงทะเบียน"</b></p>
+<p><span class="step-num">6</span>ระบบจะแสดงหน้า <b>"รอการอนุมัติ"</b> — รอให้ Admin อนุมัติบัญชีก่อน</p>
+</div>
+
+<div class="note"><b>หมายเหตุ:</b> ผู้ใช้คนแรกที่ตั้งเป็น ADMIN_EMAIL จะได้รับสิทธิ์ Admin โดยอัตโนมัติ ไม่ต้องรออนุมัติ</div>
+
+<h3>1.2 การตั้ง PIN (ครั้งแรกหลังได้รับอนุมัติ)</h3>
+<div class="step">
+<p><span class="step-num">1</span>หลังจาก Admin อนุมัติแล้ว เมื่อ Login จะแสดงหน้า <b>"ตั้ง PIN"</b></p>
+<p><span class="step-num">2</span>กรอก PIN ตัวเลข <b>4-6 หลัก</b></p>
+<p><span class="step-num">3</span>กรอก PIN อีกครั้งเพื่อยืนยัน</p>
+<p><span class="step-num">4</span>กดปุ่ม <b>"ตั้ง PIN"</b></p>
+</div>
+
+<div class="note"><b>ข้อห้าม:</b> ไม่อนุญาต PIN ที่ง่ายเกินไป เช่น 1111, 1234, 0000</div>
+
+<h3>1.3 การเข้าสู่ระบบครั้งถัดไป</h3>
+<div class="step">
+<p><span class="step-num">1</span>กดปุ่ม <b>"เข้าสู่ระบบด้วยอีเมล @up.ac.th"</b></p>
+<p><span class="step-num">2</span>เลือก Google Account</p>
+<p><span class="step-num">3</span>กรอก <b>PIN</b> ที่ตั้งไว้</p>
+<p><span class="step-num">4</span>กดปุ่ม <b>"เข้าสู่ระบบ"</b></p>
+</div>
+
+<div class="note"><b>ความปลอดภัย:</b> ใส่ PIN ผิด 5 ครั้งติดต่อกัน → บัญชีจะถูกล็อค 15 นาที หากลืม PIN ให้ติดต่อ Admin เพื่อ Reset PIN</div>
+
+<!-- ========== หมวดที่ 2 ========== -->
+<h2>2. การบันทึกข้อร้องเรียนใหม่</h2>
+
+<p>การบันทึกข้อร้องเรียนเป็นหน้าที่ของ <span class="role-badge role-crm">CRM</span> เจ้าหน้าที่ศูนย์รับข้อร้องเรียน และ <span class="role-badge role-admin">Admin</span></p>
+
+<h3>2.1 ขั้นตอนการบันทึก</h3>
+<div class="step">
+<p><span class="step-num">1</span>กดเมนู <b>"บันทึกข้อร้องเรียน"</b> ที่แถบด้านซ้าย หรือกดปุ่ม <b>"+ บันทึกใหม่"</b></p>
+<p><span class="step-num">2</span>เลือก <b>วันที่</b> รับเรื่อง</p>
+</div>
+
+<h3>2.2 กรอกข้อมูลในแบบฟอร์ม</h3>
+<table>
+<tr><th>ส่วนที่</th><th>รายละเอียด</th></tr>
+<tr><td><b>1. รายละเอียดผู้ร้องเรียน</b></td><td>
+- ชื่อ, สกุล, ที่อยู่, โทรศัพท์ (หรือติ๊ก "ไม่ประสงค์แจ้งชื่อ")<br>
+- สถานะ: ค่าเริ่มต้น "ผู้ป่วย/ผู้รับบริการ" กดแก้ไขเพื่อเปลี่ยน<br>
+- วิธีการร้องเรียน: เลือกได้หลายช่องทาง (จดหมาย, โทรศัพท์, Line OA ฯลฯ)
+</td></tr>
+<tr><td><b>2. หน่วยงานที่ถูกร้องเรียน</b></td><td>พิมพ์ค้นหาและเลือกจากรายการหน่วยงาน</td></tr>
+<tr><td><b>3. เรื่องที่ร้องเรียน</b></td><td>กรอกหัวข้อเรื่อง และรายละเอียด</td></tr>
+<tr><td><b>ประเมินระดับความรุนแรง</b></td><td>
+- ระดับ 1: บ่น/เสนอแนะ (กรอบเวลา 3 วันทำการ)<br>
+- ระดับ 2: ตำหนิ/ร้องทุกข์ (กรอบเวลา 72 ชั่วโมง)<br>
+- ระดับ 3: ด่าทอ/ขู่ฟ้อง/ทำร้าย (กรอบเวลา 6 ชั่วโมง)
+</td></tr>
+<tr><td><b>การดำเนินการศูนย์</b></td><td>
+- รายละเอียดการดำเนินการ<br>
+- ชื่อเจ้าหน้าที่ผู้บันทึก<br>
+- Tag หน่วยงาน / Tag ผู้รับผิดชอบ (แจ้งให้ทราบ)<br>
+<i>*สามารถพิมพ์ชื่อผู้รับผิดชอบเองได้ แม้ไม่มีในรายการ</i>
+</td></tr>
+</table>
+
+<div class="step">
+<p><span class="step-num">3</span>กดปุ่ม <b>"บันทึกข้อร้องเรียน"</b></p>
+</div>
+
+<div class="tip"><b>แจ้งเตือน LINE:</b> เมื่อบันทึกสำเร็จ ระบบจะส่งแจ้งเตือนไปยังกลุ่ม LINE OA โดยอัตโนมัติ</div>
+
+<!-- ========== หมวดที่ 3 ========== -->
+<h2>3. การบันทึกการตรวจสอบ/ตอบกลับ และผลการแก้ไข</h2>
+
+<p>เป็นหน้าที่ของ <span class="role-badge role-user">User</span> หน่วยงานที่ถูก Tag ให้ดำเนินการตรวจสอบและบันทึกผลการแก้ไข</p>
+
+<h3>3.1 การบันทึกการตรวจสอบ/ตอบกลับ</h3>
+<div class="step">
+<p><span class="step-num">1</span>เข้าเมนู <b>"ทะเบียนข้อร้องเรียน"</b></p>
+<p><span class="step-num">2</span>หาเรื่องที่ต้องการ → กดปุ่ม <b>"ตรวจสอบ"</b></p>
+<p><span class="step-num">3</span>กรอกข้อมูลในแท็บ <b>"ตรวจสอบ/ตอบกลับ"</b>:</p>
+<ul>
+<li>1. ตรวจสอบข้อเท็จจริง</li>
+<li>2. วิเคราะห์สาเหตุ (Root Cause Analysis)</li>
+<li>3. แนวทางแก้ไขและป้องกัน</li>
+<li>ผู้ตอบ</li>
+<li>วันที่ตรวจสอบ/ตอบกลับ (ปฏิทิน พ.ศ.)</li>
+</ul>
+<p><span class="step-num">4</span>กดปุ่ม <b>"บันทึกผลการตรวจสอบ"</b></p>
+</div>
+
+<h3>3.2 การบันทึกผลการแก้ไข</h3>
+<div class="step">
+<p><span class="step-num">1</span>จากรายการเดียวกัน กดแท็บ <b>"ผลการแก้ไข"</b></p>
+<p><span class="step-num">2</span>กรอกข้อมูล:</p>
+<ul>
+<li>การดำเนินการแก้ไข</li>
+<li>ผลการแก้ไข</li>
+<li>มาตรการป้องกันการเกิดซ้ำ</li>
+<li>วันที่แก้ไขแล้วเสร็จ (ปฏิทิน พ.ศ.)</li>
+</ul>
+<p><span class="step-num">3</span>กดปุ่ม <b>"บันทึกผลการแก้ไข"</b></p>
+</div>
+
+<div class="note"><b>สถานะอัตโนมัติ:</b> เมื่อบันทึกการตรวจสอบ สถานะจะเปลี่ยนเป็น "กำลังดำเนินการ" และเมื่อบันทึกผลแก้ไข สถานะจะเปลี่ยนเป็น "แก้ไขแล้ว" โดยอัตโนมัติ</div>
+
+<!-- ========== หมวดที่ 4 ========== -->
+<h2>4. การใช้งานทะเบียนข้อร้องเรียน</h2>
+
+<p>ทะเบียนข้อร้องเรียนเป็นหน้ารวมรายการทั้งหมด สามารถค้นหา กรอง และ Export ได้</p>
+
+<h3>4.1 มุมมอง</h3>
+<p>สามารถสลับมุมมองได้ 2 แบบ:</p>
+<ul>
+<li><b>มุมมองตาราง</b> — แสดงรายการเป็นตารางแถว เหมาะกับหน้าจอใหญ่</li>
+<li><b>มุมมองการ์ด</b> — แสดงเป็นการ์ด เหมาะกับมือถือ</li>
+</ul>
+
+<h3>4.2 การค้นหาและกรอง</h3>
+<table>
+<tr><th>ตัวกรอง</th><th>รายละเอียด</th></tr>
+<tr><td>ช่องค้นหา</td><td>พิมพ์คำค้นหาจากหัวข้อ, รายละเอียด หรือรหัส</td></tr>
+<tr><td>สถานะ</td><td>กรองตาม: กำลังตรวจสอบ, กำลังดำเนินการ, แก้ไขแล้ว</td></tr>
+<tr><td>ระดับความรุนแรง</td><td>กรองตาม: ระดับ 1, 2 หรือ 3</td></tr>
+<tr><td>หน่วยงาน</td><td>พิมพ์เลือกหน่วยงาน</td></tr>
+<tr><td>วันที่</td><td>เลือกเดือน หรือกำหนดช่วงวัน (จาก-ถึง)</td></tr>
+</table>
+
+<h3>4.3 การ Export PDF</h3>
+<div class="step">
+<p><span class="step-num">1</span>ในคอลัมน์ <b>"สรุปรายงาน"</b> กดปุ่ม <b>"Export PDF"</b> ของรายการที่ต้องการ</p>
+<p><span class="step-num">2</span>ระบบจะเปิดหน้าต่างใหม่แสดงรายงาน</p>
+<p><span class="step-num">3</span>หน้าต่าง Print จะเปิดอัตโนมัติ → เลือก <b>"Save as PDF"</b> หรือ <b>"Print"</b></p>
+</div>
+
+<div class="tip"><b>เนื้อหา PDF:</b> รายงานประกอบด้วยข้อมูลทั่วไป, เรื่องที่ร้องเรียน, การดำเนินการศูนย์, ผลการสอบสวน (ถ้ามี) และผลการแก้ไข (ถ้ามี)</div>
+
+<!-- ========== หมวดที่ 5 ========== -->
+<h2>5. การใช้งานปฏิทิน</h2>
+
+<p>ปฏิทินแสดงภาพรวมข้อร้องเรียนและการนัดประชุมในแต่ละวัน ช่วยติดตามการดำเนินการ</p>
+
+<h3>5.1 การดูข้อมูลในปฏิทิน</h3>
+<ul>
+<li>จุดสีเหลือง/เขียว/แดง = ข้อร้องเรียน (สีตามระดับความรุนแรง)</li>
+<li>จุดสีม่วง = นัดประชุม</li>
+<li>ในแต่ละวันจะแสดงข้อความสรุปเรื่องข้อร้องเรียนในกล่อง</li>
+<li>กดที่วันเพื่อดูรายละเอียดด้านล่าง</li>
+<li>กดที่กล่องข้อร้องเรียน → ลิงก์ไปหน้ารายละเอียดเรื่องนั้น</li>
+</ul>
+
+<h3>5.2 การนัดประชุม</h3>
+<div class="step">
+<p><span class="step-num">1</span>กดปุ่ม <b>"+ นัดประชุม"</b> มุมบนขวา</p>
+<p><span class="step-num">2</span>กรอกข้อมูลในกล่องลอย:</p>
+<ul>
+<li>หัวข้อเรื่อง</li>
+<li>สถานที่</li>
+<li>วันที่ (ปฏิทิน พ.ศ.)</li>
+<li>เวลา</li>
+</ul>
+<p><span class="step-num">3</span>กดปุ่ม <b>"บันทึก"</b></p>
+</div>
+
+<div class="tip"><b>แจ้งเตือน LINE:</b> เมื่อนัดประชุมใหม่ ระบบจะส่งแจ้งเตือนไปยัง LINE OA โดยอัตโนมัติ</div>
+
+<h3>5.3 การแก้ไข/ลบนัดประชุม</h3>
+<div class="step">
+<p><span class="step-num">1</span>กดที่วันที่ในปฏิทินที่มีนัดประชุม</p>
+<p><span class="step-num">2</span>ในรายการด้านล่าง จะแสดงปุ่ม <b>"แก้ไข"</b> และ <b>"ลบ"</b></p>
+<p><span class="step-num">3</span>กดแก้ไข → แก้ข้อมูลในกล่องลอย → กดบันทึก</p>
+</div>
+
+<!-- ========== หมวดที่ 6 ========== -->
+<h2>6. การใช้งาน Dashboard</h2>
+
+<p>Dashboard แสดงภาพรวมสถิติข้อร้องเรียนทั้งหมดในระบบ</p>
+
+<h3>6.1 กล่องสถิติหลัก</h3>
+<table>
+<tr><th>กล่อง</th><th>ข้อมูล</th><th>กดเข้าดู</th></tr>
+<tr><td>ข้อร้องเรียนทั้งหมด</td><td>จำนวนทั้งหมดในระบบ</td><td>ลิงก์ไปทะเบียน (ทั้งหมด)</td></tr>
+<tr><td>แก้ไขแล้ว</td><td>จำนวนที่ดำเนินการเสร็จ + เปอร์เซ็นต์</td><td>ลิงก์ไปทะเบียน (สถานะแก้ไขแล้ว)</td></tr>
+<tr><td>รอดำเนินการ</td><td>จำนวนที่ยังไม่เสร็จ</td><td>ลิงก์ไปทะเบียน (สถานะรอดำเนินการ)</td></tr>
+<tr><td>ระยะเวลาเฉลี่ย</td><td>จำนวนวันเฉลี่ยในการจัดการ</td><td>-</td></tr>
+</table>
+
+<h3>6.2 กราฟและแผนภูมิ</h3>
+<ul>
+<li><b>กราฟแท่งรายเดือน</b> — จำนวนข้อร้องเรียนทั้งหมด, แก้ไขแล้ว, รอดำเนินการ</li>
+<li><b>แผนภูมิวงกลม</b> — สัดส่วนตามหน่วยงาน (แสดงชื่อหน่วยงาน)</li>
+<li><b>กราฟแท่งแนวนอน</b> — จำนวนตามระดับความรุนแรง</li>
+<li><b>กราฟเส้น</b> — แนวโน้มรายเดือน</li>
+</ul>
+
+<div class="tip"><b>เคล็ดลับ:</b> กดที่กล่องสถิติด้านบนเพื่อลิงก์ไปหน้าทะเบียนที่กรองสถานะให้อัตโนมัติ</div>
+
+<!-- ========== ภาคผนวก ========== -->
+<div style="margin-top:40px">
+<h2 style="border-left-color:#94a3b8">ภาคผนวก: ข้อมูลทางเทคนิค</h2>
+
+<h3>ระบบที่ใช้</h3>
+<table>
+<tr><td>เว็บแอป</td><td>cm-uph.web.app (Firebase Hosting)</td></tr>
+<tr><td>การยืนยันตัวตน</td><td>Firebase Authentication (Google OAuth)</td></tr>
+<tr><td>ฐานข้อมูล</td><td>localStorage + Google Sheets (GAS)</td></tr>
+<tr><td>แจ้งเตือน</td><td>LINE Messaging API</td></tr>
+<tr><td>ปฏิทิน</td><td>ปฏิทิน พ.ศ. แบบ Custom</td></tr>
+</table>
+
+<h3>การ Auto-logout</h3>
+<ul>
+<li>ปิดแท็บ/browser = ออกจากระบบอัตโนมัติ</li>
+<li>ไม่มีกิจกรรม 2 ชั่วโมง = ออกจากระบบอัตโนมัติ</li>
+<li>ต้องใส่ PIN ใหม่ทุกครั้งที่ Login</li>
+</ul>
+
+<h3>การติดต่อผู้ดูแลระบบ</h3>
+<p>หากพบปัญหาในการใช้งาน หรือต้องการ Reset PIN กรุณาติดต่อผู้ดูแลระบบ (Admin)</p>
+</div>
+
+<div class="footer">
+ริเริ่มระบบด้วย phatcharapon ud<br>
+คู่มือนี้จัดทำสำหรับระบบจัดการข้อร้องเรียน โรงพยาบาลมหาวิทยาลัยพะเยา
+</div>
+
+<script>
+// Auto print when opened
+window.onload = function(){ setTimeout(function(){ window.print(); }, 500); };
+</script>
+</body>
+</html>

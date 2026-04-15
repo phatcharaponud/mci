@@ -3,7 +3,733 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="refresh" content="0;url=hospital-complaint.html">
-<title>ระบบจัดการข้อร้องเรียน - โรงพยาบาลมหาวิทยาลัยพะเยา</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ระบบอุบัติเหตุหมู่ (MCI)</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏥</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Sarabun','Noto Sans Thai',sans-serif}
+@media print{.no-print{display:none!important}}
+.sync-bar{position:fixed;top:0;left:0;right:0;height:3px;z-index:99999;transition:opacity .3s}
+.sync-bar.syncing{background:linear-gradient(90deg,#3B82F6,#60A5FA,#3B82F6);background-size:200% 100%;animation:syncAnim 1s linear infinite}
+@keyframes syncAnim{0%{background-position:200% 0}100%{background-position:-200% 0}}
+</style>
 </head>
-<body></body>
+<body>
+<div id="root"></div>
+<div class="sync-bar" id="syncBar"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+
+<script type="text/babel">
+const { useState, useEffect, useCallback, useRef } = React;
+
+// ╔══════════════════════════════════════════════════════╗
+// ║  ⚠️  ใส่ URL ของ Google Apps Script Web App ตรงนี้   ║
+// ╚══════════════════════════════════════════════════════╝
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwpU16BI_Mg3S7ugNCUbyruDIiNz8N4Ke-TQReViIztmVhpLgWS6n3ABJ72BH6pItUB/exec";
+
+// ====== SYNC ENGINE ======
+const SYNC_INTERVAL = 5000; // poll ทุก 5 วินาที
+const SAVE_DEBOUNCE = 800;  // รอ 0.8 วินาทีก่อน save
+
+const SyncEngine = {
+  _saveTimer: null,
+  _station: localStorage.getItem('mci-station') || '',
+
+  setStation(s) { this._station = s; localStorage.setItem('mci-station', s); },
+  getStation() { return this._station; },
+
+  isConfigured() { return SCRIPT_URL && SCRIPT_URL.length > 10; },
+
+  async fetchAll() {
+    if (!this.isConfigured()) return this._localGet();
+    try {
+      document.getElementById('syncBar').className = 'sync-bar syncing';
+      const r = await fetch(SCRIPT_URL + '?action=getAll');
+      const data = await r.json();
+      document.getElementById('syncBar').className = 'sync-bar';
+      if (Array.isArray(data)) {
+        localStorage.setItem('mci-data', JSON.stringify(data));
+        localStorage.setItem('mci-last-sync', new Date().toISOString());
+        return data;
+      }
+      return this._localGet();
+    } catch (e) {
+      document.getElementById('syncBar').className = 'sync-bar';
+      console.warn('Fetch failed, using local:', e.message);
+      return this._localGet();
+    }
+  },
+
+  async saveMCI(mci) {
+    localStorage.setItem('mci-data', JSON.stringify(
+      this._localGet().map(m => m.id === mci.id ? mci : m).concat(
+        this._localGet().find(m => m.id === mci.id) ? [] : [mci]
+      )
+    ));
+    if (!this.isConfigured()) return;
+    clearTimeout(this._saveTimer);
+    this._saveTimer = setTimeout(async () => {
+      try {
+        document.getElementById('syncBar').className = 'sync-bar syncing';
+        await fetch(SCRIPT_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ action: 'save', mci, station: this._station })
+        });
+        document.getElementById('syncBar').className = 'sync-bar';
+      } catch (e) { 
+        document.getElementById('syncBar').className = 'sync-bar';
+        console.warn('Save failed:', e.message); 
+      }
+    }, SAVE_DEBOUNCE);
+  },
+
+  _localGet() {
+    try { return JSON.parse(localStorage.getItem('mci-data')) || []; } catch { return []; }
+  }
+};
+
+// ====== HELPERS ======
+const now = () => new Date().toLocaleString("th-TH");
+const nowTime = () => new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
+
+const createEmptyMCI = () => ({
+  id: Date.now().toString(), name: "", location: "", date: now(), status: "open",
+  patients: [], fleetSources: [], hospitals: [], blood: { A: 0, B: 0, AB: 0, O: 0 }, closedAt: ""
+});
+
+const createEmptyPatient = () => ({
+  id: Date.now().toString() + Math.random().toString(36).slice(2, 6),
+  scene: "", triage: "แดง", name: "ไม่ทราบชื่อ", hn: "-", age: "-", edTriage: "",
+  diagnosis: "", status: "", destination: "", destinationHospitalId: "", o2: "",
+  arrival: nowTime(), blood: "-", note: "", transferFleetId: "", referHospital: "",
+  statusLog: [{ status: "ลงทะเบียน", time: now() }]
+});
+
+const TRIAGE_COLORS = {
+  "แดง": { bg: "#DC2626", label: "Critical", text: "#fff" },
+  "เหลือง": { bg: "#EAB308", label: "Urgent", text: "#000" },
+  "เขียว": { bg: "#16A34A", label: "Minor", text: "#fff" },
+  "ดำ": { bg: "#1F2937", label: "Deceased", text: "#fff" }
+};
+const STATUS_OPTIONS = ["Admit", "X-Ray", "CT", "OR", "D/C", "Refer", "Dead", "กำลังตรวจรักษา"];
+const STATIONS = ["จุดบัญชาการ (Command)", "จุด Triage", "ER", "จุดรับผู้ป่วย", "จุดส่งต่อ", "อื่นๆ"];
+
+const getEffectiveTriage = (p) => (p.edTriage && TRIAGE_COLORS[p.edTriage]) ? p.edTriage : p.triage;
+const getTriageCounts = (pts) => { const c = {"แดง":0,"เหลือง":0,"เขียว":0,"ดำ":0}; pts.forEach(p => { const t = getEffectiveTriage(p); if(c[t]!==undefined) c[t]++; }); return c; };
+const getPatientsByTriageColor = (pts, color) => pts.filter(p => getEffectiveTriage(p) === color);
+
+// ====== STYLES ======
+const font = "'Sarabun','Noto Sans Thai',sans-serif";
+const inputStyle = { width:"100%", padding:"8px 12px", borderRadius:6, border:"1px solid #CBD5E1", fontSize:14, fontFamily:font, boxSizing:"border-box" };
+const selectStyle = { ...inputStyle, background:"#fff" };
+const btnPrimary = { padding:"8px 20px", background:"#DC2626", color:"#fff", border:"none", borderRadius:6, fontWeight:700, cursor:"pointer", fontSize:14 };
+const btnSecondary = { ...btnPrimary, background:"#475569" };
+const btnSuccess = { ...btnPrimary, background:"#16A34A" };
+const btnWarning = { ...btnPrimary, background:"#EA580C" };
+
+// ====== SMALL COMPONENTS ======
+function TriageBadge({triage}){ const c=TRIAGE_COLORS[triage]||TRIAGE_COLORS["แดง"]; return <span style={{padding:"2px 12px",fontSize:12,background:c.bg,color:c.text,borderRadius:4,fontWeight:700,display:"inline-block"}}>{triage}</span>; }
+function StatusBadge({status}){ const m={Admit:"#16A34A","X-Ray":"#2563EB",CT:"#7C3AED",OR:"#DB2777","D/C":"#64748B",Refer:"#EA580C",Dead:"#1F2937","กำลังตรวจรักษา":"#F59E0B"}; return status ? <span style={{padding:"3px 14px",background:m[status]||"#94A3B8",color:status==="กำลังตรวจรักษา"?"#000":"#fff",borderRadius:4,fontSize:12,fontWeight:600}}>{status}</span> : null; }
+function Modal({open,onClose,title,children,width=560}){ if(!open) return null; return (<div style={{position:"fixed",inset:0,zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,0.5)"}} onClick={onClose}><div style={{background:"#fff",borderRadius:12,padding:24,width,maxWidth:"95vw",maxHeight:"90vh",overflow:"auto",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}} onClick={e=>e.stopPropagation()}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}><h3 style={{margin:0,fontSize:18,fontWeight:700,color:"#1E293B"}}>{title}</h3><button onClick={onClose} style={{background:"none",border:"none",fontSize:22,cursor:"pointer",color:"#64748B"}}>✕</button></div>{children}</div></div>); }
+function FormField({label,children}){ return <div style={{marginBottom:12}}><label style={{display:"block",fontSize:13,fontWeight:600,color:"#475569",marginBottom:4}}>{label}</label>{children}</div>; }
+
+// ====== CONNECTION STATUS ======
+function ConnectionStatus({ isOnline, lastSync, station }) {
+  return (
+    <div className="no-print" style={{ position:"fixed", bottom:12, right:12, zIndex:9998, display:"flex", gap:8, alignItems:"center" }}>
+      {station && <div style={{ background:"#1E293B", color:"#fff", padding:"6px 12px", borderRadius:20, fontSize:11, fontWeight:700 }}>📍 {station}</div>}
+      <div style={{ background: isOnline ? "#DCFCE7" : "#FEF2F2", border: `1px solid ${isOnline ? "#86EFAC" : "#FECACA"}`, padding:"6px 12px", borderRadius:20, fontSize:11, fontWeight:700, color: isOnline ? "#16A34A" : "#DC2626", display:"flex", alignItems:"center", gap:4 }}>
+        <span style={{ width:8, height:8, borderRadius:"50%", background: isOnline ? "#16A34A" : "#DC2626", display:"inline-block" }}></span>
+        {isOnline ? "Online — Sync" : "Offline — Local"}
+      </div>
+    </div>
+  );
+}
+
+// ====== TRIAGE CARDS ======
+function TriageSummaryCards({patients,onClickColor,activeColor}) {
+  const counts = getTriageCounts(patients);
+  return (
+    <div style={{marginBottom:16}}>
+      <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
+        {Object.entries(TRIAGE_COLORS).map(([key,val]) => {
+          const act = activeColor===key;
+          return (<div key={key} onClick={()=>onClickColor(act?null:key)} style={{background:val.bg,color:val.text,borderRadius:12,padding:"14px 28px",textAlign:"center",minWidth:120,flex:1,boxShadow:act?`0 0 0 4px #fff,0 0 0 7px ${val.bg}`:"0 2px 8px rgba(0,0,0,0.15)",cursor:"pointer",transform:act?"scale(1.05)":"scale(1)",transition:"all 0.2s"}}>
+            <div style={{fontSize:42,fontWeight:900,lineHeight:1.1}}>{counts[key]}</div>
+            <div style={{fontSize:14,fontWeight:600,opacity:0.95}}>{key} ({val.label})</div>
+          </div>);
+        })}
+      </div>
+      <div style={{display:"flex",justifyContent:"space-between",marginTop:10,padding:"6px 12px",background:"#fff",borderRadius:8,border:"1px solid #E2E8F0",fontSize:13,color:"#64748B"}}>
+        <span>{activeColor ? `แสดง: ${activeColor} (${counts[activeColor]} ราย) — กดอีกครั้งเพื่อแสดงทั้งหมด` : <>รวมทั้งหมด <strong style={{color:"#1E293B"}}>{patients.length}</strong> ราย</>}</span>
+        <span style={{fontSize:12,color:"#94A3B8"}}>อ้างอิง: {patients.some(p=>p.edTriage?.trim()) ? "ED Triage (ถ้ามี)" : "Scene Triage"}</span>
+      </div>
+    </div>
+  );
+}
+
+// ====== FILTERED PANEL ======
+function FilteredPatientPanel({patients,color,onClose,onEditPatient}) {
+  const filtered=getPatientsByTriageColor(patients,color); const ti=TRIAGE_COLORS[color];
+  return (
+    <div style={{background:"#fff",borderRadius:12,border:`2px solid ${ti.bg}`,overflow:"hidden",marginBottom:16,boxShadow:"0 4px 20px rgba(0,0,0,0.12)",animation:"sd .25s ease"}}>
+      <style>{`@keyframes sd{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}`}</style>
+      <div style={{background:ti.bg,color:ti.text,padding:"12px 16px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <span style={{fontWeight:800,fontSize:16}}>● Triage {color} — {filtered.length} ราย</span>
+        <button onClick={onClose} style={{background:"rgba(255,255,255,0.2)",border:"none",color:ti.text,padding:"4px 12px",borderRadius:6,cursor:"pointer",fontWeight:700}}>✕</button>
+      </div>
+      <div style={{overflowX:"auto"}}>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:13,minWidth:800}}>
+          <thead><tr style={{background:`${ti.bg}15`,fontWeight:700,color:"#475569"}}>{["#","Scene","ชื่อ","HN","วินิจฉัย","สถานะ","Destination",""].map((h,i)=><th key={i} style={{padding:"8px 10px",textAlign:"left",borderBottom:`2px solid ${ti.bg}40`}}>{h}</th>)}</tr></thead>
+          <tbody>{filtered.map((p,i)=>(
+            <tr key={p.id} style={{borderBottom:"1px solid #F1F5F9"}}>
+              <td style={{padding:"8px 10px"}}>{i+1}</td><td style={{padding:"8px 10px",fontWeight:600}}>{p.scene}</td>
+              <td style={{padding:"8px 10px",fontWeight:600}}>{p.name}</td><td style={{padding:"8px 10px",color:"#64748B"}}>{p.hn}</td>
+              <td style={{padding:"8px 10px"}}>{p.diagnosis||"-"}</td><td style={{padding:"8px 10px"}}><StatusBadge status={p.status}/></td>
+              <td style={{padding:"8px 10px",fontSize:12}}>{p.destination||"-"}</td>
+              <td style={{padding:"8px 6px"}}><button onClick={()=>onEditPatient(p)} style={{background:"#EFF6FF",border:"none",borderRadius:4,padding:"4px 8px",cursor:"pointer"}}>✏️</button></td>
+            </tr>
+          ))}</tbody>
+        </table>
+        {filtered.length===0 && <div style={{padding:30,textAlign:"center",color:"#94A3B8"}}>ไม่มีผู้ป่วย</div>}
+      </div>
+    </div>
+  );
+}
+
+// ====== PATIENT FORM MODAL ======
+function PatientFormModal({open,onClose,patient,onSave,fleetSources=[],hospitals=[]}) {
+  const [form,setForm]=useState(patient||createEmptyPatient());
+  useEffect(()=>{setForm(patient||createEmptyPatient())},[patient,open]);
+  const u=(k,v)=>setForm(f=>({...f,[k]:v}));
+  const isRefer=form.status==="Refer";
+  const selectedFleet=fleetSources.find(f=>f.id===form.transferFleetId);
+  const handleStatusChange=(ns)=>{
+    const log=[...(form.statusLog||[])];
+    if(ns&&ns!==form.status){log.push({status:ns,time:now()});}
+    setForm(f=>({...f,status:ns,statusLog:log}));
+    if(ns!=="Refer"){u("transferFleetId","");u("referHospital","");}
+  };
+  return (
+    <Modal open={open} onClose={onClose} title={patient?.scene?`แก้ไข: ${patient.scene}`:"เพิ่มผู้ป่วยใหม่"} width={660}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}}>
+        <FormField label="Scene"><input style={inputStyle} value={form.scene} onChange={e=>u("scene",e.target.value)} placeholder="เช่น แดง 1"/></FormField>
+        <FormField label="Triage"><select style={selectStyle} value={form.triage} onChange={e=>u("triage",e.target.value)}>{Object.keys(TRIAGE_COLORS).map(t=><option key={t} value={t}>{t}</option>)}</select></FormField>
+        <FormField label="ชื่อ-นามสกุล"><input style={inputStyle} value={form.name} onChange={e=>u("name",e.target.value)}/></FormField>
+        <FormField label="HN"><input style={inputStyle} value={form.hn} onChange={e=>u("hn",e.target.value)}/></FormField>
+        <FormField label="อายุ"><input style={inputStyle} value={form.age} onChange={e=>u("age",e.target.value)}/></FormField>
+        <FormField label="ED Triage">
+          <select style={{...selectStyle,borderColor:form.edTriage?TRIAGE_COLORS[form.edTriage]?.bg:"#CBD5E1",borderWidth:form.edTriage?2:1}} value={form.edTriage} onChange={e=>u("edTriage",e.target.value)}>
+            <option value="">-- ยังไม่ได้ Triage (ใช้ Scene) --</option>
+            {Object.keys(TRIAGE_COLORS).map(t=><option key={t} value={t}>{t}</option>)}
+          </select>
+        </FormField>
+        <FormField label="วินิจฉัย"><input style={inputStyle} value={form.diagnosis} onChange={e=>u("diagnosis",e.target.value)}/></FormField>
+        <FormField label="สถานะ">
+          <select style={{...selectStyle,borderColor:isRefer?"#EA580C":"#CBD5E1",borderWidth:isRefer?2:1,background:isRefer?"#FFF7ED":"#fff"}} value={form.status} onChange={e=>handleStatusChange(e.target.value)}>
+            <option value="">-- เลือก --</option>{STATUS_OPTIONS.map(s=><option key={s} value={s}>{s}</option>)}
+          </select>
+        </FormField>
+        <FormField label="Destination / รพ.ส่งต่อ">
+          <select style={selectStyle} value={form.destinationHospitalId||""} onChange={e=>{u("destinationHospitalId",e.target.value);const h=hospitals.find(x=>x.id===e.target.value);if(h){u("destination",h.name);if(isRefer)u("referHospital",h.name);}}}>
+            <option value="">-- เลือก รพ. --</option>
+            {hospitals.map(h=><option key={h.id} value={h.id}>{h.name} (เตียง: {h.capacity||0})</option>)}
+          </select>
+          <input style={{...inputStyle,marginTop:4}} value={form.destination} onChange={e=>u("destination",e.target.value)} placeholder="หรือพิมพ์เอง"/>
+        </FormField>
+        <FormField label="O2"><select style={selectStyle} value={form.o2} onChange={e=>u("o2",e.target.value)}><option value="">-</option><option value="ETT">ETT</option><option value="Mask">Mask with bag</option><option value="Cannula">Nasal Cannula</option><option value="Collar">Collar</option></select></FormField>
+        <FormField label="Arrival"><input style={inputStyle} value={form.arrival} onChange={e=>u("arrival",e.target.value)}/></FormField>
+        <FormField label="หมู่เลือด"><select style={selectStyle} value={form.blood} onChange={e=>u("blood",e.target.value)}><option value="-">-</option><option value="A">A</option><option value="B">B</option><option value="AB">AB</option><option value="O">O</option></select></FormField>
+      </div>
+      {isRefer && (
+        <div style={{background:"linear-gradient(135deg,#FFF7ED,#FFEDD5)",border:"2px solid #FB923C",borderRadius:10,padding:16,marginTop:4,marginBottom:8}}>
+          <div style={{fontWeight:800,fontSize:15,color:"#9A3412",marginBottom:12}}>🚑 เลือกรถส่งต่อ</div>
+          <FormField label="เลือกแหล่งรถส่งต่อ">
+            <select style={{...selectStyle,borderColor:"#FB923C"}} value={form.transferFleetId} onChange={e=>u("transferFleetId",e.target.value)}>
+              <option value="">-- ยังไม่เลือกรถ --</option>
+              {fleetSources.map(f=><option key={f.id} value={f.id}>{f.name} ({f.vehicleType}) — {f.initialCount} คัน</option>)}
+            </select>
+            {fleetSources.length===0 && <div style={{fontSize:11,color:"#DC2626",marginTop:3}}>⚠ ยังไม่มีแหล่งรถ — ไปเพิ่มที่แถบ "รถส่งต่อ"</div>}
+          </FormField>
+          {selectedFleet && <div style={{background:"#fff",borderRadius:8,padding:10,fontSize:12,color:"#475569",display:"flex",gap:12,flexWrap:"wrap",border:"1px solid #FED7AA"}}><span>🏢 <strong>{selectedFleet.name}</strong></span><span>📋 {selectedFleet.vehicleType}</span><span>🚑 {selectedFleet.initialCount} คัน</span></div>}
+          <div style={{marginTop:8}}><FormField label="ส่งไป รพ."><input style={{...inputStyle,borderColor:"#FB923C"}} value={form.referHospital} onChange={e=>u("referHospital",e.target.value)} placeholder="เช่น รพ.ศรีนครินทร์"/></FormField></div>
+        </div>
+      )}
+      {form.statusLog&&form.statusLog.length>0 && (
+        <div style={{background:"#F8FAFC",borderRadius:8,padding:12,marginBottom:8,border:"1px solid #E2E8F0"}}>
+          <div style={{fontSize:12,fontWeight:700,color:"#475569",marginBottom:6}}>⏱ ไทม์ไลน์</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+            {form.statusLog.map((log,i)=>(
+              <div key={i} style={{background:"#fff",border:"1px solid #E2E8F0",borderRadius:6,padding:"4px 10px",fontSize:11}}>
+                <strong style={{color:"#1E293B"}}>{log.status}</strong> <span style={{color:"#94A3B8"}}>{log.time}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      <FormField label="หมายเหตุ"><input style={inputStyle} value={form.note} onChange={e=>u("note",e.target.value)}/></FormField>
+      <div style={{display:"flex",justifyContent:"flex-end",gap:10,marginTop:16}}>
+        <button onClick={onClose} style={btnSecondary}>ยกเลิก</button>
+        <button onClick={()=>{onSave(form);onClose();}} style={btnSuccess}>💾 บันทึก</button>
+      </div>
+    </Modal>
+  );
+}
+
+// ====== FLEET SOURCE FORM ======
+function FleetSourceFormModal({open,onClose,source,onSave}) {
+  const [form,setForm]=useState(source||{}); useEffect(()=>{setForm(source||{id:Date.now().toString(),name:"",initialCount:1,vehicleType:"ALS",note:""})},[source,open]);
+  const u=(k,v)=>setForm(f=>({...f,[k]:v}));
+  return (
+    <Modal open={open} onClose={onClose} title={source?.name?`แก้ไข: ${source.name}`:"เพิ่มแหล่งรถส่งต่อ"} width={480}>
+      <div style={{background:"#FFF7ED",border:"1px solid #FED7AA",borderRadius:8,padding:12,marginBottom:16,fontSize:13,color:"#92400E"}}>💡 บันทึกจำนวนรถเริ่มต้น ระบบจะหักลบเมื่อจับคู่ผู้ป่วย Refer</div>
+      <FormField label="ชื่อหน่วยงาน"><input style={inputStyle} value={form.name} onChange={e=>u("name",e.target.value)} placeholder="เช่น รพ.พะเยา"/></FormField>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}}>
+        <FormField label="ประเภทรถ"><select style={selectStyle} value={form.vehicleType} onChange={e=>u("vehicleType",e.target.value)}><option value="ALS">ALS</option><option value="BLS">BLS</option><option value="FR">FR</option><option value="รถส่งต่อ">รถส่งต่อ</option><option value="มูลนิธิ">มูลนิธิ</option></select></FormField>
+        <FormField label="จำนวนรถเริ่มต้น"><input style={{...inputStyle,textAlign:"center",fontSize:22,fontWeight:900}} type="number" min={0} value={form.initialCount} onChange={e=>u("initialCount",parseInt(e.target.value)||0)}/></FormField>
+      </div>
+      <FormField label="หมายเหตุ"><input style={inputStyle} value={form.note} onChange={e=>u("note",e.target.value)}/></FormField>
+      <div style={{display:"flex",justifyContent:"flex-end",gap:10,marginTop:16}}>
+        <button onClick={onClose} style={btnSecondary}>ยกเลิก</button>
+        <button onClick={()=>{if(!form.name.trim())return;onSave(form);onClose();}} style={btnSuccess}>💾 บันทึก</button>
+      </div>
+    </Modal>
+  );
+}
+
+// ====== HOSPITAL FORM ======
+function HospitalFormModal({open,onClose,hospital,onSave}) {
+  const [form,setForm]=useState(hospital||{}); useEffect(()=>{setForm(hospital||{id:Date.now().toString(),name:"",capacity:0,contact:"",note:""})},[hospital,open]);
+  const u=(k,v)=>setForm(f=>({...f,[k]:v}));
+  return (
+    <Modal open={open} onClose={onClose} title={hospital?.name?`แก้ไข: ${hospital.name}`:"เพิ่ม รพ.ส่งต่อ"} width={480}>
+      <FormField label="ชื่อโรงพยาบาล"><input style={inputStyle} value={form.name} onChange={e=>u("name",e.target.value)} placeholder="เช่น รพ.ศรีนครินทร์"/></FormField>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}}>
+        <FormField label="จำนวนเตียงที่รับได้"><input style={{...inputStyle,textAlign:"center",fontSize:20,fontWeight:900}} type="number" min={0} value={form.capacity} onChange={e=>u("capacity",parseInt(e.target.value)||0)}/></FormField>
+        <FormField label="เบอร์ติดต่อ"><input style={inputStyle} value={form.contact} onChange={e=>u("contact",e.target.value)}/></FormField>
+      </div>
+      <FormField label="หมายเหตุ"><input style={inputStyle} value={form.note} onChange={e=>u("note",e.target.value)}/></FormField>
+      <div style={{display:"flex",justifyContent:"flex-end",gap:10,marginTop:16}}>
+        <button onClick={onClose} style={btnSecondary}>ยกเลิก</button>
+        <button onClick={()=>{if(!form.name.trim())return;onSave(form);onClose();}} style={btnSuccess}>💾 บันทึก</button>
+      </div>
+    </Modal>
+  );
+}
+
+function CreateMCIModal({open,onClose,onSave}) {
+  const [name,setName]=useState(""); const [location,setLocation]=useState("");
+  return (<Modal open={open} onClose={onClose} title="เปิดแผน MCI ใหม่">
+    <FormField label="ชื่อเหตุการณ์"><input style={inputStyle} value={name} onChange={e=>setName(e.target.value)} placeholder="เช่น เพลิงไหม้โรงเรียน"/></FormField>
+    <FormField label="สถานที่"><input style={inputStyle} value={location} onChange={e=>setLocation(e.target.value)}/></FormField>
+    <div style={{display:"flex",justifyContent:"flex-end",gap:10,marginTop:20}}>
+      <button onClick={onClose} style={btnSecondary}>ยกเลิก</button>
+      <button onClick={()=>{if(!name.trim())return;const m=createEmptyMCI();m.name=name;m.location=location;onSave(m);onClose();setName("");setLocation("");}} style={btnPrimary}>🚨 เปิดแผน MCI</button>
+    </div>
+  </Modal>);
+}
+
+// ====== SIDE PANELS ======
+function BloodPanel({blood,onChange}){ return (<div style={{background:"#fff",borderRadius:10,border:"1px solid #E2E8F0",overflow:"hidden"}}><div style={{background:"#F59E0B",color:"#fff",padding:"10px 14px",fontWeight:700,fontSize:14}}>🩸 หมู่เลือด</div><div style={{display:"flex",padding:10}}>{["A","B","AB","O"].map((t,i)=><div key={t} style={{flex:1,textAlign:"center"}}><input type="number" min={0} value={blood[t]||0} onChange={e=>onChange({...blood,[t]:parseInt(e.target.value)||0})} style={{width:50,textAlign:"center",border:"2px solid #E2E8F0",borderRadius:8,padding:"6px 4px",fontSize:20,fontWeight:900,color:["#DC2626","#2563EB","#16A34A","#F59E0B"][i]}}/><div style={{fontSize:12,color:"#64748B",marginTop:2}}>{t}</div></div>)}</div></div>); }
+function StatusSummaryPanel({patients}){ const sc={}; patients.forEach(p=>{if(p.status)sc[p.status]=(sc[p.status]||0)+1;}); return (<div style={{background:"#fff",borderRadius:10,border:"1px solid #E2E8F0",overflow:"hidden"}}><div style={{background:"#1E293B",color:"#fff",padding:"10px 14px",fontWeight:700,fontSize:14}}>📋 สถานะผู้ป่วย</div><div style={{padding:10,display:"grid",gridTemplateColumns:"1fr auto",gap:"6px 16px",fontSize:13}}>{STATUS_OPTIONS.map(s=><React.Fragment key={s}><span style={{color:"#475569"}}>{s}</span><span style={{fontWeight:700,background:"#F1F5F9",borderRadius:10,padding:"1px 10px",fontSize:12}}>{sc[s]||0}</span></React.Fragment>)}</div></div>); }
+
+// ====== TRANSFER TAB ======
+function TransferVehicleTab({mci,onUpdate}) {
+  const [fleetModal,setFleetModal]=useState({open:false,source:null});
+  const [expandedFleet,setExpandedFleet]=useState(null);
+  const fleetSources=mci.fleetSources||[];
+  const patients=mci.patients||[];
+  const getPatientsForFleet=(fid)=>patients.filter(p=>p.transferFleetId===fid&&p.status==="Refer");
+  const totalInitial=fleetSources.reduce((s,f)=>s+(f.initialCount||0),0);
+  const totalUsed=fleetSources.reduce((s,f)=>s+getPatientsForFleet(f.id).length,0);
+  const totalRemaining=totalInitial-totalUsed;
+  const saveFleet=(src)=>{const i=fleetSources.findIndex(x=>x.id===src.id);const u=i>=0?fleetSources.map((x,j)=>j===i?src:x):[...fleetSources,src];onUpdate({...mci,fleetSources:u});};
+  const deleteFleet=(id)=>{if(confirm("ลบ?"))onUpdate({...mci,fleetSources:fleetSources.filter(f=>f.id!==id)});};
+  return (
+    <div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12,marginBottom:16}}>
+        {[{v:totalInitial,l:"🚑 รถทั้งหมด",g:"linear-gradient(135deg,#1E40AF,#3B82F6)"},{v:totalUsed,l:"🔄 ใช้งานแล้ว",g:"linear-gradient(135deg,#EA580C,#F97316)"},{v:totalRemaining,l:"✅ คงเหลือ",g:"linear-gradient(135deg,#16A34A,#22C55E)"},{v:patients.filter(p=>p.status==="Refer").length,l:"📋 Refer ทั้งหมด",g:"linear-gradient(135deg,#7C3AED,#A78BFA)"}].map((c,i)=>(
+          <div key={i} style={{background:c.g,borderRadius:12,padding:"16px 20px",color:"#fff",textAlign:"center"}}><div style={{fontSize:34,fontWeight:900}}>{c.v}</div><div style={{fontSize:12,opacity:0.9}}>{c.l}</div></div>
+        ))}
+      </div>
+      <div style={{background:"#fff",borderRadius:12,border:"1px solid #E2E8F0",overflow:"hidden",marginBottom:16}}>
+        <div style={{background:"#1E40AF",color:"#fff",padding:"12px 16px",fontWeight:700,fontSize:15,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <span>🏢 แหล่งรถส่งต่อ</span>
+          <button onClick={()=>setFleetModal({open:true,source:null})} style={{background:"rgba(255,255,255,0.2)",border:"none",color:"#fff",padding:"5px 14px",borderRadius:6,cursor:"pointer",fontSize:13,fontWeight:700}}>+ เพิ่มแหล่งรถ</button>
+        </div>
+        {fleetSources.length===0?<div style={{padding:30,textAlign:"center",color:"#94A3B8"}}>ยังไม่มีแหล่งรถ</div>:(
+          <div style={{overflowX:"auto"}}>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+              <thead><tr style={{background:"#EFF6FF",fontWeight:700,color:"#1E40AF"}}>{["หน่วยงาน","ประเภท","เริ่มต้น","ใช้แล้ว","คงเหลือ","สถานะ",""].map((h,i)=><th key={i} style={{padding:"10px 12px",textAlign:i>=2&&i<=4?"center":"left",borderBottom:"2px solid #BFDBFE"}}>{h}</th>)}</tr></thead>
+              <tbody>
+                {fleetSources.map((src,i)=>{
+                  const used=getPatientsForFleet(src.id).length;const rem=Math.max(0,(src.initialCount||0)-used);
+                  const pct=src.initialCount>0?Math.round((rem/src.initialCount)*100):0;const bc=pct>50?"#16A34A":pct>20?"#F59E0B":"#DC2626";
+                  const isExp=expandedFleet===src.id;const fp=getPatientsForFleet(src.id);
+                  return (<React.Fragment key={src.id}>
+                    <tr style={{borderBottom:"1px solid #F1F5F9",background:i%2===0?"#fff":"#FAFBFC",cursor:fp.length>0?"pointer":"default"}} onClick={()=>fp.length>0&&setExpandedFleet(isExp?null:src.id)}>
+                      <td style={{padding:"10px 12px"}}><div style={{fontWeight:700}}>{src.name}</div>{src.note&&<div style={{fontSize:11,color:"#94A3B8"}}>{src.note}</div>}</td>
+                      <td style={{padding:"10px 12px"}}><span style={{background:"#DBEAFE",color:"#1D4ED8",padding:"2px 10px",borderRadius:10,fontSize:11,fontWeight:600}}>{src.vehicleType}</span></td>
+                      <td style={{padding:"10px 12px",textAlign:"center",fontWeight:900,fontSize:18,color:"#1E40AF"}}>{src.initialCount}</td>
+                      <td style={{padding:"10px 12px",textAlign:"center",fontWeight:700,fontSize:16,color:"#EA580C"}}>{used}{fp.length>0&&<span style={{fontSize:10,color:"#2563EB",display:"block"}}>{isExp?"▲":"▼ ดู"}</span>}</td>
+                      <td style={{padding:"10px 12px",textAlign:"center",fontWeight:900,fontSize:22,color:bc}}>{rem}</td>
+                      <td style={{padding:"10px 12px"}}><div style={{background:"#E2E8F0",borderRadius:6,height:8,minWidth:60}}><div style={{height:"100%",width:`${pct}%`,background:bc,borderRadius:6}}/></div><div style={{fontSize:10,color:"#64748B",textAlign:"center",marginTop:2}}>{pct}%</div></td>
+                      <td style={{padding:"10px 8px"}} onClick={e=>e.stopPropagation()}><button onClick={()=>setFleetModal({open:true,source:src})} style={{background:"#EFF6FF",border:"none",borderRadius:4,padding:"4px 8px",cursor:"pointer",marginRight:4}}>✏️</button><button onClick={()=>deleteFleet(src.id)} style={{background:"#FEF2F2",border:"none",borderRadius:4,padding:"4px 8px",cursor:"pointer"}}>🗑</button></td>
+                    </tr>
+                    {isExp&&fp.length>0&&(<tr><td colSpan={7} style={{padding:0}}>
+                      <div style={{background:"#FFF7ED",borderLeft:"4px solid #FB923C",margin:"0 12px 8px 24px",borderRadius:"0 8px 8px 0"}}>
+                        <div style={{padding:"8px 12px",background:"#FFEDD5",fontWeight:700,fontSize:12,color:"#9A3412"}}>👤 ผู้ป่วยจับคู่ {src.name} ({fp.length} ราย)</div>
+                        <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                          <thead><tr style={{color:"#9A3412",fontWeight:600}}>{["#","Scene","Triage","ชื่อ","HN","วินิจฉัย","ส่ง รพ."].map((h,i)=><th key={i} style={{padding:"6px 10px",textAlign:"left"}}>{h}</th>)}</tr></thead>
+                          <tbody>{fp.map((p,pi)=>(<tr key={p.id} style={{borderTop:"1px solid #FED7AA"}}><td style={{padding:"6px 10px"}}>{pi+1}</td><td style={{padding:"6px 10px",fontWeight:600}}>{p.scene}</td><td style={{padding:"6px 10px"}}><TriageBadge triage={getEffectiveTriage(p)}/></td><td style={{padding:"6px 10px",fontWeight:700}}>{p.name}</td><td style={{padding:"6px 10px",color:"#64748B"}}>{p.hn}</td><td style={{padding:"6px 10px"}}>{p.diagnosis||"-"}</td><td style={{padding:"6px 10px",fontWeight:600,color:"#EA580C"}}>{p.referHospital||"-"}</td></tr>))}</tbody>
+                        </table>
+                      </div>
+                    </td></tr>)}
+                  </React.Fragment>);
+                })}
+                <tr style={{background:"#EFF6FF",fontWeight:900,borderTop:"2px solid #1E40AF"}}><td style={{padding:"10px 12px"}}>รวม</td><td></td><td style={{textAlign:"center",fontSize:18,color:"#1E40AF",padding:"10px"}}>{totalInitial}</td><td style={{textAlign:"center",fontSize:16,color:"#EA580C",padding:"10px"}}>{totalUsed}</td><td style={{textAlign:"center",fontSize:22,color:totalRemaining>0?"#16A34A":"#DC2626",padding:"10px"}}>{totalRemaining}</td><td colSpan={2}></td></tr>
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+      <FleetSourceFormModal open={fleetModal.open} onClose={()=>setFleetModal({open:false,source:null})} source={fleetModal.source} onSave={saveFleet}/>
+    </div>
+  );
+}
+
+// ====== HOSPITAL TAB ======
+function HospitalTab({mci,onUpdate}) {
+  const [hospModal,setHospModal]=useState({open:false,hospital:null});
+  const hospitals=mci.hospitals||[];const patients=mci.patients||[];
+  const getHP=(n)=>patients.filter(p=>p.status==="Refer"&&(p.referHospital===n||p.destination===n));
+  const saveHosp=(h)=>{const i=hospitals.findIndex(x=>x.id===h.id);const u=i>=0?hospitals.map((x,j)=>j===i?h:x):[...hospitals,h];onUpdate({...mci,hospitals:u});};
+  const deleteHosp=(id)=>{if(confirm("ลบ?"))onUpdate({...mci,hospitals:hospitals.filter(h=>h.id!==id)});};
+  return (
+    <div>
+      <div style={{background:"#fff",borderRadius:12,border:"1px solid #E2E8F0",overflow:"hidden"}}>
+        <div style={{background:"#0D9488",color:"#fff",padding:"12px 16px",fontWeight:700,fontSize:15,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <span>🏥 รายการ รพ.ส่งต่อ</span>
+          <button onClick={()=>setHospModal({open:true,hospital:null})} style={{background:"rgba(255,255,255,0.2)",border:"none",color:"#fff",padding:"5px 14px",borderRadius:6,cursor:"pointer",fontSize:13,fontWeight:700}}>+ เพิ่ม รพ.</button>
+        </div>
+        {hospitals.length===0?<div style={{padding:30,textAlign:"center",color:"#94A3B8"}}>ยังไม่มี รพ.ส่งต่อ</div>:(
+          <div style={{overflowX:"auto"}}>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+              <thead><tr style={{background:"#F0FDFA",fontWeight:700,color:"#0D9488"}}>{["ชื่อ รพ.","เบอร์","เตียงรับ","ส่งแล้ว","เตียงว่าง","สถานะ",""].map((h,i)=><th key={i} style={{padding:"10px 12px",textAlign:i>=2&&i<=4?"center":"left",borderBottom:"2px solid #99F6E4"}}>{h}</th>)}</tr></thead>
+              <tbody>{hospitals.map((h,i)=>{
+                const recv=getHP(h.name).length;const avail=Math.max(0,(h.capacity||0)-recv);
+                const pct=h.capacity>0?Math.round((avail/h.capacity)*100):0;const bc=pct>50?"#16A34A":pct>20?"#F59E0B":"#DC2626";
+                const tc={"แดง":0,"เหลือง":0,"เขียว":0,"ดำ":0};getHP(h.name).forEach(p=>{const t=getEffectiveTriage(p);if(tc[t]!==undefined)tc[t]++;});
+                return (<tr key={h.id} style={{borderBottom:"1px solid #F1F5F9"}}>
+                  <td style={{padding:"10px 12px"}}><div style={{fontWeight:700}}>{h.name}</div>{h.note&&<div style={{fontSize:11,color:"#94A3B8"}}>{h.note}</div>}</td>
+                  <td style={{padding:"10px 12px"}}>{h.contact||"-"}</td>
+                  <td style={{padding:"10px 12px",textAlign:"center",fontWeight:900,fontSize:18,color:"#1E40AF"}}>{h.capacity||0}</td>
+                  <td style={{padding:"10px 12px",textAlign:"center"}}><div style={{fontWeight:700,fontSize:16,color:"#EA580C"}}>{recv}</div><div style={{fontSize:10,color:"#64748B",display:"flex",gap:4,justifyContent:"center"}}>{Object.entries(tc).filter(([,v])=>v>0).map(([k,v])=><span key={k} style={{color:TRIAGE_COLORS[k].bg}}>{k}:{v}</span>)}</div></td>
+                  <td style={{padding:"10px 12px",textAlign:"center",fontWeight:900,fontSize:22,color:bc}}>{avail}</td>
+                  <td style={{padding:"10px 12px"}}><div style={{background:"#E2E8F0",borderRadius:6,height:8,minWidth:60}}><div style={{height:"100%",width:`${pct}%`,background:bc,borderRadius:6}}/></div></td>
+                  <td style={{padding:"10px 8px"}}><button onClick={()=>setHospModal({open:true,hospital:h})} style={{background:"#EFF6FF",border:"none",borderRadius:4,padding:"4px 8px",cursor:"pointer",marginRight:4}}>✏️</button><button onClick={()=>deleteHosp(h.id)} style={{background:"#FEF2F2",border:"none",borderRadius:4,padding:"4px 8px",cursor:"pointer"}}>🗑</button></td>
+                </tr>);
+              })}</tbody>
+            </table>
+          </div>
+        )}
+      </div>
+      <HospitalFormModal open={hospModal.open} onClose={()=>setHospModal({open:false,hospital:null})} hospital={hospModal.hospital} onSave={saveHosp}/>
+    </div>
+  );
+}
+
+// ====== REPORT PAGE ======
+function ReportPage({mci,onBack}) {
+  const patients=mci.patients||[];const tc=getTriageCounts(patients);const fleets=mci.fleetSources||[];const hosps=mci.hospitals||[];
+  const referPatients=patients.filter(p=>p.status==="Refer");
+  const avgTimes=[];
+  patients.forEach(p=>{if(p.statusLog&&p.statusLog.length>=2){try{const f=new Date(p.statusLog[0].time);const l=new Date(p.statusLog[p.statusLog.length-1].time);const d=Math.round((l-f)/60000);if(d>0)avgTimes.push(d);}catch{}}});
+  const avgMin=avgTimes.length>0?Math.round(avgTimes.reduce((a,b)=>a+b,0)/avgTimes.length):0;
+  const exportCSV=()=>{
+    let csv="Scene,Triage,ED Triage,ชื่อ,HN,อายุ,วินิจฉัย,สถานะ,Destination,รพ.ส่งต่อ,รถส่งต่อ,Arrival,หมายเหตุ,สถานะ Log\n";
+    patients.forEach(p=>{const fn=fleets.find(f=>f.id===p.transferFleetId)?.name||"";const ls=(p.statusLog||[]).map(l=>`${l.status}@${l.time}`).join(" → ");csv+=`"${p.scene}","${p.triage}","${p.edTriage}","${p.name}","${p.hn}","${p.age}","${p.diagnosis}","${p.status}","${p.destination}","${p.referHospital}","${fn}","${p.arrival}","${p.note}","${ls}"\n`;});
+    const blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=`MCI-Report-${mci.name}.csv`;a.click();
+  };
+  return (
+    <div style={{minHeight:"100vh",background:"#F1F5F9",fontFamily:font}}>
+      <div className="no-print" style={{background:"linear-gradient(135deg,#1E293B,#0F172A)",color:"#fff",padding:"20px 24px"}}>
+        <div style={{maxWidth:1200,margin:"0 auto",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
+          <div><h1 style={{margin:0,fontSize:22,fontWeight:900}}>📊 รายงาน MCI: {mci.name}</h1><div style={{fontSize:12,color:"#94A3B8",marginTop:4}}>📅 เปิด: {mci.date} | ปิด: {mci.closedAt||"-"} | 📍 {mci.location}</div></div>
+          <div style={{display:"flex",gap:6}}>
+            <button onClick={onBack} style={{...btnSecondary,fontSize:12}}>← กลับ</button>
+            <button onClick={exportCSV} style={{...btnSuccess,fontSize:12}}>📥 Export CSV</button>
+            <button onClick={()=>window.print()} style={{...btnPrimary,fontSize:12,background:"#7C3AED"}}>🖨 Print/PDF</button>
+          </div>
+        </div>
+      </div>
+      <div style={{maxWidth:1200,margin:"0 auto",padding:20}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:12,marginBottom:20}}>
+          {[{v:patients.length,l:"ผู้ป่วยทั้งหมด",bg:"#fff",tc:"#1E293B"},...Object.entries(TRIAGE_COLORS).map(([k,v])=>({v:tc[k],l:k,bg:v.bg})),{v:referPatients.length,l:"Refer",bg:"#EA580C"},{v:`${avgMin} นาที`,l:"เวลาเฉลี่ย",bg:"#2563EB"}].map((c,i)=><div key={i} style={{background:c.bg,color:c.tc||"#fff",borderRadius:10,padding:"14px 16px",textAlign:"center",border:c.bg==="#fff"?"2px solid #E2E8F0":"none"}}><div style={{fontSize:28,fontWeight:900}}>{c.v}</div><div style={{fontSize:12,opacity:0.9}}>{c.l}</div></div>)}
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:20}}>
+          <div style={{background:"#fff",borderRadius:10,border:"1px solid #E2E8F0",padding:16}}>
+            <h3 style={{margin:"0 0 10px",fontSize:15,fontWeight:700}}>🚑 ทรัพยากรรถส่งต่อ</h3>
+            {fleets.map(f=><div key={f.id} style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:13,borderBottom:"1px solid #F1F5F9"}}><span>{f.name} ({f.vehicleType})</span><span>เริ่มต้น: {f.initialCount} | ใช้: {patients.filter(p=>p.transferFleetId===f.id).length}</span></div>)}
+            {fleets.length===0&&<div style={{color:"#94A3B8",fontSize:13}}>ไม่มีข้อมูล</div>}
+          </div>
+          <div style={{background:"#fff",borderRadius:10,border:"1px solid #E2E8F0",padding:16}}>
+            <h3 style={{margin:"0 0 10px",fontSize:15,fontWeight:700}}>🏥 โรงพยาบาลส่งต่อ</h3>
+            {hosps.map(h=>{const rv=patients.filter(p=>p.referHospital===h.name||p.destination===h.name).length;return <div key={h.id} style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:13,borderBottom:"1px solid #F1F5F9"}}><span>{h.name}</span><span>เตียง: {h.capacity} | รับ: {rv}</span></div>;})}
+            {hosps.length===0&&<div style={{color:"#94A3B8",fontSize:13}}>ไม่มีข้อมูล</div>}
+          </div>
+        </div>
+        <div style={{background:"#fff",borderRadius:10,border:"1px solid #E2E8F0",overflow:"auto"}}>
+          <div style={{background:"#1E293B",color:"#fff",padding:"10px 14px",fontWeight:700}}>📋 รายชื่อผู้ป่วยทั้งหมด</div>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:1000}}>
+            <thead><tr style={{background:"#F8FAFC",fontWeight:700}}>{["#","Scene","Triage","ชื่อ","HN","วินิจฉัย","สถานะ","Dest","รถ","ไทม์ไลน์"].map((h,i)=><th key={i} style={{padding:"8px 10px",textAlign:"left",borderBottom:"2px solid #E2E8F0"}}>{h}</th>)}</tr></thead>
+            <tbody>{patients.map((p,i)=>{const fl=fleets.find(f=>f.id===p.transferFleetId);return(
+              <tr key={p.id} style={{borderBottom:"1px solid #F1F5F9"}}><td style={{padding:"6px 10px"}}>{i+1}</td><td style={{padding:"6px 10px"}}>{p.scene}</td><td style={{padding:"6px 10px"}}><TriageBadge triage={getEffectiveTriage(p)}/></td><td style={{padding:"6px 10px",fontWeight:600}}>{p.name}</td><td style={{padding:"6px 10px"}}>{p.hn}</td><td style={{padding:"6px 10px"}}>{p.diagnosis}</td><td style={{padding:"6px 10px"}}><StatusBadge status={p.status}/></td><td style={{padding:"6px 10px"}}>{p.destination}{p.referHospital&&<div style={{fontSize:10,color:"#EA580C"}}>→{p.referHospital}</div>}</td><td style={{padding:"6px 10px",fontSize:11}}>{fl?fl.name:"-"}</td><td style={{padding:"6px 10px",fontSize:10}}>{(p.statusLog||[]).map((l,j)=><span key={j}><strong>{l.status}</strong>({l.time?.split(" ")[1]||l.time}){j<(p.statusLog||[]).length-1?" → ":""}</span>)}</td></tr>
+            );})}</tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ====== MAIN DASHBOARD ======
+function MCIDashboard({mci,onUpdate,onBack,onPublicBoard}) {
+  const [patientModal,setPatientModal]=useState({open:false,patient:null});
+  const [tab,setTab]=useState("patients");
+  const [activeTriageColor,setActiveTriageColor]=useState(null);
+  const savePatient=p=>{const i=mci.patients.findIndex(x=>x.id===p.id);const u=i>=0?mci.patients.map((x,j)=>j===i?p:x):[...mci.patients,p];onUpdate({...mci,patients:u});};
+  const deletePatient=id=>{if(confirm("ลบ?"))onUpdate({...mci,patients:mci.patients.filter(p=>p.id!==id)});};
+  return (
+    <div style={{minHeight:"100vh",background:"#F1F5F9",fontFamily:font}}>
+      <div className="no-print" style={{background:"linear-gradient(135deg,#1E293B,#0F172A)",color:"#fff",padding:"14px 20px"}}>
+        <div style={{maxWidth:1400,margin:"0 auto",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
+          <div style={{display:"flex",alignItems:"center",gap:12}}>
+            <span style={{fontSize:28}}>🔥</span>
+            <div><h1 style={{margin:0,fontSize:20,fontWeight:900,display:"flex",alignItems:"center",gap:8}}>{mci.name} <span style={{background:mci.status==="open"?"#16A34A":"#64748B",padding:"2px 10px",borderRadius:10,fontSize:11,fontWeight:700}}>● {mci.status==="open"?"LIVE":"ปิด"}</span></h1><div style={{fontSize:12,color:"#94A3B8"}}>📅 {mci.date} | 📍 {mci.location}</div></div>
+          </div>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            <button onClick={onBack} style={{...btnSecondary,fontSize:12,padding:"6px 14px"}}>≡ รายการ</button>
+            <button onClick={onPublicBoard} style={{...btnSecondary,fontSize:12,padding:"6px 14px",background:"#2563EB"}}>📺 บอร์ดญาติ</button>
+            <button onClick={()=>setPatientModal({open:true,patient:null})} style={{...btnSuccess,fontSize:12,padding:"6px 14px"}}>+ เพิ่มผู้ป่วย</button>
+            <button onClick={()=>{const u={...mci,status:mci.status==="open"?"closed":"open"};if(u.status==="closed")u.closedAt=now();onUpdate(u);}} style={{...btnWarning,fontSize:12,padding:"6px 14px",background:mci.status==="open"?"#DC2626":"#16A34A"}}>{mci.status==="open"?"✕ ปิดแผน":"↻ เปิดแผน"}</button>
+          </div>
+        </div>
+      </div>
+      <div style={{maxWidth:1400,margin:"0 auto",padding:16}}>
+        <TriageSummaryCards patients={mci.patients} onClickColor={c=>setActiveTriageColor(c)} activeColor={activeTriageColor}/>
+        {activeTriageColor&&<FilteredPatientPanel patients={mci.patients} color={activeTriageColor} onClose={()=>setActiveTriageColor(null)} onEditPatient={p=>setPatientModal({open:true,patient:p})}/>}
+        <div className="no-print" style={{display:"flex",gap:4,marginBottom:16,background:"#fff",borderRadius:10,padding:4,border:"1px solid #E2E8F0"}}>
+          {[["patients","📋 รายชื่อผู้ป่วย"],["transfers","🚑 รถส่งต่อ"],["hospitals","🏥 รพ.ส่งต่อ"]].map(([key,label])=>(
+            <button key={key} onClick={()=>setTab(key)} style={{flex:1,padding:"10px 16px",border:"none",borderRadius:8,cursor:"pointer",fontSize:14,fontWeight:700,fontFamily:font,background:tab===key?"#1E293B":"transparent",color:tab===key?"#fff":"#64748B"}}>{label}</button>
+          ))}
+        </div>
+        {tab==="patients"&&(<>
+          <div style={{background:"#fff",borderRadius:10,border:"1px solid #E2E8F0",overflow:"auto",marginBottom:16}}>
+            <div style={{background:"#1E293B",color:"#fff",padding:"10px 14px",fontWeight:700,display:"flex",justifyContent:"space-between"}}>
+              <span>≡ รายชื่อผู้ป่วย ({mci.patients.length} ราย)</span>
+              <button onClick={()=>setPatientModal({open:true,patient:null})} style={{background:"rgba(255,255,255,0.15)",border:"none",color:"#fff",padding:"3px 12px",borderRadius:4,cursor:"pointer",fontSize:12,fontWeight:700}}>+ เพิ่ม</button>
+            </div>
+            <div style={{overflowX:"auto"}}>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:13,minWidth:1100}}>
+                <thead><tr style={{background:"#F8FAFC",color:"#475569",fontWeight:700}}>{["#","Scene","Triage","ชื่อ","HN","อายุ","ED Triage","วินิจฉัย","สถานะ","Destination","O2","Arrival",""].map((h,i)=><th key={i} style={{padding:"8px 10px",textAlign:"left",whiteSpace:"nowrap",borderBottom:"2px solid #E2E8F0"}}>{h}</th>)}</tr></thead>
+                <tbody>{mci.patients.map((p,i)=>{
+                  const eff=getEffectiveTriage(p);const uEd=p.edTriage&&TRIAGE_COLORS[p.edTriage];const fleet=(mci.fleetSources||[]).find(f=>f.id===p.transferFleetId);
+                  return(<tr key={p.id} style={{borderBottom:"1px solid #F1F5F9",opacity:activeTriageColor&&eff!==activeTriageColor?0.4:1,transition:"opacity 0.2s"}}>
+                    <td style={{padding:"8px 10px",color:"#64748B"}}>{i+1}</td>
+                    <td style={{padding:"8px 10px",fontWeight:600}}>{p.scene}</td>
+                    <td style={{padding:"8px 10px"}}><TriageBadge triage={p.triage}/>{!uEd&&<div style={{fontSize:9,color:"#94A3B8"}}>⬤ ใช้</div>}</td>
+                    <td style={{padding:"8px 10px",fontWeight:600}}>{p.name}</td>
+                    <td style={{padding:"8px 10px",color:"#64748B"}}>{p.hn}</td>
+                    <td style={{padding:"8px 10px",color:"#64748B"}}>{p.age}</td>
+                    <td style={{padding:"8px 10px"}}>{uEd?<><TriageBadge triage={p.edTriage}/><div style={{fontSize:9,color:"#7C3AED",fontWeight:700}}>⬤ ใช้</div></>:<span style={{color:"#CBD5E1"}}>—</span>}</td>
+                    <td style={{padding:"8px 10px"}}>{p.diagnosis}</td>
+                    <td style={{padding:"8px 10px"}}><StatusBadge status={p.status}/>{fleet&&<div style={{fontSize:10,color:"#EA580C",fontWeight:700,marginTop:2}}>🚑 {fleet.name}</div>}</td>
+                    <td style={{padding:"8px 10px",fontSize:12,color:"#475569"}}>{p.destination}{p.referHospital&&<div style={{fontSize:10,color:"#EA580C"}}>→ {p.referHospital}</div>}</td>
+                    <td style={{padding:"8px 10px"}}>{p.o2&&<span style={{background:"#DBEAFE",color:"#1D4ED8",padding:"2px 8px",borderRadius:4,fontSize:11,fontWeight:700}}>{p.o2}</span>}</td>
+                    <td style={{padding:"8px 10px",color:"#64748B",fontSize:12}}>{p.arrival}</td>
+                    <td style={{padding:"8px 6px",whiteSpace:"nowrap"}}>
+                      <button onClick={()=>setPatientModal({open:true,patient:p})} style={{background:"#EFF6FF",border:"none",borderRadius:4,padding:"4px 8px",cursor:"pointer",marginRight:4}}>✏️</button>
+                      <button onClick={()=>deletePatient(p.id)} style={{background:"#FEF2F2",border:"none",borderRadius:4,padding:"4px 8px",cursor:"pointer"}}>🗑</button>
+                    </td>
+                  </tr>);
+                })}</tbody>
+              </table>
+              {mci.patients.length===0&&<div style={{padding:40,textAlign:"center",color:"#94A3B8"}}>ยังไม่มีผู้ป่วย</div>}
+            </div>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:14}}>
+            <StatusSummaryPanel patients={mci.patients}/>
+            <BloodPanel blood={mci.blood} onChange={b=>onUpdate({...mci,blood:b})}/>
+          </div>
+        </>)}
+        {tab==="transfers"&&<TransferVehicleTab mci={mci} onUpdate={onUpdate}/>}
+        {tab==="hospitals"&&<HospitalTab mci={mci} onUpdate={onUpdate}/>}
+      </div>
+      <PatientFormModal open={patientModal.open} onClose={()=>setPatientModal({open:false,patient:null})} patient={patientModal.patient} onSave={savePatient} fleetSources={mci.fleetSources||[]} hospitals={mci.hospitals||[]}/>
+    </div>
+  );
+}
+
+// ====== PUBLIC BOARD ======
+function PublicBoard({mci,onBack}) {
+  return (
+    <div style={{minHeight:"100vh",background:"linear-gradient(160deg,#0F172A,#1E293B)",fontFamily:font,color:"#fff"}}>
+      <div style={{maxWidth:1000,margin:"0 auto",padding:"24px 16px"}}>
+        <div style={{textAlign:"center",marginBottom:24}}>
+          <h1 style={{fontSize:28,fontWeight:900,margin:0}}>🏥 {mci.name}</h1>
+          <div style={{fontSize:13,opacity:0.7,marginTop:6}}>📅 {mci.date} | 📍 {mci.location}</div>
+          <button className="no-print" onClick={onBack} style={{...btnSecondary,marginTop:10,fontSize:12}}>← กลับ</button>
+        </div>
+        <div style={{background:"rgba(255,255,255,0.06)",borderRadius:12,overflow:"hidden"}}>
+          <div style={{display:"grid",gridTemplateColumns:"40px 70px 80px 1fr 100px 1fr",padding:"12px 16px",background:"rgba(255,255,255,0.08)",fontSize:13,fontWeight:700,color:"#94A3B8"}}><div>#</div><div>Triage</div><div>Scene</div><div>ชื่อ</div><div>สถานะ</div><div>Destination</div></div>
+          {mci.patients.map((p,i)=>(
+            <div key={p.id} style={{display:"grid",gridTemplateColumns:"40px 70px 80px 1fr 100px 1fr",padding:"14px 16px",borderTop:"1px solid rgba(255,255,255,0.06)",alignItems:"center"}}>
+              <div style={{color:"#94A3B8"}}>{i+1}</div>
+              <div style={{display:"flex",alignItems:"center",gap:6}}><span style={{width:10,height:10,borderRadius:"50%",background:TRIAGE_COLORS[getEffectiveTriage(p)]?.bg}}></span>{getEffectiveTriage(p)}</div>
+              <div>{p.scene}</div><div style={{fontWeight:700}}>{p.name}</div><div><StatusBadge status={p.status}/></div><div style={{color:"#94A3B8"}}>{p.destination||"-"}</div>
+            </div>
+          ))}
+          {mci.patients.length===0&&<div style={{padding:40,textAlign:"center",color:"#64748B"}}>ยังไม่มีข้อมูล</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ====== MCI LIST ======
+function MCIListPage({mcis,onSelect,onCreateNew}) {
+  return (
+    <div style={{minHeight:"100vh",background:"#F1F5F9",fontFamily:font}}>
+      <div style={{background:"linear-gradient(135deg,#B91C1C,#7F1D1D)",color:"#fff",padding:"28px 32px"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",maxWidth:1200,margin:"0 auto",flexWrap:"wrap",gap:10}}>
+          <div><h1 style={{margin:0,fontSize:26,fontWeight:900}}>🏥 ระบบอุบัติเหตุหมู่ (MCI)</h1><p style={{margin:"4px 0 0",fontSize:14,opacity:0.85}}>Mass Casualty Incident — คณะแพทยศาสตร์ มหาวิทยาลัยพะเยา</p></div>
+          <button onClick={onCreateNew} style={{...btnPrimary,background:"#fff",color:"#B91C1C",padding:"10px 24px",fontSize:15,borderRadius:8}}>+ เปิดแผน MCI ใหม่</button>
+        </div>
+      </div>
+      <div style={{maxWidth:1200,margin:"24px auto",padding:"0 16px"}}>
+        {!SyncEngine.isConfigured()&&<div style={{background:"#FEF2F2",border:"1px solid #FECACA",borderRadius:10,padding:16,marginBottom:16,fontSize:13,color:"#991B1B"}}>⚠️ <strong>ยังไม่ได้ตั้งค่า Google Sheets</strong> — ข้อมูลบันทึกเฉพาะเครื่องนี้ (localStorage) กรุณาใส่ SCRIPT_URL ใน code เพื่อ sync ข้อมูลระหว่างหลายเครื่อง</div>}
+        {mcis.length===0&&<div style={{textAlign:"center",padding:60,color:"#94A3B8"}}>📋 ยังไม่มีรายการ MCI — กดปุ่ม "เปิดแผน MCI ใหม่"</div>}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(340px,1fr))",gap:20}}>
+          {mcis.map(mci=>{const c=getTriageCounts(mci.patients);return(
+            <div key={mci.id} style={{background:"#fff",borderRadius:12,overflow:"hidden",boxShadow:"0 1px 6px rgba(0,0,0,0.08)",border:"1px solid #E2E8F0"}}>
+              <div style={{background:mci.status==="open"?"#FEF2F2":"#F1F5F9",padding:"14px 18px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid #E2E8F0"}}>
+                <span style={{fontWeight:700,fontSize:15}}>⚠ {mci.name}</span>
+                <span style={{padding:"3px 12px",borderRadius:20,fontSize:12,fontWeight:700,background:mci.status==="open"?"#DCFCE7":"#F1F5F9",color:mci.status==="open"?"#16A34A":"#64748B"}}>{mci.status==="open"?"เปิด":"ปิด"}</span>
+              </div>
+              <div style={{padding:"14px 18px"}}>
+                <div style={{fontSize:12,color:"#64748B",marginBottom:10}}>📅 {mci.date} {mci.location&&`| 📍 ${mci.location}`}</div>
+                <div style={{display:"flex",gap:6,marginBottom:12}}>{Object.entries(TRIAGE_COLORS).map(([k,v])=><div key={k} style={{background:v.bg,color:v.text,borderRadius:8,padding:"6px 0",textAlign:"center",flex:1}}><div style={{fontSize:22,fontWeight:900}}>{c[k]}</div><div style={{fontSize:10}}>{k}</div></div>)}</div>
+                <button onClick={()=>onSelect(mci)} style={{...btnPrimary,width:"100%",fontSize:13}}>{mci.status==="closed"?"📊 ดูรายงาน":"📊 Dashboard"}</button>
+              </div>
+            </div>
+          );})}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ====== STATION SELECTOR ======
+function StationSelector({onDone}) {
+  const [station,setStation]=useState(SyncEngine.getStation());
+  return (
+    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"linear-gradient(135deg,#1E293B,#0F172A)",fontFamily:font}}>
+      <div style={{background:"#fff",borderRadius:16,padding:32,maxWidth:440,width:"90%",textAlign:"center"}}>
+        <div style={{fontSize:48,marginBottom:12}}>🏥</div>
+        <h1 style={{fontSize:22,fontWeight:900,color:"#1E293B",marginBottom:4}}>ระบบอุบัติเหตุหมู่ (MCI)</h1>
+        <p style={{color:"#64748B",fontSize:14,marginBottom:20}}>เลือกจุดปฏิบัติงานของคุณ</p>
+        <div style={{display:"grid",gap:8,marginBottom:20}}>
+          {STATIONS.map(s=>(
+            <button key={s} onClick={()=>setStation(s)} style={{padding:"12px 16px",borderRadius:8,border:station===s?"2px solid #DC2626":"2px solid #E2E8F0",background:station===s?"#FEF2F2":"#fff",fontWeight:station===s?700:400,fontSize:14,cursor:"pointer",fontFamily:font,color:station===s?"#DC2626":"#475569",textAlign:"left"}}>
+              {station===s?"● ":"○ "}{s}
+            </button>
+          ))}
+        </div>
+        <button onClick={()=>{if(!station)return;SyncEngine.setStation(station);onDone();}} style={{...btnPrimary,width:"100%",padding:"12px",fontSize:16,borderRadius:10}} disabled={!station}>
+          เข้าสู่ระบบ →
+        </button>
+        <div style={{marginTop:12,fontSize:11,color:"#94A3B8"}}>
+          {SyncEngine.isConfigured() ? "✅ เชื่อมต่อ Google Sheets แล้ว" : "⚠ Offline Mode — ยังไม่ได้ตั้งค่า Google Sheets"}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ====== MAIN APP ======
+function App() {
+  const [mcis,setMcis]=useState([]);
+  const [selectedMCI,setSelectedMCI]=useState(null);
+  const [view,setView]=useState("station");
+  const [createOpen,setCreateOpen]=useState(false);
+  const [loading,setLoading]=useState(true);
+  const [isOnline,setIsOnline]=useState(SyncEngine.isConfigured());
+  const syncRef=useRef(null);
+
+  // Initial load
+  useEffect(()=>{
+    if(SyncEngine.getStation()) setView("list");
+    (async()=>{
+      const d=await SyncEngine.fetchAll();
+      if(d)setMcis(d);
+      setLoading(false);
+    })();
+  },[]);
+
+  // Auto-sync polling
+  useEffect(()=>{
+    if(!SyncEngine.isConfigured()) return;
+    syncRef.current=setInterval(async()=>{
+      try{
+        const d=await SyncEngine.fetchAll();
+        if(Array.isArray(d)){
+          setMcis(d);
+          setIsOnline(true);
+          // Update selected MCI if open
+          if(selectedMCI){
+            const updated=d.find(m=>m.id===selectedMCI.id);
+            if(updated)setSelectedMCI(updated);
+          }
+        }
+      }catch{setIsOnline(false);}
+    },SYNC_INTERVAL);
+    return ()=>clearInterval(syncRef.current);
+  },[selectedMCI]);
+
+  const saveMcis=useCallback(async(newMcis)=>{
+    setMcis(newMcis);
+    localStorage.setItem('mci-data',JSON.stringify(newMcis));
+  },[]);
+
+  const handleCreateMCI=async(m)=>{
+    const n=[m,...mcis];saveMcis(n);setSelectedMCI(m);setView("dashboard");
+    await SyncEngine.saveMCI(m);
+  };
+  const handleSelectMCI=m=>{setSelectedMCI(m);setView(m.status==="closed"?"report":"dashboard");};
+  const handleUpdateMCI=async(u)=>{
+    saveMcis(mcis.map(m=>m.id===u.id?u:m));setSelectedMCI(u);
+    if(u.status==="closed")setView("report");
+    await SyncEngine.saveMCI(u);
+  };
+
+  if(loading) return <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#F1F5F9",fontFamily:font}}><div style={{textAlign:"center"}}><div style={{fontSize:48,animation:"p 1.5s infinite"}}>🏥</div><div style={{marginTop:8,color:"#64748B"}}>กำลังโหลด...</div><style>{`@keyframes p{0%,100%{opacity:1}50%{opacity:.5}}`}</style></div></div>;
+  if(view==="station") return <StationSelector onDone={()=>{setView("list");SyncEngine.fetchAll().then(d=>{if(d)setMcis(d);});}}/>;
+  if(view==="report"&&selectedMCI) return <><ReportPage mci={selectedMCI} onBack={()=>{setView("list");setSelectedMCI(null);}}/><ConnectionStatus isOnline={isOnline} station={SyncEngine.getStation()}/></>;
+  if(view==="publicBoard"&&selectedMCI) return <PublicBoard mci={selectedMCI} onBack={()=>setView("dashboard")}/>;
+  if(view==="dashboard"&&selectedMCI) return <><MCIDashboard mci={selectedMCI} onUpdate={handleUpdateMCI} onBack={()=>{setView("list");setSelectedMCI(null);}} onPublicBoard={()=>setView("publicBoard")}/><ConnectionStatus isOnline={isOnline} station={SyncEngine.getStation()}/></>;
+
+  return (<><MCIListPage mcis={mcis} onSelect={handleSelectMCI} onCreateNew={()=>setCreateOpen(true)}/><CreateMCIModal open={createOpen} onClose={()=>setCreateOpen(false)} onSave={handleCreateMCI}/><ConnectionStatus isOnline={isOnline} station={SyncEngine.getStation()}/></>);
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(App));
+</script>
+</body>
 </html>

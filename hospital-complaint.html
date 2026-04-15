@@ -1380,7 +1380,8 @@ function CalendarPage({dbData,setDbData,user}){
           return <div key={day} onClick={function(){setSelDay(isSel?null:day);}} style={{padding:"4px 3px",borderRadius:8,cursor:"pointer",background:isSel?"#eef2ff":isToday?"#f0fdf4":"#fff",border:isSel?"2px solid #6366f1":isToday?"2px solid #10b981":"1px solid #f1f5f9",minHeight:70,transition:"all .15s",overflow:"hidden"}}>
             <div style={{fontSize:12,fontWeight:isToday||isSel?700:500,color:isSel?"#4338ca":isToday?"#166534":"#334155",textAlign:"right",padding:"2px 4px"}}>{day}</div>
             {hasC && ev.complaints.slice(0,2).map(function(c){
-              return <div key={c.id} style={{fontSize:9,padding:"2px 4px",margin:"1px 2px",borderRadius:4,background:"#fffbeb",color:"#92400e",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",borderLeft:"2px solid "+(sevColors[c.severity]||"#f59e0b")}}>{c.subject}</div>;
+              var sevBg={1:"#dcfce7",2:"#fef3c7",3:"#fecaca"};var sevTx={1:"#166534",2:"#92400e",3:"#991b1b"};
+              return <div key={c.id} style={{fontSize:9,padding:"2px 4px",margin:"1px 2px",borderRadius:4,background:sevBg[c.severity]||"#f1f5f9",color:sevTx[c.severity]||"#334155",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",borderLeft:"2px solid "+(sevColors[c.severity]||"#f59e0b")}}>{c.subject}</div>;
             })}
             {hasC && ev.complaints.length>2 && <div style={{fontSize:8,color:"#94a3b8",textAlign:"center"}}>+{ev.complaints.length-2} อีก</div>}
             {hasM && ev.meetings.slice(0,1).map(function(m){

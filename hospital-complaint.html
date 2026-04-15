@@ -1217,6 +1217,15 @@ function Guide(){
 }
 
 // ============ CALENDAR ============
+function fmtDateBE(d){
+  if(!d) return "-";
+  var p = d.split("-");
+  if(p.length!==3) return d;
+  var yr = parseInt(p[0]);
+  if(yr < 2500) yr += 543;
+  return p[2]+"/"+p[1]+"/"+yr;
+}
+
 function CalendarPage({dbData,setDbData,user}){
   const [curDate,setCurDate] = useState(function(){var d=new Date();return{y:d.getFullYear()+543,m:d.getMonth()};});
   const [showForm,setShowForm] = useState(false);
@@ -1226,17 +1235,15 @@ function CalendarPage({dbData,setDbData,user}){
   var complaints = dbData.complaints || [];
   var meetings = dbData.meetings || [];
   var months = ["มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน","กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"];
-  var days = ["อา","จ","อ","พ","พฤ","ศ","ส"];
+  var dayNames = ["อา","จ","อ","พ","พฤ","ศ","ส"];
   var ceYear = curDate.y - 543;
 
-  // สร้างวันในเดือน
   var firstDay = new Date(ceYear, curDate.m, 1).getDay();
   var daysInMonth = new Date(ceYear, curDate.m + 1, 0).getDate();
   var cells = [];
   for(var i=0;i<firstDay;i++) cells.push(null);
   for(var d=1;d<=daysInMonth;d++) cells.push(d);
 
-  // หาข้อร้องเรียน/ประชุมในแต่ละวัน
   function getEventsForDay(day){
     if(!day) return {complaints:[],meetings:[]};
     var dateStr = ceYear+"-"+String(curDate.m+1).padStart(2,"0")+"-"+String(day).padStart(2,"0");
@@ -1246,8 +1253,8 @@ function CalendarPage({dbData,setDbData,user}){
     return {complaints:c,meetings:m};
   }
 
-  function prevMonth(){setCurDate(function(p){var m=p.m-1,y=p.y;if(m<0){m=11;y--;}return{y:y,m:m};});}
-  function nextMonth(){setCurDate(function(p){var m=p.m+1,y=p.y;if(m>11){m=0;y++;}return{y:y,m:m};});}
+  function prevMonth(){setCurDate(function(p){var m=p.m-1,y=p.y;if(m<0){m=11;y--;}return{y:y,m:m};});setSelDay(null);}
+  function nextMonth(){setCurDate(function(p){var m=p.m+1,y=p.y;if(m>11){m=0;y++;}return{y:y,m:m};});setSelDay(null);}
 
   function saveMeeting(){
     if(!mt.title||!mt.date){alert("กรุณากรอกหัวข้อและวันที่");return;}
@@ -1255,12 +1262,8 @@ function CalendarPage({dbData,setDbData,user}){
     var newMeetings = [newMeeting].concat(meetings);
     var newDb = Object.assign({},dbData,{meetings:newMeetings});
     setDbData(newDb); db.save(newDb);
-    // ส่งแจ้งเตือนผ่าน GAS
     if(CLOUD_URL){
-      fetch(CLOUD_URL, {
-        method:"POST", headers:{"Content-Type":"text/plain"},
-        body: JSON.stringify({action:"saveMeeting",data:newMeeting,user:user.email||""})
-      }).catch(function(){});
+      fetch(CLOUD_URL, {method:"POST",headers:{"Content-Type":"text/plain"},body:JSON.stringify({action:"saveMeeting",data:newMeeting,user:user.email||""})}).catch(function(){});
     }
     setMt({title:"",date:"",time:"",location:""});
     setShowForm(false);
@@ -1274,6 +1277,7 @@ function CalendarPage({dbData,setDbData,user}){
 
   var selEvents = selDay ? getEventsForDay(selDay) : null;
   var canEdit = user.role==="admin" || user.role==="crm";
+  var sevColors = {1:"#10b981",2:"#f59e0b",3:"#ef4444"};
 
   return(<div style={{animation:"fadeUp .4s ease"}}>
     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20,flexWrap:"wrap",gap:10}}>
@@ -1281,44 +1285,52 @@ function CalendarPage({dbData,setDbData,user}){
         <h2 style={{fontSize:22,fontWeight:700,margin:"0 0 4px",color:"#0f172a"}}>ปฏิทิน</h2>
         <p style={{fontSize:13,color:"#94a3b8",margin:0}}>ข้อร้องเรียนและกำหนดการประชุม</p>
       </div>
-      {canEdit && <Btn variant="primary" size="sm" onClick={function(){setShowForm(!showForm);}}><Ico name="plus" sz={15}/> นัดประชุม</Btn>}
+      {canEdit && <Btn variant="primary" size="sm" onClick={function(){setShowForm(true);}}><Ico name="plus" sz={15}/> นัดประชุม</Btn>}
     </div>
 
-    {showForm && canEdit && <Card style={{marginBottom:16}}>
-      <h3 style={{fontSize:14,fontWeight:700,color:"#3730a3",margin:"0 0 14px"}}>เพิ่มนัดประชุม</h3>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 14px"}}>
+    {/* Modal นัดประชุม */}
+    {showForm && canEdit && <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,.5)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={function(){setShowForm(false);}}>
+      <div style={{background:"#fff",borderRadius:20,padding:28,width:480,maxWidth:"100%",boxShadow:"0 24px 48px rgba(0,0,0,.2)",animation:"fadeUp .3s ease"}} onClick={function(e){e.stopPropagation();}}>
+        <h3 style={{fontSize:16,fontWeight:700,color:"#3730a3",margin:"0 0 18px"}}>เพิ่มนัดประชุม</h3>
         <Inp label="หัวข้อเรื่อง" value={mt.title} onChange={function(e){setMt(Object.assign({},mt,{title:e.target.value}));}} required placeholder="เรื่องที่ประชุม"/>
         <Inp label="สถานที่" value={mt.location} onChange={function(e){setMt(Object.assign({},mt,{location:e.target.value}));}} placeholder="ห้องประชุม..."/>
-        <Inp label="วันที่" type="date" value={mt.date} onChange={function(e){setMt(Object.assign({},mt,{date:e.target.value}));}} required/>
-        <Inp label="เวลา" type="time" value={mt.time} onChange={function(e){setMt(Object.assign({},mt,{time:e.target.value}));}}/>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 14px"}}>
+          <Inp label="วันที่" type="date" value={mt.date} onChange={function(e){setMt(Object.assign({},mt,{date:e.target.value}));}} required/>
+          <Inp label="เวลา" type="time" value={mt.time} onChange={function(e){setMt(Object.assign({},mt,{time:e.target.value}));}}/>
+        </div>
+        <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:8}}>
+          <Btn variant="secondary" size="sm" onClick={function(){setShowForm(false);}}>ยกเลิก</Btn>
+          <Btn variant="primary" size="sm" onClick={saveMeeting}>บันทึก</Btn>
+        </div>
       </div>
-      <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
-        <Btn variant="secondary" size="sm" onClick={function(){setShowForm(false);}}>ยกเลิก</Btn>
-        <Btn variant="primary" size="sm" onClick={saveMeeting}>บันทึก</Btn>
-      </div>
-    </Card>}
+    </div>}
 
+    {/* ปฏิทิน */}
     <Card style={{marginBottom:16}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
         <Btn variant="ghost" size="sm" onClick={prevMonth}><Ico name="chevL" sz={16}/></Btn>
-        <h3 style={{fontSize:16,fontWeight:700,color:"#1e293b",margin:0}}>{months[curDate.m]} {curDate.y}</h3>
+        <h3 style={{fontSize:16,fontWeight:700,color:"#1e293b",margin:0}}>{months[curDate.m]} พ.ศ. {curDate.y}</h3>
         <Btn variant="ghost" size="sm" onClick={nextMonth}><Ico name="chevR" sz={16}/></Btn>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2}}>
-        {days.map(function(d){return <div key={d} style={{textAlign:"center",fontSize:11,fontWeight:600,color:"#94a3b8",padding:"8px 0"}}>{d}</div>;})}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:3}}>
+        {dayNames.map(function(d){return <div key={d} style={{textAlign:"center",fontSize:11,fontWeight:700,color:"#64748b",padding:"8px 0",background:"#f8fafc",borderRadius:6}}>{d}</div>;})}
         {cells.map(function(day,i){
-          if(!day) return <div key={"e"+i} style={{padding:8}}/>;
+          if(!day) return <div key={"e"+i}/>;
           var ev = getEventsForDay(day);
           var hasC = ev.complaints.length > 0;
           var hasM = ev.meetings.length > 0;
           var isToday = (function(){var t=new Date();return t.getDate()===day && t.getMonth()===curDate.m && (t.getFullYear()+543)===curDate.y;})();
           var isSel = selDay===day;
-          return <div key={day} onClick={function(){setSelDay(isSel?null:day);}} style={{padding:"6px 4px",textAlign:"center",borderRadius:10,cursor:"pointer",background:isSel?"#eef2ff":isToday?"#f0fdf4":"transparent",border:isSel?"2px solid #6366f1":isToday?"2px solid #10b981":"2px solid transparent",minHeight:48,transition:"all .15s"}}>
-            <div style={{fontSize:13,fontWeight:isToday||isSel?700:400,color:isSel?"#4338ca":isToday?"#166534":"#334155"}}>{day}</div>
-            <div style={{display:"flex",gap:2,justifyContent:"center",marginTop:3}}>
-              {hasC && <div style={{width:6,height:6,borderRadius:"50%",background:"#f59e0b"}}/>}
-              {hasM && <div style={{width:6,height:6,borderRadius:"50%",background:"#6366f1"}}/>}
-            </div>
+          return <div key={day} onClick={function(){setSelDay(isSel?null:day);}} style={{padding:"4px 3px",borderRadius:8,cursor:"pointer",background:isSel?"#eef2ff":isToday?"#f0fdf4":"#fff",border:isSel?"2px solid #6366f1":isToday?"2px solid #10b981":"1px solid #f1f5f9",minHeight:70,transition:"all .15s",overflow:"hidden"}}>
+            <div style={{fontSize:12,fontWeight:isToday||isSel?700:500,color:isSel?"#4338ca":isToday?"#166534":"#334155",textAlign:"right",padding:"2px 4px"}}>{day}</div>
+            {hasC && ev.complaints.slice(0,2).map(function(c){
+              return <div key={c.id} style={{fontSize:9,padding:"2px 4px",margin:"1px 2px",borderRadius:4,background:"#fffbeb",color:"#92400e",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",borderLeft:"2px solid "+(sevColors[c.severity]||"#f59e0b")}}>{c.subject}</div>;
+            })}
+            {hasC && ev.complaints.length>2 && <div style={{fontSize:8,color:"#94a3b8",textAlign:"center"}}>+{ev.complaints.length-2} อีก</div>}
+            {hasM && ev.meetings.slice(0,1).map(function(m){
+              return <div key={m.id} style={{fontSize:9,padding:"2px 4px",margin:"1px 2px",borderRadius:4,background:"#eef2ff",color:"#4338ca",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",borderLeft:"2px solid #6366f1"}}>{m.time?m.time+" ":""}{m.title}</div>;
+            })}
+            {hasM && ev.meetings.length>1 && <div style={{fontSize:8,color:"#94a3b8",textAlign:"center"}}>+{ev.meetings.length-1} ประชุม</div>}
           </div>;
         })}
       </div>
@@ -1328,18 +1340,25 @@ function CalendarPage({dbData,setDbData,user}){
       </div>
     </Card>
 
-    {selDay && selEvents && <Card>
+    {/* รายละเอียดวันที่เลือก */}
+    {selDay && selEvents && <Card style={{marginBottom:16}}>
       <h3 style={{fontSize:14,fontWeight:700,color:"#1e293b",margin:"0 0 12px"}}>
-        วันที่ {selDay} {months[curDate.m]} {curDate.y}
+        {String(selDay).padStart(2,"0")}/{String(curDate.m+1).padStart(2,"0")}/{curDate.y}
       </h3>
       {selEvents.complaints.length===0 && selEvents.meetings.length===0 && <div style={{textAlign:"center",padding:20,color:"#94a3b8",fontSize:13}}>ไม่มีรายการในวันนี้</div>}
 
       {selEvents.complaints.length>0 && <>
         <div style={{fontSize:12,fontWeight:600,color:"#f59e0b",marginBottom:8}}>ข้อร้องเรียน ({selEvents.complaints.length})</div>
         {selEvents.complaints.map(function(c){
-          return <div key={c.id} style={{padding:"10px 14px",background:"#fffbeb",borderRadius:10,marginBottom:6,border:"1px solid #fde68a"}}>
-            <div style={{fontSize:13,fontWeight:600,color:"#92400e"}}>{c.id} - {c.subject}</div>
-            <div style={{fontSize:11,color:"#a16207",marginTop:2}}>{c.unit||c.dept||"-"} | ระดับ {c.severity}</div>
+          var st = getAutoStatus(c);
+          var stsLabel = {investigating:"ตรวจสอบ",in_progress:"ดำเนินการ",resolved:"แก้ไขแล้ว"};
+          return <div key={c.id} style={{padding:"10px 14px",background:"#fffbeb",borderRadius:10,marginBottom:6,border:"1px solid #fde68a",borderLeft:"3px solid "+(sevColors[c.severity]||"#f59e0b")}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{fontSize:13,fontWeight:600,color:"#92400e"}}>{c.id}</span>
+              <span style={{fontSize:10,padding:"2px 8px",borderRadius:8,background:st==="resolved"?"#dcfce7":"#fef3c7",color:st==="resolved"?"#166534":"#92400e"}}>{stsLabel[st]||st}</span>
+            </div>
+            <div style={{fontSize:13,fontWeight:500,color:"#78350f",marginTop:4}}>{c.subject}</div>
+            <div style={{fontSize:11,color:"#a16207",marginTop:3}}>{c.unit||c.dept||"-"} | ระดับ {c.severity} | {fmtDateBE(c.date)}</div>
           </div>;
         })}
       </>}
@@ -1347,11 +1366,11 @@ function CalendarPage({dbData,setDbData,user}){
       {selEvents.meetings.length>0 && <>
         <div style={{fontSize:12,fontWeight:600,color:"#6366f1",marginBottom:8,marginTop:selEvents.complaints.length?12:0}}>ประชุม ({selEvents.meetings.length})</div>
         {selEvents.meetings.map(function(m){
-          return <div key={m.id} style={{padding:"10px 14px",background:"#eef2ff",borderRadius:10,marginBottom:6,border:"1px solid #c7d2fe",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          return <div key={m.id} style={{padding:"10px 14px",background:"#eef2ff",borderRadius:10,marginBottom:6,border:"1px solid #c7d2fe",borderLeft:"3px solid #6366f1",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
             <div>
               <div style={{fontSize:13,fontWeight:600,color:"#3730a3"}}>{m.title}</div>
               <div style={{fontSize:11,color:"#6366f1",marginTop:2}}>
-                {m.time ? m.time+" น." : ""}{m.location ? " | "+m.location : ""}
+                {fmtDateBE(m.date)}{m.time ? " | "+m.time+" น." : ""}{m.location ? " | "+m.location : ""}
               </div>
             </div>
             {canEdit && <button onClick={function(){deleteMeeting(m.id);}} style={{background:"none",border:"none",cursor:"pointer",color:"#94a3b8",fontSize:16,padding:4}}>x</button>}
@@ -1360,14 +1379,14 @@ function CalendarPage({dbData,setDbData,user}){
       </>}
     </Card>}
 
-    {/* รายการประชุมที่กำลังจะมาถึง */}
-    {meetings.length>0 && <Card style={{marginTop:16}}>
+    {/* กำหนดการประชุมทั้งหมด */}
+    {meetings.length>0 && <Card>
       <h3 style={{fontSize:14,fontWeight:700,color:"#1e293b",margin:"0 0 12px"}}>กำหนดการประชุมทั้งหมด</h3>
       {meetings.sort(function(a,b){return(a.date+a.time).localeCompare(b.date+b.time);}).map(function(m){
         return <div key={m.id} style={{padding:"10px 14px",borderBottom:"1px solid #f1f5f9",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
           <div>
             <div style={{fontSize:13,fontWeight:600,color:"#1e293b"}}>{m.title}</div>
-            <div style={{fontSize:11,color:"#64748b"}}>{fmtDate(m.date)} {m.time?" | "+m.time+" น.":""}{m.location?" | "+m.location:""}</div>
+            <div style={{fontSize:11,color:"#64748b"}}>{fmtDateBE(m.date)}{m.time?" | "+m.time+" น.":""}{m.location?" | "+m.location:""}</div>
           </div>
           {canEdit && <button onClick={function(){deleteMeeting(m.id);}} style={{background:"none",border:"none",cursor:"pointer",color:"#dc2626",fontSize:11,fontWeight:600,padding:"4px 8px"}}>ลบ</button>}
         </div>;

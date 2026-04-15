@@ -18,8 +18,15 @@
 // =====================================================
 
 // ===== CONFIGURATION =====
-var LINE_TOKEN = '';       // ← ใส่ LINE Messaging API Channel Access Token
-var LINE_GROUP_ID = '';    // ← ใส่ Group ID หรือ User ID สำหรับแจ้งเตือน
+// วิธีสร้าง LINE Notify Token:
+// 1. ไปที่ https://notify-bot.line.me/
+// 2. Login ด้วย LINE account
+// 3. กด "Generate token"
+// 4. ตั้งชื่อ เช่น "ระบบข้อร้องเรียน รพ.มพ."
+// 5. เลือกกลุ่ม LINE ที่ต้องการรับแจ้งเตือน (หรือ "1-on-1 chat" สำหรับตัวเอง)
+// 6. คัดลอก Token มาวางด้านล่าง
+// 7. เชิญ "LINE Notify" เข้ากลุ่ม LINE ที่เลือก
+var LINE_NOTIFY_TOKEN = '';  // ← วาง LINE Notify Token ตรงนี้
 
 // ===== SHEET NAMES =====
 var SHEET_COMPLAINTS = 'Complaints';
@@ -594,43 +601,36 @@ function doPost(e) {
 // =====================================================
 
 function sendLineMessage(message) {
-  if (!LINE_TOKEN || !LINE_GROUP_ID) return;
+  if (!LINE_NOTIFY_TOKEN) return;
   try {
-    UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push', {
+    UrlFetchApp.fetch('https://notify-api.line.me/api/notify', {
       method: 'post',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + LINE_TOKEN
+        'Authorization': 'Bearer ' + LINE_NOTIFY_TOKEN
       },
-      payload: JSON.stringify({
-        to: LINE_GROUP_ID,
-        messages: [{ type: 'text', text: message }]
-      })
+      payload: { message: message }
     });
+    Logger.log('LINE Notify sent: ' + message.substring(0, 50));
   } catch (e) {
-    Logger.log('LINE send error: ' + e.message);
+    Logger.log('LINE Notify error: ' + e.message);
   }
 }
 
 function notifyNewComplaint(c) {
-  var config = getLineConfig();
-  if (!config.notif || !config.notif.newComplaint) return;
-
+  if (!LINE_NOTIFY_TOKEN) return;
   var sevDesc = { 1: 'ระดับ 1 (บ่น/เสนอแนะ)', 2: 'ระดับ 2 (ตำหนิ/ร้องทุกข์)', 3: 'ระดับ 3 (รุนแรง)' };
-  var msg = '🚨 เรื่องร้องเรียนใหม่\n\n'
+  var msg = '\n🚨 เรื่องร้องเรียนใหม่\n\n'
     + '📋 ID: ' + (c.id || '-') + '\n'
     + '📝 เรื่อง: ' + (c.subject || '-') + '\n'
-    + '🏥 แผนก: ' + (c.dept || '-') + '\n'
+    + '🏥 หน่วยงาน: ' + (c.unit || c.dept || '-') + '\n'
     + '⚠️ ความรุนแรง: ' + (sevDesc[c.severity] || '-') + '\n'
-    + '👤 ผู้รับผิดชอบ: ' + (c.responsible || '-') + '\n'
-    + '📅 วันที่: ' + fmtDateThai(c.date);
+    + '📅 วันที่: ' + fmtDateThai(c.date) + '\n'
+    + '👤 บันทึกโดย: ' + (c.by || '-');
   sendLineMessage(msg);
 }
 
 function notifyStatusChange(c) {
-  var config = getLineConfig();
-  if (!config.notif || !config.notif.statusChange) return;
-
+  if (!LINE_NOTIFY_TOKEN) return;
   var status = getAutoStatus(c);
   var statusLabels = {
     investigating: 'กำลังตรวจสอบ',
@@ -638,11 +638,11 @@ function notifyStatusChange(c) {
     resolved: 'แก้ไขแล้ว ✅'
   };
 
-  var msg = '🔄 อัปเดตสถานะเรื่องร้องเรียน\n\n'
+  var msg = '\n🔄 อัปเดตสถานะเรื่องร้องเรียน\n\n'
     + '📋 ID: ' + (c.id || '-') + '\n'
     + '📝 เรื่อง: ' + (c.subject || '-') + '\n'
     + '📊 สถานะ: ' + (statusLabels[status] || status) + '\n'
-    + '🏥 แผนก: ' + (c.dept || '-');
+    + '🏥 หน่วยงาน: ' + (c.unit || c.dept || '-');
   sendLineMessage(msg);
 }
 
@@ -751,8 +751,9 @@ function testInsertSampleData() {
 }
 
 function testLineNotification() {
-  sendLineMessage('🔔 ทดสอบแจ้งเตือน Hospital Complaint Management System\nระบบแจ้งเตือนทำงานปกติ');
-  Logger.log('LINE notification sent (check LINE app)');
+  if (!LINE_NOTIFY_TOKEN) { Logger.log('กรุณาใส่ LINE_NOTIFY_TOKEN ก่อน'); return; }
+  sendLineMessage('\n🔔 ทดสอบแจ้งเตือน\nระบบจัดการข้อร้องเรียน รพ.มหาวิทยาลัยพะเยา\nระบบแจ้งเตือนทำงานปกติ ✅');
+  Logger.log('LINE Notify sent - check LINE app');
 }
 
 function testDashboardStats() {

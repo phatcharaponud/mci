@@ -1514,9 +1514,6 @@ function App(){
   }
   menu.push({id:"registry",l:"ทะเบียนข้อร้องเรียน",ic:"list"});
   menu.push({id:"guide",l:"แนวปฏิบัติ",ic:"book"});
-  if(user.role==="admin" || user.role==="crm") {
-    menu.push({id:"line",l:"LINE แจ้งเตือน",ic:"msg"});
-  }
   if(user.role==="admin") menu.push({id:"users",l:"จัดการผู้ใช้งาน",ic:"users"});
 
   function onSave(c){
@@ -1524,6 +1521,13 @@ function App(){
     const newC = { ...c, id: nextId(complaints) };
     const newDb = { ...dbData, complaints:[newC,...complaints] };
     setDbData(newDb); db.save(newDb);
+    // ส่ง LINE แจ้งเตือนผ่าน GAS
+    if(CLOUD_URL){
+      fetch(CLOUD_URL, {
+        method:"POST", headers:{"Content-Type":"text/plain"},
+        body: JSON.stringify({ action:"saveComplaint", data:newC, user:user.email||"" })
+      }).catch(function(){});
+    }
     setPage("registry");
   }
   function onView(c,tab){ setSelC(c); setInitTab(tab||"detail"); setPage("detail"); }
@@ -1531,6 +1535,13 @@ function App(){
     const complaints = (dbData.complaints||[]).map(x=>x.id===c.id?c:x);
     const newDb = { ...dbData, complaints };
     setDbData(newDb); db.save(newDb);
+    // ส่ง LINE แจ้งเตือนสถานะเปลี่ยนผ่าน GAS
+    if(CLOUD_URL){
+      fetch(CLOUD_URL, {
+        method:"POST", headers:{"Content-Type":"text/plain"},
+        body: JSON.stringify({ action:"updateComplaint", data:c, user:user.email||"" })
+      }).catch(function(){});
+    }
     setSelC(c);
   }
 
@@ -1542,7 +1553,7 @@ function App(){
       case "registry": return <Reg data={complaints} onView={onView} user={user} initFilter={regFilter}/>;
       case "detail": return selC ? <Detail c={(dbData.complaints||[]).find(x=>x.id===selC.id)||selC} onBack={()=>setPage("registry")} onUpdate={onUp} user={user} initTab={initTab}/> : null;
       case "guide": return <Guide/>;
-      case "line": return <LinePage dbData={dbData} setDbData={setDbData}/>;
+      // LINE settings removed - ตั้งค่าที่ Google Apps Script
       case "users": return <UsersPage dbData={dbData} setDbData={setDbData} currentUser={user}/>;
       default: return <Dash data={complaints}/>;
     }

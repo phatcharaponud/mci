@@ -1528,6 +1528,8 @@ function UsersPage({dbData,setDbData,currentUser}){
   const [fbUsers,setFbUsers] = useState([]);
   const [loaded,setLoaded] = useState(false);
   const [tab,setTab] = useState("users"); // users | complaints | meetings
+  const [editC,setEditC] = useState(null); // complaint being edited
+  const [ecForm,setEcForm] = useState(null); // edit complaint form data
   const roleLabels = {admin:"Admin",crm:"CRM",user:"User"};
   const roleColors = {admin:"#8b5cf6",crm:"#0891b2",user:"#6366f1"};
   const stsLabels = {approved:"อนุมัติแล้ว",pending:"รออนุมัติ",rejected:"ถูกปฏิเสธ"};
@@ -1578,6 +1580,19 @@ function UsersPage({dbData,setDbData,currentUser}){
     if(!confirm("ต้องการลบนัดประชุมนี้ใช่หรือไม่?")) return;
     var newDb = Object.assign({},dbData,{meetings:meetings.filter(function(m){return m.id!==id;})});
     setDbData(newDb); db.save(newDb);
+  }
+
+  function startEditComplaint(c){
+    setEcForm({subject:c.subject||"",detail:c.detail||"",unit:c.unit||"",severity:c.severity||1,centerAction:c.centerAction||"",recorder:c.recorder||""});
+    setEditC(c);
+  }
+  function saveEditComplaint(){
+    if(!editC||!ecForm) return;
+    var updated = Object.assign({},editC,{subject:ecForm.subject,detail:ecForm.detail,unit:ecForm.unit,severity:parseInt(ecForm.severity),centerAction:ecForm.centerAction,recorder:ecForm.recorder});
+    var newComplaints = complaints.map(function(c){return c.id===editC.id?updated:c;});
+    var newDb = Object.assign({},dbData,{complaints:newComplaints});
+    setDbData(newDb); db.save(newDb);
+    setEditC(null); setEcForm(null);
   }
 
   var tabStyle = function(t){return{padding:"9px 20px",fontSize:13,fontWeight:tab===t?700:500,color:tab===t?"#6366f1":"#94a3b8",background:tab===t?"#eef2ff":"transparent",border:"none",borderRadius:10,cursor:"pointer",fontFamily:"inherit"};};
@@ -1657,12 +1672,38 @@ function UsersPage({dbData,setDbData,currentUser}){
     </>}
 
     {/* ========== แท็บข้อร้องเรียน ========== */}
-    {tab==="complaints" && <Card style={{padding:0,overflow:"hidden"}}>
+    {tab==="complaints" && <>
+    {/* Modal แก้ไขข้อร้องเรียน */}
+    {editC && ecForm && <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,.5)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={function(){setEditC(null);setEcForm(null);}}>
+      <div style={{background:"#fff",borderRadius:20,padding:28,width:560,maxWidth:"100%",maxHeight:"90vh",overflowY:"auto",boxShadow:"0 24px 48px rgba(0,0,0,.2)",animation:"fadeUp .3s ease"}} onClick={function(e){e.stopPropagation();}}>
+        <h3 style={{fontSize:16,fontWeight:700,color:"#1e293b",margin:"0 0 4px"}}>แก้ไขข้อร้องเรียน</h3>
+        <p style={{fontSize:12,color:"#94a3b8",margin:"0 0 18px"}}>{editC.id} | {fmtDate(editC.date)}</p>
+        <Inp label="หัวข้อเรื่อง" value={ecForm.subject} onChange={function(e){setEcForm(Object.assign({},ecForm,{subject:e.target.value}));}} required/>
+        <Inp label="รายละเอียด" value={ecForm.detail} onChange={function(e){setEcForm(Object.assign({},ecForm,{detail:e.target.value}));}} multi={true} rows={4}/>
+        <SearchSel label="หน่วยงานที่ถูกร้องเรียน" value={ecForm.unit} onChange={function(v){setEcForm(Object.assign({},ecForm,{unit:v}));}} options={DEPTS} placeholder="พิมพ์ชื่อหน่วยงาน..."/>
+        <div style={{marginBottom:16}}>
+          <label style={{display:"block",fontSize:12,fontWeight:600,marginBottom:6,color:"#475569"}}>ระดับความรุนแรง</label>
+          <div style={{display:"flex",gap:8}}>
+            {SEV.map(function(s){return <label key={s.level} style={{display:"flex",alignItems:"center",gap:5,fontSize:13,cursor:"pointer",padding:"6px 14px",borderRadius:10,background:parseInt(ecForm.severity)===s.level?"#eef2ff":"#f8fafc",border:parseInt(ecForm.severity)===s.level?"1.5px solid "+s.color:"1.5px solid #e2e8f0",color:parseInt(ecForm.severity)===s.level?s.color:"#64748b",fontWeight:parseInt(ecForm.severity)===s.level?600:400}}>
+              <input type="radio" name="ecSev" checked={parseInt(ecForm.severity)===s.level} onChange={function(){setEcForm(Object.assign({},ecForm,{severity:s.level}));}} style={{display:"none"}}/>{s.label}
+            </label>;})}
+          </div>
+        </div>
+        <Inp label="การดำเนินการศูนย์" value={ecForm.centerAction} onChange={function(e){setEcForm(Object.assign({},ecForm,{centerAction:e.target.value}));}} multi={true} rows={2}/>
+        <Inp label="เจ้าหน้าที่ผู้บันทึก" value={ecForm.recorder} onChange={function(e){setEcForm(Object.assign({},ecForm,{recorder:e.target.value}));}}/>
+        <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:8}}>
+          <Btn variant="secondary" size="sm" onClick={function(){setEditC(null);setEcForm(null);}}>ยกเลิก</Btn>
+          <Btn variant="primary" size="sm" onClick={saveEditComplaint}>บันทึก</Btn>
+        </div>
+      </div>
+    </div>}
+
+    <Card style={{padding:0,overflow:"hidden"}}>
       <div style={{overflowX:"auto"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
           <thead>
             <tr style={{background:"#fafafe"}}>
-              {["รหัส","วันที่","เรื่อง","หน่วยงาน","ระดับ","สถานะ","ลบ"].map(function(h){
+              {["รหัส","วันที่","เรื่อง","หน่วยงาน","ระดับ","สถานะ","ดำเนินการ"].map(function(h){
                 return <th key={h} style={{padding:"13px 14px",textAlign:"left",fontWeight:600,borderBottom:"1px solid #e2e8f0",color:"#64748b",fontSize:11}}>{h}</th>;
               })}
             </tr>
@@ -1680,14 +1721,18 @@ function UsersPage({dbData,setDbData,currentUser}){
                 <td style={{padding:"12px 14px"}}><Badge text={"ระดับ "+c.severity} color={sevColors[c.severity]||"#64748b"} small/></td>
                 <td style={{padding:"12px 14px"}}><Badge text={stsL[st]||st} color={st==="resolved"?"#10b981":st==="in_progress"?"#a855f7":"#f59e0b"} small/></td>
                 <td style={{padding:"12px 14px"}}>
-                  <button onClick={function(){deleteComplaint(c.id);}} style={{padding:"5px 12px",borderRadius:8,border:"none",background:"#fef2f2",color:"#dc2626",fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>ลบ</button>
+                  <div style={{display:"flex",gap:5}}>
+                    <button onClick={function(){startEditComplaint(c);}} style={{padding:"5px 12px",borderRadius:8,border:"none",background:"#e0e7ff",color:"#4338ca",fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>แก้ไข</button>
+                    <button onClick={function(){deleteComplaint(c.id);}} style={{padding:"5px 12px",borderRadius:8,border:"none",background:"#fef2f2",color:"#dc2626",fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>ลบ</button>
+                  </div>
                 </td>
               </tr>;
             })}
           </tbody>
         </table>
       </div>
-    </Card>}
+    </Card>
+    </>}
 
     {/* ========== แท็บนัดประชุม ========== */}
     {tab==="meetings" && <Card style={{padding:0,overflow:"hidden"}}>

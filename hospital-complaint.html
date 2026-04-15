@@ -1282,9 +1282,10 @@ function fmtDateBE(d){
   return p[2]+"/"+p[1]+"/"+yr;
 }
 
-function CalendarPage({dbData,setDbData,user}){
+function CalendarPage({dbData,setDbData,user,onViewComplaint}){
   const [curDate,setCurDate] = useState(function(){var d=new Date();return{y:d.getFullYear()+543,m:d.getMonth()};});
   const [showForm,setShowForm] = useState(false);
+  const [editMeeting,setEditMeeting] = useState(null); // meeting being edited
   const [mt,setMt] = useState({title:"",date:"",time:"",location:""});
   const [selDay,setSelDay] = useState(null);
 
@@ -1314,15 +1315,31 @@ function CalendarPage({dbData,setDbData,user}){
 
   function saveMeeting(){
     if(!mt.title||!mt.date){alert("กรุณากรอกหัวข้อและวันที่");return;}
-    var newMeeting = {id:"MTG-"+Date.now(),title:mt.title,date:mt.date,time:mt.time,location:mt.location,createdBy:user.email,createdAt:new Date().toISOString()};
-    var newMeetings = [newMeeting].concat(meetings);
-    var newDb = Object.assign({},dbData,{meetings:newMeetings});
-    setDbData(newDb); db.save(newDb);
-    if(CLOUD_URL){
-      fetch(CLOUD_URL, {method:"POST",headers:{"Content-Type":"text/plain"},body:JSON.stringify({action:"saveMeeting",data:newMeeting,user:user.email||""})}).catch(function(){});
+    if(editMeeting){
+      // แก้ไขประชุมที่มีอยู่
+      var updated = Object.assign({},editMeeting,{title:mt.title,date:mt.date,time:mt.time,location:mt.location});
+      var newMeetings = meetings.map(function(m){return m.id===editMeeting.id?updated:m;});
+      var newDb = Object.assign({},dbData,{meetings:newMeetings});
+      setDbData(newDb); db.save(newDb);
+      setEditMeeting(null);
+    }else{
+      // สร้างประชุมใหม่
+      var newMeeting = {id:"MTG-"+Date.now(),title:mt.title,date:mt.date,time:mt.time,location:mt.location,createdBy:user.email,createdAt:new Date().toISOString()};
+      var newMeetings2 = [newMeeting].concat(meetings);
+      var newDb2 = Object.assign({},dbData,{meetings:newMeetings2});
+      setDbData(newDb2); db.save(newDb2);
+      if(CLOUD_URL){
+        fetch(CLOUD_URL, {method:"POST",headers:{"Content-Type":"text/plain"},body:JSON.stringify({action:"saveMeeting",data:newMeeting,user:user.email||""})}).catch(function(){});
+      }
     }
     setMt({title:"",date:"",time:"",location:""});
-    setShowForm(false);
+    setShowForm(false); setEditMeeting(null);
+  }
+
+  function startEditMeeting(m){
+    setMt({title:m.title,date:m.date,time:m.time||"",location:m.location||""});
+    setEditMeeting(m);
+    setShowForm(true);
   }
 
   function deleteMeeting(id){
@@ -1347,7 +1364,7 @@ function CalendarPage({dbData,setDbData,user}){
     {/* Modal นัดประชุม */}
     {showForm && canEdit && <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,.5)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={function(){setShowForm(false);}}>
       <div style={{background:"#fff",borderRadius:20,padding:28,width:480,maxWidth:"100%",boxShadow:"0 24px 48px rgba(0,0,0,.2)",animation:"fadeUp .3s ease"}} onClick={function(e){e.stopPropagation();}}>
-        <h3 style={{fontSize:16,fontWeight:700,color:"#3730a3",margin:"0 0 18px"}}>เพิ่มนัดประชุม</h3>
+        <h3 style={{fontSize:16,fontWeight:700,color:"#3730a3",margin:"0 0 18px"}}>{editMeeting?"แก้ไขนัดประชุม":"เพิ่มนัดประชุม"}</h3>
         <Inp label="หัวข้อเรื่อง" value={mt.title} onChange={function(e){setMt(Object.assign({},mt,{title:e.target.value}));}} required placeholder="เรื่องที่ประชุม"/>
         <Inp label="สถานที่" value={mt.location} onChange={function(e){setMt(Object.assign({},mt,{location:e.target.value}));}} placeholder="ห้องประชุม..."/>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 14px"}}>
@@ -1409,7 +1426,7 @@ function CalendarPage({dbData,setDbData,user}){
         {selEvents.complaints.map(function(c){
           var st = getAutoStatus(c);
           var stsLabel = {investigating:"ตรวจสอบ",in_progress:"ดำเนินการ",resolved:"แก้ไขแล้ว"};
-          return <div key={c.id} style={{padding:"10px 14px",background:"#fffbeb",borderRadius:10,marginBottom:6,border:"1px solid #fde68a",borderLeft:"3px solid "+(sevColors[c.severity]||"#f59e0b")}}>
+          return <div key={c.id} onClick={function(){if(onViewComplaint)onViewComplaint(c,"detail");}} style={{padding:"10px 14px",background:"#fffbeb",borderRadius:10,marginBottom:6,border:"1px solid #fde68a",borderLeft:"3px solid "+(sevColors[c.severity]||"#f59e0b"),cursor:"pointer",transition:"transform .1s"}} onMouseEnter={function(e){e.currentTarget.style.transform="translateX(4px)";}} onMouseLeave={function(e){e.currentTarget.style.transform="none";}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <span style={{fontSize:13,fontWeight:600,color:"#92400e"}}>{c.id}</span>
               <span style={{fontSize:10,padding:"2px 8px",borderRadius:8,background:st==="resolved"?"#dcfce7":"#fef3c7",color:st==="resolved"?"#166534":"#92400e"}}>{stsLabel[st]||st}</span>
@@ -1423,14 +1440,19 @@ function CalendarPage({dbData,setDbData,user}){
       {selEvents.meetings.length>0 && <>
         <div style={{fontSize:12,fontWeight:600,color:"#6366f1",marginBottom:8,marginTop:selEvents.complaints.length?12:0}}>ประชุม ({selEvents.meetings.length})</div>
         {selEvents.meetings.map(function(m){
-          return <div key={m.id} style={{padding:"10px 14px",background:"#eef2ff",borderRadius:10,marginBottom:6,border:"1px solid #c7d2fe",borderLeft:"3px solid #6366f1",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-            <div>
-              <div style={{fontSize:13,fontWeight:600,color:"#3730a3"}}>{m.title}</div>
-              <div style={{fontSize:11,color:"#6366f1",marginTop:2}}>
-                {fmtDateBE(m.date)}{m.time ? " | "+m.time+" น." : ""}{m.location ? " | "+m.location : ""}
+          return <div key={m.id} style={{padding:"10px 14px",background:"#eef2ff",borderRadius:10,marginBottom:6,border:"1px solid #c7d2fe",borderLeft:"3px solid #6366f1"}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <div>
+                <div style={{fontSize:13,fontWeight:600,color:"#3730a3"}}>{m.title}</div>
+                <div style={{fontSize:11,color:"#6366f1",marginTop:2}}>
+                  {fmtDateBE(m.date)}{m.time ? " | "+m.time+" น." : ""}{m.location ? " | "+m.location : ""}
+                </div>
               </div>
+              {canEdit && <div style={{display:"flex",gap:6}}>
+                <button onClick={function(){startEditMeeting(m);}} style={{padding:"4px 10px",borderRadius:6,border:"none",background:"#e0e7ff",color:"#4338ca",fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>แก้ไข</button>
+                <button onClick={function(){deleteMeeting(m.id);}} style={{padding:"4px 10px",borderRadius:6,border:"none",background:"#fef2f2",color:"#dc2626",fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>ลบ</button>
+              </div>}
             </div>
-            {canEdit && <button onClick={function(){deleteMeeting(m.id);}} style={{background:"none",border:"none",cursor:"pointer",color:"#94a3b8",fontSize:16,padding:4}}>x</button>}
           </div>;
         })}
       </>}
@@ -1877,7 +1899,7 @@ function App(){
       case "registry": return <Reg data={complaints} onView={onView} user={user} initFilter={regFilter}/>;
       case "detail": return selC ? <Detail c={(dbData.complaints||[]).find(x=>x.id===selC.id)||selC} onBack={()=>setPage("registry")} onUpdate={onUp} user={user} initTab={initTab}/> : null;
       case "guide": return <Guide/>;
-      case "calendar": return <CalendarPage dbData={dbData} setDbData={setDbData} user={user}/>;
+      case "calendar": return <CalendarPage dbData={dbData} setDbData={setDbData} user={user} onViewComplaint={onView}/>;
       case "users": return <UsersPage dbData={dbData} setDbData={setDbData} currentUser={user}/>;
       default: return <Dash data={complaints}/>;
     }
@@ -1929,7 +1951,7 @@ function App(){
         <div style={{fontSize:14,fontWeight:600,color:"#334155"}}>
           {(menu.find(m=>m.id===page)||{}).l || (page==="detail"?"รายละเอียดข้อร้องเรียน":"")}
         </div>
-        <Btn variant="primary" size="sm" onClick={()=>setPage("newForm")}><Ico name="plus" sz={15}/> บันทึกใหม่</Btn>
+        {(page==="dashboard"||page==="newForm"||page==="registry"||page==="detail") && <Btn variant="primary" size="sm" onClick={()=>setPage("newForm")}><Ico name="plus" sz={15}/> บันทึกใหม่</Btn>}
       </header>
       <div style={{flex:1,padding:24,overflowY:"auto"}}>{renderPage()}</div>
       <footer style={{textAlign:"center",padding:"12px 24px",borderTop:"1px solid #f1f5f9",fontSize:11,color:"#94a3b8"}}>ริเริ่มระบบด้วย phatcharapon ud</footer>

@@ -1216,6 +1216,62 @@ function Guide(){
   </div>);
 }
 
+// ============ THAI DATE PICKER ============
+function ThaiDatePicker({label,value,onChange,required}){
+  const [open,setOpen] = useState(false);
+  const [vw,setVw] = useState(function(){
+    if(value){var p=value.split("-");return{y:parseInt(p[0])<2500?parseInt(p[0])+543:parseInt(p[0]),m:parseInt(p[1])-1};}
+    var d=new Date();return{y:d.getFullYear()+543,m:d.getMonth()};
+  });
+  const ref = useRef(null);
+  var months=["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+  var dayH=["อา","จ","อ","พ","พฤ","ศ","ส"];
+  var ceY=vw.y-543;
+  var fd=new Date(ceY,vw.m,1).getDay();
+  var dim=new Date(ceY,vw.m+1,0).getDate();
+  var cls=[];for(var i=0;i<fd;i++)cls.push(null);for(var d=1;d<=dim;d++)cls.push(d);
+
+  useEffect(function(){
+    function h(e){if(ref.current&&!ref.current.contains(e.target))setOpen(false);}
+    document.addEventListener("mousedown",h);return function(){document.removeEventListener("mousedown",h);};
+  },[]);
+
+  function pick(day){
+    var iso=ceY+"-"+String(vw.m+1).padStart(2,"0")+"-"+String(day).padStart(2,"0");
+    onChange(iso);setOpen(false);
+  }
+  function pm(){setVw(function(p){var m=p.m-1,y=p.y;if(m<0){m=11;y--;}return{y:y,m:m};});}
+  function nm(){setVw(function(p){var m=p.m+1,y=p.y;if(m>11){m=0;y++;}return{y:y,m:m};});}
+
+  var selDay=null;
+  if(value){var sp=value.split("-");var sy=parseInt(sp[0]);if(sy<2500)sy+=543;if(sy===vw.y&&parseInt(sp[1])-1===vw.m)selDay=parseInt(sp[2]);}
+  var todayD=new Date();var isThisMonth=todayD.getMonth()===vw.m&&(todayD.getFullYear()+543)===vw.y;
+
+  return(<div style={{marginBottom:16,position:"relative"}} ref={ref}>
+    {label&&<label style={{display:"block",fontSize:12,fontWeight:600,marginBottom:6,color:"#475569"}}>{label}{required&&<span style={{color:"#ef4444"}}> *</span>}</label>}
+    <div onClick={function(){setOpen(!open);}} style={{width:"100%",padding:"11px 16px",borderRadius:12,border:"1.5px solid "+(open?"#6366f1":"#e2e8f0"),fontSize:14,background:"#fff",color:value?"#0f172a":"#94a3b8",cursor:"pointer",boxSizing:"border-box",fontFamily:"inherit",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+      <span>{value?fmtDateBE(value):"เลือกวันที่..."}</span>
+      <Ico name="calendar" sz={16}/>
+    </div>
+    {open&&<div style={{position:"absolute",top:"100%",left:0,zIndex:100,background:"#fff",border:"1px solid #e2e8f0",borderRadius:14,boxShadow:"0 12px 32px rgba(0,0,0,.15)",padding:14,marginTop:4,width:300}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+        <button type="button" onClick={pm} style={{background:"none",border:"none",cursor:"pointer",color:"#6366f1",fontSize:16,padding:4}}>&#9664;</button>
+        <span style={{fontSize:13,fontWeight:700,color:"#1e293b"}}>{months[vw.m]} พ.ศ. {vw.y}</span>
+        <button type="button" onClick={nm} style={{background:"none",border:"none",cursor:"pointer",color:"#6366f1",fontSize:16,padding:4}}>&#9654;</button>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2}}>
+        {dayH.map(function(d){return <div key={d} style={{textAlign:"center",fontSize:10,fontWeight:600,color:"#94a3b8",padding:4}}>{d}</div>;})}
+        {cls.map(function(day,i){
+          if(!day) return <div key={"e"+i}/>;
+          var isSel=selDay===day;
+          var isT=isThisMonth&&todayD.getDate()===day;
+          return <button type="button" key={day} onClick={function(){pick(day);}} style={{width:"100%",padding:"7px 0",border:"none",borderRadius:8,fontSize:13,fontWeight:isSel||isT?700:400,background:isSel?"#6366f1":isT?"#ecfdf5":"transparent",color:isSel?"#fff":isT?"#166534":"#334155",cursor:"pointer",fontFamily:"inherit"}}>{day}</button>;
+        })}
+      </div>
+    </div>}
+  </div>);
+}
+
 // ============ CALENDAR ============
 function fmtDateBE(d){
   if(!d) return "-";
@@ -1295,7 +1351,7 @@ function CalendarPage({dbData,setDbData,user}){
         <Inp label="หัวข้อเรื่อง" value={mt.title} onChange={function(e){setMt(Object.assign({},mt,{title:e.target.value}));}} required placeholder="เรื่องที่ประชุม"/>
         <Inp label="สถานที่" value={mt.location} onChange={function(e){setMt(Object.assign({},mt,{location:e.target.value}));}} placeholder="ห้องประชุม..."/>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 14px"}}>
-          <Inp label="วันที่" type="date" value={mt.date} onChange={function(e){setMt(Object.assign({},mt,{date:e.target.value}));}} required/>
+          <ThaiDatePicker label="วันที่" value={mt.date} onChange={function(v){setMt(Object.assign({},mt,{date:v}));}} required/>
           <Inp label="เวลา" type="time" value={mt.time} onChange={function(e){setMt(Object.assign({},mt,{time:e.target.value}));}}/>
         </div>
         <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:8}}>

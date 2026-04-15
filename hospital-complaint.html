@@ -1161,13 +1161,13 @@ function Reg({data,onView,user,initFilter}){
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
           <thead>
             <tr style={{background:"#fafafe"}}>
-              {["รหัส","วันที่","เรื่อง","หน่วยงานที่ถูกร้องเรียน","ระดับ","สถานะ","ระยะเวลา","ผู้รับผิดชอบ","ดำเนินการ","สรุปรายงาน"].map(h=>
+              {["รหัส","วันที่","เรื่อง","หน่วยงานที่ถูกร้องเรียน","หน่วยงานรับผิดชอบ","ระดับ","สถานะ","ระยะเวลา","ผู้รับผิดชอบ","ดำเนินการ","สรุปรายงาน"].map(h=>
                 <th key={h} style={{padding:"13px 14px",textAlign:"left",fontWeight:600,borderBottom:"1px solid #e2e8f0",whiteSpace:"nowrap",color:"#64748b",fontSize:11,letterSpacing:".04em"}}>{h}</th>
               )}
             </tr>
           </thead>
           <tbody>
-            {list.length===0 && <tr><td colSpan={10} style={{padding:48,textAlign:"center",color:"#cbd5e1",fontSize:14}}>
+            {list.length===0 && <tr><td colSpan={11} style={{padding:48,textAlign:"center",color:"#cbd5e1",fontSize:14}}>
               {data.length===0 ? "ยังไม่มีข้อมูลข้อร้องเรียน กรุณาเริ่มต้นโดยการบันทึกข้อร้องเรียนใหม่" : "ไม่พบข้อมูลตามเงื่อนไขที่ค้นหา"}
             </td></tr>}
             {list.map(c=>{
@@ -1178,6 +1178,7 @@ function Reg({data,onView,user,initFilter}){
                 <td style={{padding:"12px 14px",whiteSpace:"nowrap",color:"#64748b"}}>{fmtDate(c.date)}</td>
                 <td style={{padding:"12px 14px",maxWidth:200,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontWeight:500,color:"#1e293b"}}>{c.subject}</td>
                 <td style={{padding:"12px 14px",whiteSpace:"nowrap",fontSize:12,color:"#64748b"}}>{c.unit||c.dept||"-"}</td>
+                <td style={{padding:"12px 14px",fontSize:11,color:"#4338ca",maxWidth:160,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{(c.tagDepts&&c.tagDepts.length>0)?c.tagDepts.join(", "):"-"}</td>
                 <td style={{padding:"12px 14px"}}><LBadge level={c.severity}/></td>
                 <td style={{padding:"12px 14px"}}><SBadge status={st}/></td>
                 <td style={{padding:"12px 14px",textAlign:"center",fontWeight:600,color:"#334155"}}>{daysSince(c.date)} <span style={{fontSize:11,color:"#94a3b8",fontWeight:400}}>วัน</span></td>

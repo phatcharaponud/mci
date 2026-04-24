@@ -52,7 +52,11 @@ const ResponsiveContainer = Recharts.ResponsiveContainer, PieChart = Recharts.Pi
 const Cell = Recharts.Cell, LineChart = Recharts.LineChart, Line = Recharts.Line;
 
 // ============ CONFIG ============
-const DEPTS = ["งานพยาบาลแผนก ER","งานพยาบาลผู้ป่วยนอก (OPD)","งานพยาบาลแผนก IPD 1/1 (ผู้ป่วยในสามัญ)","งานพยาบาลแผนก IPD3 (ผู้ป่วยในพิเศษ)","งานพยาบาลแผนก ICU","งานพยาบาลห้องผ่าตัด","งานพยาบาลห้องคลอด","งานพยาบาลคลินิกพิเศษ","งานพยาบาลแผนกไตเทียม","งานวิสัญญี","งานธาลัสซีเมีย","งานปฐมภูมิและเสริมสร้างสุขภาพ","งานเภสัชกรรม","งานเทคนิคการแพทย์","งานธนาคารเลือด","งานรังสี","งานกายภาพบำบัด","งานเทคโนโลยีสารสนเทศและนวัตกรรมดิจิทัลทางการแพทย์","งานเวชระเบียนและเวชสถิติ","งานการเงินและบัญชี","งานประกันสุขภาพ","งานบริหารบุคคล","งานพัสดุ","งานโครงสร้างพื้นฐานและวิศวกรรมทางการแพทย์","งานควบคุมและป้องกันการติดเชื้อ (IC)","งานวิชาการ","งานพัฒนาคุณภาพ"];
+const DEPTS_DEFAULT = ["งานพยาบาลแผนก ER","งานพยาบาลผู้ป่วยนอก (OPD)","งานพยาบาลแผนก IPD 1/1 (ผู้ป่วยในสามัญ)","งานพยาบาลแผนก IPD3 (ผู้ป่วยในพิเศษ)","งานพยาบาลแผนก ICU","งานพยาบาลห้องผ่าตัด","งานพยาบาลห้องคลอด","งานพยาบาลคลินิกพิเศษ","งานพยาบาลแผนกไตเทียม","งานวิสัญญี","งานธาลัสซีเมีย","งานปฐมภูมิและเสริมสร้างสุขภาพ","งานเภสัชกรรม","งานเทคนิคการแพทย์","งานธนาคารเลือด","งานรังสี","งานกายภาพบำบัด","งานเทคโนโลยีสารสนเทศและนวัตกรรมดิจิทัลทางการแพทย์","งานเวชระเบียนและเวชสถิติ","งานการเงินและบัญชี","งานประกันสุขภาพ","งานบริหารบุคคล","งานพัสดุ","งานโครงสร้างพื้นฐานและวิศวกรรมทางการแพทย์","งานควบคุมและป้องกันการติดเชื้อ (IC)","งานวิชาการ","งานพัฒนาคุณภาพ","งานเคลื่อนย้าย"];
+function getCustomDepts(){try{var c=JSON.parse(localStorage.getItem("hcms_custom_depts")||"[]");return c;}catch(e){return [];}}
+function saveCustomDepts(list){localStorage.setItem("hcms_custom_depts",JSON.stringify(list));}
+function getAllDepts(){var custom=getCustomDepts();var all=DEPTS_DEFAULT.concat(custom);return all.filter(function(v,i,a){return a.indexOf(v)===i;});}
+var DEPTS = getAllDepts();
 const STAFF_INIT = [];
 const SEV = [
   {level:1,label:"ระดับ 1",desc:"บ่น/เสนอแนะ/เล่าให้ฟัง",color:"#10b981",impact:"ไม่รุนแรง",time:"ภายใน 3 วันทำการ"},
@@ -1538,9 +1542,11 @@ function UsersPage({dbData,setDbData,currentUser}){
   if(currentUser.role!=="admin") return <Card style={{textAlign:"center",padding:48,color:"#ef4444"}}>เฉพาะ Admin เท่านั้นที่เข้าถึงหน้านี้ได้</Card>;
   const [fbUsers,setFbUsers] = useState([]);
   const [loaded,setLoaded] = useState(false);
-  const [tab,setTab] = useState("users"); // users | complaints | meetings
+  const [tab,setTab] = useState("users"); // users | complaints | meetings | depts
   const [editC,setEditC] = useState(null); // complaint being edited
   const [ecForm,setEcForm] = useState(null); // edit complaint form data
+  const [newDept,setNewDept] = useState("");
+  const [deptsList,setDeptsList] = useState(getAllDepts);
   const roleLabels = {admin:"Admin",crm:"CRM",user:"User"};
   const roleColors = {admin:"#8b5cf6",crm:"#0891b2",user:"#6366f1"};
   const stsLabels = {approved:"อนุมัติแล้ว",pending:"รออนุมัติ",rejected:"ถูกปฏิเสธ"};
@@ -1608,6 +1614,26 @@ function UsersPage({dbData,setDbData,currentUser}){
     setEditC(null); setEcForm(null);
   }
 
+  function addDept(){
+    var val = newDept.trim();
+    if(!val){alert("กรุณากรอกชื่อหน่วยงาน");return;}
+    if(deptsList.includes(val)){alert("หน่วยงานนี้มีอยู่แล้ว");return;}
+    var custom = getCustomDepts();
+    custom.push(val);
+    saveCustomDepts(custom);
+    DEPTS = getAllDepts();
+    setDeptsList(DEPTS);
+    setNewDept("");
+  }
+  function removeDept(name){
+    if(DEPTS_DEFAULT.includes(name)){alert("ไม่สามารถลบหน่วยงานเริ่มต้นได้");return;}
+    if(!confirm("ต้องการลบหน่วยงาน \""+name+"\" ใช่หรือไม่?")) return;
+    var custom = getCustomDepts().filter(function(d){return d!==name;});
+    saveCustomDepts(custom);
+    DEPTS = getAllDepts();
+    setDeptsList(DEPTS);
+  }
+
   var tabStyle = function(t){return{padding:"9px 20px",fontSize:13,fontWeight:tab===t?700:500,color:tab===t?"#6366f1":"#94a3b8",background:tab===t?"#eef2ff":"transparent",border:"none",borderRadius:10,cursor:"pointer",fontFamily:"inherit"};};
 
   return(<div style={{animation:"fadeUp .4s ease"}}>
@@ -1618,6 +1644,7 @@ function UsersPage({dbData,setDbData,currentUser}){
       <button onClick={function(){setTab("users");}} style={tabStyle("users")}>ผู้ใช้งาน ({users.length})</button>
       <button onClick={function(){setTab("complaints");}} style={tabStyle("complaints")}>ข้อร้องเรียน ({complaints.length})</button>
       <button onClick={function(){setTab("meetings");}} style={tabStyle("meetings")}>นัดประชุม ({meetings.length})</button>
+      <button onClick={function(){setTab("depts");}} style={tabStyle("depts")}>หน่วยงาน ({deptsList.length})</button>
     </div>
 
     {/* ========== แท็บผู้ใช้งาน ========== */}
@@ -1777,6 +1804,28 @@ function UsersPage({dbData,setDbData,currentUser}){
           </tbody>
         </table>
       </div>
+    </Card>}
+
+    {/* ========== แท็บหน่วยงาน ========== */}
+    {tab==="depts" && <Card>
+      <div style={{display:"flex",gap:8,marginBottom:16,alignItems:"flex-end"}}>
+        <div style={{flex:1}}>
+          <Inp label="เพิ่มหน่วยงานใหม่" value={newDept} onChange={function(e){setNewDept(e.target.value);}} placeholder="พิมพ์ชื่อหน่วยงานใหม่..."/>
+        </div>
+        <Btn variant="primary" size="sm" onClick={addDept} style={{marginBottom:16}}>เพิ่ม</Btn>
+      </div>
+      <div style={{fontSize:12,color:"#94a3b8",marginBottom:12}}>หน่วยงานทั้งหมด {deptsList.length} รายการ (หน่วยงานเริ่มต้น {DEPTS_DEFAULT.length} + เพิ่มเอง {getCustomDepts().length})</div>
+      {deptsList.map(function(d,i){
+        var isCustom = !DEPTS_DEFAULT.includes(d);
+        return <div key={d} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 14px",borderBottom:"1px solid #f1f5f9"}}>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <span style={{fontSize:11,color:"#94a3b8",width:24,textAlign:"right"}}>{i+1}.</span>
+            <span style={{fontSize:13,color:"#1e293b"}}>{d}</span>
+            {isCustom && <span style={{fontSize:10,padding:"1px 8px",borderRadius:8,background:"#eef2ff",color:"#6366f1",fontWeight:600}}>เพิ่มเอง</span>}
+          </div>
+          {isCustom && <button onClick={function(){removeDept(d);}} style={{padding:"3px 10px",borderRadius:6,border:"none",background:"#fef2f2",color:"#dc2626",fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>ลบ</button>}
+        </div>;
+      })}
     </Card>}
   </div>);
 }

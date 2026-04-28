@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<title>นำเสนอระบบจัดการข้อร้องเรียน</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700;800&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'IBM Plex Sans Thai',sans-serif;color:#1e293b;background:#fff}
+@media print{
+  .slide{page-break-after:always;break-after:page}
+  .slide:last-child{page-break-after:avoid}
+  body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+@page{size:landscape;margin:0}
+.slide{width:100vw;height:100vh;padding:60px 80px;display:flex;flex-direction:column;justify-content:center;position:relative;overflow:hidden}
+.slide-num{position:absolute;bottom:30px;right:50px;font-size:12px;color:#94a3b8}
+.slide-footer{position:absolute;bottom:30px;left:50px;font-size:10px;color:#94a3b8}
+
+/* Slide 1 - Cover */
+.s1{background:linear-gradient(135deg,#1e1b4b 0%,#312e81 40%,#4f46e5 100%);color:#fff;text-align:center;justify-content:center;align-items:center}
+.s1 h1{font-size:42px;font-weight:800;margin-bottom:8px}
+.s1 .sub{font-size:20px;color:rgba(255,255,255,.6);margin-bottom:40px}
+.s1 .org{font-size:16px;color:rgba(255,255,255,.4)}
+.s1 .icon-box{width:100px;height:100px;border-radius:24px;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;margin:0 auto 24px;font-size:48px}
+
+/* Slide 2+ */
+.s-white{background:#fff}
+.s-light{background:#f8fafc}
+.s-indigo{background:linear-gradient(135deg,#eef2ff,#e0e7ff)}
+.s-green{background:linear-gradient(135deg,#ecfdf5,#d1fae5)}
+.s-amber{background:linear-gradient(135deg,#fffbeb,#fef3c7)}
+.s-purple{background:linear-gradient(135deg,#faf5ff,#ede9fe)}
+
+.slide h2{font-size:32px;font-weight:800;color:#1e1b4b;margin-bottom:6px}
+.slide h2 span{color:#6366f1}
+.slide .h2-sub{font-size:14px;color:#64748b;margin-bottom:30px}
+.slide h3{font-size:18px;font-weight:700;color:#334155;margin:20px 0 10px}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px}
+.grid4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:16px}
+
+.card{background:#fff;border-radius:16px;padding:24px;border:1px solid #e2e8f0;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+.card-indigo{border-left:4px solid #6366f1}
+.card-green{border-left:4px solid #10b981}
+.card-amber{border-left:4px solid #f59e0b}
+.card-red{border-left:4px solid #ef4444}
+.card-purple{border-left:4px solid #8b5cf6}
+
+.card .card-title{font-size:14px;font-weight:700;color:#475569;margin-bottom:8px}
+.card .card-num{font-size:36px;font-weight:800;color:#1e1b4b;line-height:1}
+.card .card-unit{font-size:13px;color:#64748b;margin-top:4px}
+
+.flow-box{background:#fff;border:2px solid #c7d2fe;border-radius:12px;padding:14px 18px;text-align:center;font-size:13px;font-weight:600;color:#3730a3}
+.flow-arrow{display:flex;align-items:center;justify-content:center;font-size:20px;color:#6366f1}
+
+.badge{display:inline-block;padding:3px 12px;border-radius:20px;font-size:11px;font-weight:600}
+.badge-green{background:#dcfce7;color:#166534}
+.badge-amber{background:#fef3c7;color:#92400e}
+.badge-red{background:#fecaca;color:#991b1b}
+.badge-indigo{background:#e0e7ff;color:#3730a3}
+
+.kpi-card{background:#fff;border-radius:14px;padding:20px;text-align:center;border:1px solid #e2e8f0}
+.kpi-card .kpi-icon{font-size:32px;margin-bottom:8px}
+.kpi-card .kpi-title{font-size:12px;font-weight:600;color:#64748b;margin-bottom:6px}
+.kpi-card .kpi-target{font-size:20px;font-weight:800;color:#1e1b4b}
+.kpi-card .kpi-desc{font-size:11px;color:#94a3b8;margin-top:4px}
+
+ul{margin:0 0 0 20px;list-style:none}
+ul li{position:relative;padding:4px 0 4px 16px;font-size:14px;line-height:1.7}
+ul li:before{content:"";position:absolute;left:0;top:12px;width:6px;height:6px;border-radius:50%;background:#6366f1}
+
+.check-list li:before{content:"✓";position:absolute;left:-2px;top:4px;width:auto;height:auto;border-radius:0;background:none;color:#10b981;font-weight:700;font-size:14px}
+
+.timeline{display:flex;align-items:flex-start;gap:0;margin:16px 0}
+.tl-step{flex:1;text-align:center;position:relative}
+.tl-dot{width:36px;height:36px;border-radius:50%;background:#6366f1;color:#fff;display:flex;align-items:center;justify-content:center;margin:0 auto 8px;font-size:14px;font-weight:700}
+.tl-line{position:absolute;top:18px;left:calc(50% + 18px);right:calc(-50% + 18px);height:2px;background:#c7d2fe}
+.tl-step:last-child .tl-line{display:none}
+.tl-label{font-size:11px;font-weight:600;color:#475569;line-height:1.4}
+</style>
+</head>
+<body>
+
+<!-- ==================== SLIDE 1: Cover ==================== -->
+<div class="slide s1">
+  <div class="icon-box">🏥</div>
+  <h1>ระบบจัดการข้อร้องเรียน</h1>
+  <div class="sub">Hospital Complaint Management System</div>
+  <div class="org">โรงพยาบาลมหาวิทยาลัยพะเยา<br>
+  <span style="font-size:13px;color:rgba(255,255,255,.3)">cm-uph.web.app</span></div>
+  <div class="slide-num" style="color:rgba(255,255,255,.3)">1</div>
+</div>
+
+<!-- ==================== SLIDE 2: ที่มาและความสำคัญ ==================== -->
+<div class="slide s-white">
+  <h2>ที่มาและ<span>ความสำคัญ</span></h2>
+  <div class="h2-sub">ทำไมต้องมีระบบจัดการข้อร้องเรียน?</div>
+  <div class="grid2">
+    <div>
+      <h3>สถานการณ์ปัจจุบัน</h3>
+      <ul>
+        <li>ข้อร้องเรียนบันทึกด้วยกระดาษ/Excel กระจัดกระจาย</li>
+        <li>ติดตามผลยาก ไม่ทราบสถานะดำเนินการ</li>
+        <li>ไม่มีระบบแจ้งเตือน ทำให้เกินกรอบเวลา</li>
+        <li>ไม่มีข้อมูลสถิติ ไม่สามารถวิเคราะห์แนวโน้มได้</li>
+        <li>การประสานงานระหว่างหน่วยงานล่าช้า</li>
+      </ul>
+    </div>
+    <div>
+      <h3>แนวทางแก้ไข</h3>
+      <ul class="check-list">
+        <li>ระบบ Web Application เข้าถึงได้ทุกที่</li>
+        <li>บันทึก ติดตาม แก้ไข ครบจบในระบบเดียว</li>
+        <li>แจ้งเตือนผ่าน LINE OA อัตโนมัติ</li>
+        <li>Dashboard แสดงสถิติ กราฟ แนวโน้ม</li>
+        <li>Export รายงาน PDF พร้อมใช้</li>
+        <li>ปลอดภัย — Login ด้วยอีเมลองค์กร + PIN</li>
+      </ul>
+    </div>
+  </div>
+  <div class="slide-footer">ระบบจัดการข้อร้องเรียน — โรงพยาบาลมหาวิทยาลัยพะเยา</div>
+  <div class="slide-num">2</div>
+</div>
+
+<!-- ==================== SLIDE 3: เป้าหมาย ==================== -->
+<div class="slide s-indigo">
+  <h2>เป้าหมาย<span>ของระบบ</span></h2>
+  <div class="h2-sub">วัตถุประสงค์หลัก 4 ด้าน</div>
+  <div class="grid4">
+    <div class="card card-indigo">
+      <div style="font-size:32px;margin-bottom:10px">📋</div>
+      <div class="card-title">1. รวมศูนย์ข้อมูล</div>
+      <div style="font-size:13px;color:#64748b;line-height:1.6">บันทึกข้อร้องเรียนทุกช่องทางไว้ในระบบเดียว ค้นหาได้ ไม่สูญหาย</div>
+    </div>
+    <div class="card card-green">
+      <div style="font-size:32px;margin-bottom:10px">⚡</div>
+      <div class="card-title">2. ตอบสนองรวดเร็ว</div>
+      <div style="font-size:13px;color:#64748b;line-height:1.6">ติดตามสถานะ แจ้งเตือนอัตโนมัติ ดำเนินการภายในกรอบเวลา</div>
+    </div>
+    <div class="card card-amber">
+      <div style="font-size:32px;margin-bottom:10px">📊</div>
+      <div class="card-title">3. วิเคราะห์ข้อมูล</div>
+      <div style="font-size:13px;color:#64748b;line-height:1.6">Dashboard สถิติ กราฟแนวโน้ม เพื่อวางแผนป้องกันและพัฒนาคุณภาพ</div>
+    </div>
+    <div class="card card-purple">
+      <div style="font-size:32px;margin-bottom:10px">🔒</div>
+      <div class="card-title">4. ปลอดภัย โปร่งใส</div>
+      <div style="font-size:13px;color:#64748b;line-height:1.6">ระบบสิทธิ์ 3 ระดับ Login ด้วยอีเมลองค์กร + PIN มีประวัติทุกการดำเนินการ</div>
+    </div>
+  </div>
+  <div class="slide-footer">ระบบจัดการข้อร้องเรียน — โรงพยาบาลมหาวิทยาลัยพะเยา</div>
+  <div class="slide-num">3</div>
+</div>
+
+<!-- ==================== SLIDE 4: ตัวชี้วัด ==================== -->
+<div class="slide s-white">
+  <h2>ตัวชี้วัด<span>ที่วัดได้</span> (KPIs)</h2>
+  <div class="h2-sub">เป้าหมายเชิงปริมาณเมื่อนำระบบมาใช้</div>
+  <div class="grid4" style="margin-bottom:24px">
+    <div class="kpi-card">
+      <div class="kpi-icon">⏱️</div>
+      <div class="kpi-title">ระยะเวลาตอบสนอง</div>
+      <div class="kpi-target">100%</div>
+      <div class="kpi-desc">ดำเนินการภายในกรอบเวลาตามระดับความรุนแรง</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon">✅</div>
+      <div class="kpi-title">อัตราแก้ไขสำเร็จ</div>
+      <div class="kpi-target">&ge; 90%</div>
+      <div class="kpi-desc">ข้อร้องเรียนได้รับการแก้ไขจนเสร็จสิ้น</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon">📉</div>
+      <div class="kpi-title">ลดเรื่องซ้ำ</div>
+      <div class="kpi-target">&le; 10%</div>
+      <div class="kpi-desc">ข้อร้องเรียนซ้ำในหน่วยงานเดิม ลดลง</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon">😊</div>
+      <div class="kpi-title">ความพึงพอใจ</div>
+      <div class="kpi-target">&ge; 80%</div>
+      <div class="kpi-desc">ความพึงพอใจผู้ใช้งานระบบ</div>
+    </div>
+  </div>
+  <h3>กรอบเวลาตามระดับความรุนแรง</h3>
+  <div class="grid3" style="gap:12px">
+    <div class="card" style="text-align:center;border-top:4px solid #10b981;padding:16px">
+      <div class="badge badge-green" style="font-size:13px;padding:4px 16px">ระดับ 1</div>
+      <div style="font-size:13px;color:#64748b;margin:8px 0 4px">บ่น / เสนอแนะ</div>
+      <div style="font-size:24px;font-weight:800;color:#166534">3 วันทำการ</div>
+    </div>
+    <div class="card" style="text-align:center;border-top:4px solid #f59e0b;padding:16px">
+      <div class="badge badge-amber" style="font-size:13px;padding:4px 16px">ระดับ 2</div>
+      <div style="font-size:13px;color:#64748b;margin:8px 0 4px">ตำหนิ / ร้องทุกข์</div>
+      <div style="font-size:24px;font-weight:800;color:#92400e">72 ชั่วโมง</div>
+    </div>
+    <div class="card" style="text-align:center;border-top:4px solid #ef4444;padding:16px">
+      <div class="badge badge-red" style="font-size:13px;padding:4px 16px">ระดับ 3</div>
+      <div style="font-size:13px;color:#64748b;margin:8px 0 4px">ด่าทอ / ขู่ฟ้อง / ทำร้าย</div>
+      <div style="font-size:24px;font-weight:800;color:#991b1b">6 ชั่วโมง</div>
+    </div>
+  </div>
+  <div class="slide-footer">ระบบจัดการข้อร้องเรียน — โรงพยาบาลมหาวิทยาลัยพะเยา</div>
+  <div class="slide-num">4</div>
+</div>
+
+<!-- ==================== SLIDE 5: Flow การทำงาน ==================== -->
+<div class="slide s-light">
+  <h2>ผังกระบวนการ<span>จัดการข้อร้องเรียน</span></h2>
+  <div class="h2-sub">ตั้งแต่รับเรื่อง จนถึงแก้ไขเสร็จสิ้น</div>
+
+  <div class="timeline" style="margin:20px 0 30px">
+    <div class="tl-step"><div class="tl-line"></div><div class="tl-dot">1</div><div class="tl-label">รับเรื่อง<br><span style="color:#94a3b8;font-weight:400">ศูนย์รับข้อร้องเรียน</span></div></div>
+    <div class="tl-step"><div class="tl-line"></div><div class="tl-dot">2</div><div class="tl-label">บันทึกระบบ<br><span style="color:#94a3b8;font-weight:400">ประเมินระดับ</span></div></div>
+    <div class="tl-step"><div class="tl-line"></div><div class="tl-dot">3</div><div class="tl-label">แจ้งหน่วยงาน<br><span style="color:#94a3b8;font-weight:400">Tag + LINE แจ้งเตือน</span></div></div>
+    <div class="tl-step"><div class="tl-line"></div><div class="tl-dot">4</div><div class="tl-label">ตรวจสอบ/ตอบกลับ<br><span style="color:#94a3b8;font-weight:400">หน่วยงานรับผิดชอบ</span></div></div>
+    <div class="tl-step"><div class="tl-line"></div><div class="tl-dot">5</div><div class="tl-label">แก้ไข/ป้องกัน<br><span style="color:#94a3b8;font-weight:400">บันทึกผลลัพธ์</span></div></div>
+    <div class="tl-step"><div class="tl-dot" style="background:#10b981">6</div><div class="tl-label">สรุปรายงาน<br><span style="color:#94a3b8;font-weight:400">Export PDF</span></div></div>
+  </div>
+
+  <div class="grid2" style="gap:16px">
+    <div class="card card-indigo">
+      <div class="card-title">บทบาท: ศูนย์รับข้อร้องเรียน (CRM)</div>
+      <ul style="font-size:13px">
+        <li>รับเรื่องจากทุกช่องทาง</li>
+        <li>บันทึกรายละเอียดลงระบบ</li>
+        <li>ประเมินระดับความรุนแรง</li>
+        <li>Tag หน่วยงาน/ผู้รับผิดชอบ</li>
+        <li>ติดตามสถานะ นัดประชุม</li>
+      </ul>
+    </div>
+    <div class="card card-green">
+      <div class="card-title">บทบาท: หน่วยงานรับผิดชอบ (User)</div>
+      <ul style="font-size:13px">
+        <li>ได้รับแจ้งเตือนผ่าน LINE</li>
+        <li>เข้าดูรายละเอียดข้อร้องเรียน</li>
+        <li>บันทึกผลการตรวจสอบ (Root Cause)</li>
+        <li>บันทึกผลการแก้ไขและมาตรการป้องกัน</li>
+        <li>ดูปฏิทินติดตามงาน</li>
+      </ul>
+    </div>
+  </div>
+  <div class="slide-footer">ระบบจัดการข้อร้องเรียน — โรงพยาบาลมหาวิทยาลัยพะเยา</div>
+  <div class="slide-num">5</div>
+</div>
+
+<!-- ==================== SLIDE 6: ฟีเจอร์ระบบ ==================== -->
+<div class="slide s-white">
+  <h2>ฟีเจอร์<span>หลักของระบบ</span></h2>
+  <div class="h2-sub">ฟังก์ชันที่รองรับการทำงานครบวงจร</div>
+  <div class="grid3" style="gap:16px">
+    <div class="card card-indigo" style="padding:18px">
+      <div style="font-size:24px;margin-bottom:6px">📝</div>
+      <div class="card-title">บันทึกข้อร้องเรียน</div>
+      <div style="font-size:12px;color:#64748b;line-height:1.6">ฟอร์มบันทึกครบถ้วน ข้อมูลผู้ร้อง ช่องทาง หน่วยงาน ระดับความรุนแรง</div>
+    </div>
+    <div class="card card-green" style="padding:18px">
+      <div style="font-size:24px;margin-bottom:6px">📊</div>
+      <div class="card-title">Dashboard สถิติ</div>
+      <div style="font-size:12px;color:#64748b;line-height:1.6">กราฟแท่ง วงกลม แนวโน้ม กดที่กล่องสถิติลิงก์ไปดูรายการ</div>
+    </div>
+    <div class="card card-amber" style="padding:18px">
+      <div style="font-size:24px;margin-bottom:6px">📅</div>
+      <div class="card-title">ปฏิทิน</div>
+      <div style="font-size:12px;color:#64748b;line-height:1.6">แสดงข้อร้องเรียนตามวัน นัดประชุม ปฏิทิน พ.ศ.</div>
+    </div>
+    <div class="card card-red" style="padding:18px">
+      <div style="font-size:24px;margin-bottom:6px">🔔</div>
+      <div class="card-title">LINE แจ้งเตือน</div>
+      <div style="font-size:12px;color:#64748b;line-height:1.6">แจ้งเตือนอัตโนมัติเมื่อมีข้อร้องเรียนใหม่ สถานะเปลี่ยน นัดประชุม</div>
+    </div>
+    <div class="card card-purple" style="padding:18px">
+      <div style="font-size:24px;margin-bottom:6px">📄</div>
+      <div class="card-title">Export PDF</div>
+      <div style="font-size:12px;color:#64748b;line-height:1.6">สรุปรายงานแต่ละเรื่องเป็น PDF พร้อมส่งต่อ</div>
+    </div>
+    <div class="card" style="padding:18px;border-left:4px solid #0891b2">
+      <div style="font-size:24px;margin-bottom:6px">🔐</div>
+      <div class="card-title">ระบบความปลอดภัย</div>
+      <div style="font-size:12px;color:#64748b;line-height:1.6">Google OAuth + PIN, สิทธิ์ 3 ระดับ (Admin/CRM/User), Auto-logout</div>
+    </div>
+  </div>
+  <div class="slide-footer">ระบบจัดการข้อร้องเรียน — โรงพยาบาลมหาวิทยาลัยพะเยา</div>
+  <div class="slide-num">6</div>
+</div>
+
+<!-- ==================== SLIDE 7: ผลลัพธ์ที่คาดหวัง ==================== -->
+<div class="slide s-green">
+  <h2>ผลลัพธ์<span>ที่คาดหวัง</span></h2>
+  <div class="h2-sub">ผลที่จะได้รับเมื่อนำระบบมาใช้งานจริง</div>
+  <div class="grid2" style="gap:20px">
+    <div>
+      <h3 style="color:#166534">ผลลัพธ์เชิงกระบวนการ</h3>
+      <div class="card" style="margin-bottom:12px">
+        <ul class="check-list" style="font-size:13px">
+          <li>ลดเวลาในการบันทึกและค้นหาข้อร้องเรียน <b>50%</b></li>
+          <li>ทุกข้อร้องเรียนได้รับการติดตามจนจบกระบวนการ</li>
+          <li>หน่วยงานได้รับแจ้งภายใน <b>ทันที</b> ผ่าน LINE</li>
+          <li>ลดการใช้กระดาษและ Excel ในการจัดการ</li>
+          <li>มีฐานข้อมูลสำหรับวิเคราะห์และพัฒนาคุณภาพ</li>
+        </ul>
+      </div>
+    </div>
+    <div>
+      <h3 style="color:#166534">ผลลัพธ์เชิงคุณภาพ</h3>
+      <div class="card" style="margin-bottom:12px">
+        <ul class="check-list" style="font-size:13px">
+          <li>ผู้รับบริการได้รับการตอบสนองรวดเร็วขึ้น</li>
+          <li>ลดข้อร้องเรียนซ้ำ ด้วยมาตรการป้องกัน</li>
+          <li>ข้อมูลโปร่งใส ตรวจสอบได้</li>
+          <li>รายงานสถิติสำหรับผู้บริหารตัดสินใจ</li>
+          <li>สอดคล้องมาตรฐาน HA / JCI</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="slide-footer">ระบบจัดการข้อร้องเรียน — โรงพยาบาลมหาวิทยาลัยพะเยา</div>
+  <div class="slide-num">7</div>
+</div>
+
+<!-- ==================== SLIDE 8: สรุป ==================== -->
+<div class="slide s1" style="background:linear-gradient(135deg,#0f172a 0%,#1e1b4b 50%,#4f46e5 100%)">
+  <div class="icon-box" style="background:rgba(255,255,255,.15)">✨</div>
+  <h1 style="font-size:36px">พร้อมใช้งาน</h1>
+  <div style="font-size:18px;color:rgba(255,255,255,.5);margin:12px 0 40px">เข้าใช้ระบบได้ทันที ผ่านทุกอุปกรณ์</div>
+  <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap">
+    <div style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:14px;padding:18px 28px;text-align:center">
+      <div style="font-size:14px;color:rgba(255,255,255,.4);margin-bottom:4px">เว็บแอป</div>
+      <div style="font-size:18px;font-weight:700;color:#a5b4fc">cm-uph.web.app</div>
+    </div>
+    <div style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:14px;padding:18px 28px;text-align:center">
+      <div style="font-size:14px;color:rgba(255,255,255,.4);margin-bottom:4px">Login</div>
+      <div style="font-size:18px;font-weight:700;color:#a5b4fc">อีเมล @up.ac.th</div>
+    </div>
+    <div style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:14px;padding:18px 28px;text-align:center">
+      <div style="font-size:14px;color:rgba(255,255,255,.4);margin-bottom:4px">แจ้งเตือน</div>
+      <div style="font-size:18px;font-weight:700;color:#a5b4fc">LINE OA</div>
+    </div>
+  </div>
+  <div style="margin-top:40px;font-size:13px;color:rgba(255,255,255,.3)">ริเริ่มระบบด้วย phatcharapon ud</div>
+  <div class="slide-num" style="color:rgba(255,255,255,.3)">8</div>
+</div>
+
+<script>
+window.onload = function(){ setTimeout(function(){ window.print(); }, 500); };
+</script>
+</body>
+</html>

@@ -1940,13 +1940,7 @@ function App(){
     setUser(null); setUserDoc(null); setFbUser(null);
     setPinVerified(false); setAuthPhase("login");
     db.setSession(null); setSelC(null);
-    if(fbAuth){
-      fbAuth.signOut().then(function(){
-        // clear Google session
-        var w = window.open("https://accounts.google.com/Logout","_blank","width=50,height=50,top=0,left=0");
-        setTimeout(function(){ try{w.close();}catch(e){} },1500);
-      });
-    }
+    if(fbAuth){ fbAuth.signOut(); }
   }
 
   // --- Auth phase rendering ---

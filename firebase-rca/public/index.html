@@ -254,11 +254,12 @@ const DF={department:'',date:'',title:'',incidentCode:'',sevL:'',sevN:'',whatHap
 function gid(){return'RCA-'+Date.now().toString(36).toUpperCase()}
 function schId(){return'SCH-'+Date.now().toString(36).toUpperCase()}
 
-// ===== Date Format Helper (พ.ศ.) =====
+// ===== Date Format Helper (ค.ศ.) =====
 function fmtDate(dateStr){
   if(!dateStr)return'-';
   let d;
   if(typeof dateStr==='string'){
+    if(dateStr.includes('/'))return dateStr; // already DD/MM/YYYY
     if(dateStr.includes('T')||dateStr.includes(' ')){d=new Date(dateStr)}
     else{const p=dateStr.split('-');if(p.length===3){d=new Date(parseInt(p[0]),parseInt(p[1])-1,parseInt(p[2]))}else{d=new Date(dateStr)}}
   }else if(dateStr instanceof Date){d=dateStr}
@@ -267,7 +268,7 @@ function fmtDate(dateStr){
   if(isNaN(d.getTime()))return'-';
   const dd=String(d.getDate()).padStart(2,'0');
   const mm=String(d.getMonth()+1).padStart(2,'0');
-  const yyyy=d.getFullYear()+543;
+  const yyyy=d.getFullYear();
   return dd+'/'+mm+'/'+yyyy;
 }
 function fmtDateTime(dateStr){
@@ -279,7 +280,7 @@ function fmtDateTime(dateStr){
   if(isNaN(d.getTime()))return'-';
   const dd=String(d.getDate()).padStart(2,'0');
   const mm=String(d.getMonth()+1).padStart(2,'0');
-  const yyyy=d.getFullYear()+543;
+  const yyyy=d.getFullYear();
   const hh=String(d.getHours()).padStart(2,'0');
   const mi=String(d.getMinutes()).padStart(2,'0');
   return dd+'/'+mm+'/'+yyyy+' '+hh+':'+mi;
@@ -815,19 +816,19 @@ function FormV({fd,sFD,uf}){
 
       {tab==='p1'&&<>
         <div className="fc"><div className="fch">📋 ข้อมูลทั่วไป</div><div className="fcb">
-          <div className="fr"><div className="fg"><label className="fl">หน่วยงาน/ทีมนำ <span className="rq">*</span></label><input className="fi" value={fd.department} onChange={e=>uf('department',e.target.value)} placeholder="ระบุหน่วยงาน"/></div><div className="fg"><label className="fl">วันที่จัดทำ (ปี พ.ศ.)</label><input className="fi" type="date" value={fd.date} onChange={e=>uf('date',e.target.value)}/></div></div>
+          <div className="fr"><div className="fg"><label className="fl">หน่วยงาน/ทีมนำ <span className="rq">*</span></label><input className="fi" value={fd.department} onChange={e=>uf('department',e.target.value)} placeholder="ระบุหน่วยงาน"/></div><div className="fg"><label className="fl">วันที่จัดทำ (ปี ค.ศ.)</label><input className="fi" type="date" value={fd.date} onChange={e=>uf('date',e.target.value)}/></div></div>
           <div className="fr"><div className="fg"><label className="fl">เรื่อง <span className="rq">*</span></label><input className="fi" value={fd.title} onChange={e=>uf('title',e.target.value)} placeholder="ชื่อเหตุการณ์"/></div><div className="fg"><label className="fl">รหัสอุบัติการณ์</label><input className="fi" value={fd.incidentCode} onChange={e=>uf('incidentCode',e.target.value)} placeholder="IR-XXXX"/></div></div>
           <div className="fg"><label className="fl">ระดับความรุนแรง</label><div style={{display:'flex',gap:24,flexWrap:'wrap'}}><div><div style={{fontSize:11,color:'var(--text-light)',marginBottom:4}}>NCC MERP (A-I) <span style={{color:'var(--primary-light)'}}>- วางเมาส์เพื่อดูคำอธิบาย</span></div><div className="sg">{SEV_L.map(s=><span key={s} className="tp-wrap"><span className={`sb2 ${fd.sevL===s?'sel':''}`} onClick={()=>uf('sevL',s)}>{s}</span><span className="tp-box"><b>{s}:</b> {SEV_L_TIP[s]}</span></span>)}</div></div><div><div style={{fontSize:11,color:'var(--text-light)',marginBottom:4}}>Safety Score (1-5) <span style={{color:'var(--primary-light)'}}>- วางเมาส์เพื่อดูคำอธิบาย</span></div><div className="sg">{SEV_N.map(s=><span key={s} className="tp-wrap"><span className={`sb2 ${fd.sevN===s?'sel':''}`} onClick={()=>uf('sevN',s)}>{s}</span><span className="tp-box"><b>ระดับ {s}:</b> {SEV_N_TIP[s]}</span></span>)}</div></div></div></div>
         </div></div>
         <div className="fc"><div className="fch">📝 บรรยายสรุป</div><div className="fcb">
           <div className="fg"><label className="fl">1.1 เกิดอะไรขึ้น <span className="rq">*</span></label><textarea className="ft" style={{minHeight:120}} value={fd.whatHappened} onChange={e=>uf('whatHappened',e.target.value)} placeholder="บรรยายรายละเอียด..."/></div>
-          <div className="fr3"><div className="fg"><label className="fl">1.2 เกิดที่</label><input className="fi" value={fd.where} onChange={e=>uf('where',e.target.value)}/></div><div className="fg"><label className="fl">1.3 เวลา</label><input className="fi" type="time" value={fd.when} onChange={e=>uf('when',e.target.value)}/></div><div className="fg"><label className="fl">วันที่เกิดเหตุ (ปี พ.ศ.)</label><input className="fi" type="date" value={fd.eventDate} onChange={e=>uf('eventDate',e.target.value)}/></div></div>
+          <div className="fr3"><div className="fg"><label className="fl">1.2 เกิดที่</label><input className="fi" value={fd.where} onChange={e=>uf('where',e.target.value)}/></div><div className="fg"><label className="fl">1.3 เวลา</label><input className="fi" type="time" value={fd.when} onChange={e=>uf('when',e.target.value)}/></div><div className="fg"><label className="fl">วันที่เกิดเหตุ (ปี ค.ศ.)</label><input className="fi" type="date" value={fd.eventDate} onChange={e=>uf('eventDate',e.target.value)}/></div></div>
           <div className="fr"><div className="fg"><label className="fl">วิชาชีพที่เกี่ยวข้อง</label><textarea className="ft" value={fd.professions} onChange={e=>uf('professions',e.target.value)} placeholder="แพทย์, พยาบาล..."/></div><div className="fg"><label className="fl">หน่วยงานที่เกี่ยวข้อง</label><textarea className="ft" value={fd.relatedDepts} onChange={e=>uf('relatedDepts',e.target.value)} placeholder="ER, ICU..."/></div></div>
           <div className="fr"><div className="fg"><label className="fl">กลุ่ม/หน่วยงานหลักที่แก้ไข</label><input className="fi" value={fd.mainFixDept} onChange={e=>uf('mainFixDept',e.target.value)} placeholder="ระบุกลุ่ม/หน่วยงานหลักที่รับผิดชอบแก้ไข"/></div><div className="fg"><label className="fl">กลุ่ม/หน่วยงานร่วมที่แก้ไข</label><input className="fi" value={fd.subFixDept} onChange={e=>uf('subFixDept',e.target.value)} placeholder="ระบุกลุ่ม/หน่วยงานร่วมที่เกี่ยวข้องในการแก้ไข"/></div></div>
         </div></div>
         <div className="fc"><div className="fch">👥 ผู้เข้าร่วมการทำ RCA</div><div className="fcb">
           <div className="fg"><label className="fl">ผู้เข้าร่วมการทำ RCA</label><textarea className="ft" style={{minHeight:80}} value={fd.rcaParticipants} onChange={e=>uf('rcaParticipants',e.target.value)} placeholder="ระบุชื่อ-นามสกุล ตำแหน่ง ของผู้เข้าร่วม (คนละบรรทัด)"/></div>
-          <div className="fr"><div className="fg"><label className="fl">วันที่ทำ RCA (ปี พ.ศ.)</label><input className="fi" type="date" value={fd.rcaDate} onChange={e=>uf('rcaDate',e.target.value)}/></div><div className="fg"><label className="fl">เวลาทำ RCA</label><input className="fi" type="time" value={fd.rcaTime} onChange={e=>uf('rcaTime',e.target.value)}/></div></div>
+          <div className="fr"><div className="fg"><label className="fl">วันที่ทำ RCA (ปี ค.ศ.)</label><input className="fi" type="date" value={fd.rcaDate} onChange={e=>uf('rcaDate',e.target.value)}/></div><div className="fg"><label className="fl">เวลาทำ RCA</label><input className="fi" type="time" value={fd.rcaTime} onChange={e=>uf('rcaTime',e.target.value)}/></div></div>
         </div></div>
         <div className="fc"><div className="fch">📎 เอกสารแนบ</div><div className="fcb">
           <div style={{marginBottom:12}}>
@@ -1105,7 +1106,7 @@ function CalV({sch,sSch,st}){
   const[showForm,sSF]=useState(false);
   const[editId,sEI]=useState(null);
   const[f,sF]=useState({title:'',department:'',rcaDate:'',rcaTime:'',location:''});
-  // Date picker state (พ.ศ.)
+  // Date picker state (ค.ศ.)
   const[dpDay,sDpDay]=useState('');
   const[dpMon,sDpMon]=useState('');
   const[dpYear,sDpYear]=useState('');
@@ -1116,32 +1117,34 @@ function CalV({sch,sSch,st}){
   const prevM=()=>sCM(p=>p.m===0?{y:p.y-1,m:11}:{y:p.y,m:p.m-1});
   const nextM=()=>sCM(p=>p.m===11?{y:p.y+1,m:0}:{y:p.y,m:p.m+1});
   const pad=n=>String(n).padStart(2,'0');
-  // Store dates as DD/MM/YYYY พ.ศ. (e.g., 02/04/2569)
-  const makeDateStr=(d,m,y)=>pad(d)+'/'+pad(m)+'/'+y; // y is already พ.ศ.
-  const getEvt=d=>{const ds=makeDateStr(d,cM.m+1,cM.y+543);return sch.filter(s=>s.rcaDate===ds)};
-  // Convert dp fields to rcaDate DD/MM/YYYY พ.ศ.
+  // Store dates as DD/MM/YYYY ค.ศ. (e.g., 02/04/2026)
+  const makeDateStr=(d,m,y)=>pad(d)+'/'+pad(m)+'/'+y;
+  // Normalize stored date: convert legacy พ.ศ. year (>2500) to ค.ศ.
+  const normDate=(ds)=>{if(!ds)return'';const p=String(ds).split('/');if(p.length!==3)return ds;let y=parseInt(p[2]);if(y>2500)y-=543;return pad(parseInt(p[0]))+'/'+pad(parseInt(p[1]))+'/'+y};
+  const getEvt=d=>{const ds=makeDateStr(d,cM.m+1,cM.y);return sch.filter(s=>normDate(s.rcaDate)===ds)};
+  // Convert dp fields to rcaDate DD/MM/YYYY ค.ศ.
   const dpToDate=()=>{if(!dpDay||!dpMon||!dpYear)return'';return pad(parseInt(dpDay))+'/'+pad(parseInt(dpMon))+'/'+dpYear};
   // Parse rcaDate DD/MM/YYYY to dp fields
-  const dateToDp=(ds)=>{if(!ds)return;const p=ds.split('/');if(p.length===3){sDpDay(String(parseInt(p[0])));sDpMon(String(parseInt(p[1])));sDpYear(p[2])}};
-  const openNew=(d)=>{const ds=d?makeDateStr(d,cM.m+1,cM.y+543):'';sEI(null);sF({title:'',department:'',rcaDate:ds,rcaTime:'',location:''});if(d){sDpDay(String(d));sDpMon(String(cM.m+1));sDpYear(String(cM.y+543))}else{sDpDay('');sDpMon('');sDpYear('')}sSF(true)};
+  const dateToDp=(ds)=>{const nd=normDate(ds);if(!nd)return;const p=nd.split('/');if(p.length===3){sDpDay(String(parseInt(p[0])));sDpMon(String(parseInt(p[1])));sDpYear(p[2])}};
+  const openNew=(d)=>{const ds=d?makeDateStr(d,cM.m+1,cM.y):'';sEI(null);sF({title:'',department:'',rcaDate:ds,rcaTime:'',location:''});if(d){sDpDay(String(d));sDpMon(String(cM.m+1));sDpYear(String(cM.y))}else{sDpDay('');sDpMon('');sDpYear('')}sSF(true)};
   const openEdit=(s)=>{sEI(s.id);sF({title:s.title,department:s.department,rcaDate:s.rcaDate,rcaTime:s.rcaTime,location:s.location});dateToDp(s.rcaDate);sSF(true)};
   const hSave=()=>{const dateVal=dpToDate();if(!f.title||!dateVal)return st('กรุณาระบุเรื่องและวันที่');const saveData={...f,rcaDate:dateVal};if(editId){sSch(p=>p.map(s=>s.id===editId?{...s,...saveData}:s))}else{sSch(p=>[...p,{id:schId(),...saveData,createdAt:new Date().toISOString()}])}sSF(false);st('บันทึกกำหนดการ RCA เรียบร้อย')};
   const hDel=(id)=>{if(confirm('ลบกำหนดการนี้?'))sSch(p=>p.filter(s=>s.id!==id))};
-  const today=new Date();const todayStr=makeDateStr(today.getDate(),today.getMonth()+1,today.getFullYear()+543);
+  const today=new Date();const todayStr=makeDateStr(today.getDate(),today.getMonth()+1,today.getFullYear());
   // Compare dates for upcoming: parse DD/MM/YYYY to sortable number
-  const dateToNum=(ds)=>{if(!ds)return 0;const p=ds.split('/');return p.length===3?parseInt(p[2])*10000+parseInt(p[1])*100+parseInt(p[0]):0};
+  const dateToNum=(ds)=>{const nd=normDate(ds);if(!nd)return 0;const p=nd.split('/');return p.length===3?parseInt(p[2])*10000+parseInt(p[1])*100+parseInt(p[0]):0};
   const todayNum=dateToNum(todayStr);
   const upcoming=sch.filter(s=>dateToNum(s.rcaDate)>=todayNum).sort((a,b)=>dateToNum(a.rcaDate)-dateToNum(b.rcaDate)).slice(0,5);
   const days=[];for(let i=0;i<firstDay;i++)days.push(null);for(let d=1;d<=daysInMonth;d++)days.push(d);
-  // Year options (พ.ศ.)
-  const curBEYear=new Date().getFullYear()+543;
-  const yearOpts=[];for(let y=curBEYear-1;y<=curBEYear+3;y++)yearOpts.push(y);
+  // Year options (ค.ศ.)
+  const curYear=new Date().getFullYear();
+  const yearOpts=[];for(let y=curYear-1;y<=curYear+3;y++)yearOpts.push(y);
   // Days in selected month
-  const dpDaysInMon=dpMon&&dpYear?new Date(parseInt(dpYear)-543,parseInt(dpMon),0).getDate():31;
+  const dpDaysInMon=dpMon&&dpYear?new Date(parseInt(dpYear),parseInt(dpMon),0).getDate():31;
   return<div>
     <div className="fc"><div className="fch" style={{justifyContent:'space-between'}}>
       <button className="btn btn-sm" style={{background:'rgba(255,255,255,0.2)',color:'#fff',border:'none'}} onClick={prevM}>◀ ก่อนหน้า</button>
-      <span style={{fontWeight:700}}>{mNames[cM.m]} {cM.y+543}</span>
+      <span style={{fontWeight:700}}>{mNames[cM.m]} {cM.y}</span>
       <button className="btn btn-sm" style={{background:'rgba(255,255,255,0.2)',color:'#fff',border:'none'}} onClick={nextM}>ถัดไป ▶</button>
     </div><div className="fcb">
       <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:2,textAlign:'center',marginBottom:8}}>
@@ -1178,11 +1181,11 @@ function CalV({sch,sSch,st}){
         <div className="fg"><label className="fl">หัวข้อเรื่อง <span className="rq">*</span></label><input className="fi" value={f.title} onChange={e=>sF(p=>({...p,title:e.target.value}))} placeholder="ระบุหัวข้อเรื่อง RCA"/></div>
         <div className="fg"><label className="fl">หน่วยงานที่เกี่ยวข้อง</label><input className="fi" value={f.department} onChange={e=>sF(p=>({...p,department:e.target.value}))} placeholder="ระบุหน่วยงาน"/></div>
         <div className="fr">
-          <div className="fg"><label className="fl">วันที่ (พ.ศ.) <span className="rq">*</span></label>
+          <div className="fg"><label className="fl">วันที่ (ค.ศ.) <span className="rq">*</span></label>
             <div style={{display:'flex',gap:6}}>
               <select className="fs" value={dpDay} onChange={e=>sDpDay(e.target.value)} style={{flex:1}}><option value="">วัน</option>{Array.from({length:dpDaysInMon},(_,i)=>i+1).map(d=><option key={d} value={d}>{d}</option>)}</select>
               <select className="fs" value={dpMon} onChange={e=>sDpMon(e.target.value)} style={{flex:2}}><option value="">เดือน</option>{mNamesShort.map((m,i)=><option key={i} value={i+1}>{m}</option>)}</select>
-              <select className="fs" value={dpYear} onChange={e=>sDpYear(e.target.value)} style={{flex:1.5}}><option value="">ปี พ.ศ.</option>{yearOpts.map(y=><option key={y} value={y}>{y}</option>)}</select>
+              <select className="fs" value={dpYear} onChange={e=>sDpYear(e.target.value)} style={{flex:1.5}}><option value="">ปี ค.ศ.</option>{yearOpts.map(y=><option key={y} value={y}>{y}</option>)}</select>
             </div>
           </div>
           <div className="fg"><label className="fl">เวลา</label><input className="fi" type="time" value={f.rcaTime} onChange={e=>sF(p=>({...p,rcaTime:e.target.value}))}/></div>

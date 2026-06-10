@@ -292,11 +292,14 @@ function sendLineMessage(message) {
   Logger.log('Line message sent: ' + message.substring(0, 50));
 }
 
-// Parse วันที่ DD/MM/YYYY (พ.ศ.) → Date object (ค.ศ. สำหรับเปรียบเทียบ)
+// Parse วันที่ DD/MM/YYYY (ค.ศ.) → Date object
+// รองรับข้อมูลเก่าที่เป็นปี พ.ศ. (>2500) ด้วย
 function parseDateBE(dateStr) {
   var p = String(dateStr).split('/');
   if (p.length !== 3) return null;
-  return new Date(parseInt(p[2], 10) - 543, parseInt(p[1], 10) - 1, parseInt(p[0], 10));
+  var y = parseInt(p[2], 10);
+  if (y > 2500) y -= 543; // legacy พ.ศ. data
+  return new Date(y, parseInt(p[1], 10) - 1, parseInt(p[0], 10));
 }
 
 // ฟังก์ชันหลัก - เรียกจาก Daily Trigger

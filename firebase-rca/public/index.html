@@ -461,9 +461,16 @@ function PendingPage({user,userData,onSubmitReg,onLogout}){
   );
 }
 
-function AdminPanel({users,onApprove,onReject}){
+function AdminPanel({users,onApprove,onReject,geminiKey}){
   const DEPTS=['งานพยาบาลแผนก ER','งานการพยาบาลผู้ป่วยนอก (OPD)','งานพยาบาลแผนก IPD 1/1 (ผู้ป่วยในสามัญ)','งานพยาบาลแผนก IPD3 (ผู้ป่วยในพิเศษ)','งานพยาบาลแผนก ICU','งานการพยาบาลห้องผ่าตัด','งานการพยาบาลห้องคลอด','งานการพยาบาลคลินิกพิเศษ','งานพยาบาลแผนกไตเทียม','งานวิสัญญี','งานธาลัสซีเมีย','งานปฐมภูมิและเสริมสร้างสุขภาพ','งานเภสัชกรรม','งานเทคนิคการแพทย์','งานธนาคารเลือด','งานรังสี','งานกายภาพบำบัด','งานเทคโนโลยีสารสนเทศและนวัตกรรมดิจิทัลทางการแพทย์','งานเวชระเบียนและเวชสถิติ','งานการเงินและบัญชี','งานประกันสุขภาพ','งานบริหารบุคคล','งานพัสดุ','งานโครงสร้างพื้นฐานและวิศวกรรมทางการแพทย์','งาน ENV','งานควบคุมและป้องกันการติดเชื้อ (IC)','งานวิชาการ','QMC (ทีมนำบริหารงานคุณภาพ)','RM (ทีมนำบริหารความเสี่ยง)','PCT sx (ทีมนำการดูแลผู้ป่วยศัลยกรรม)','PCT med (ทีมนำการดูแลผู้ป่วยอายุรกรรม)','PCT ObsGynPed (ทีมนำการดูแลผู้ป่วยสูติ-นรีเวชกรรมและกุมารเวชกรรม)','PTC (ทีมนำเภสัชกรรมและการบำบัด)','IC (ทีมนำป้องกันและควบคุมการติดเชื้อ)','ENV (ทีมนำสิ่งแวดล้อมและความปลอดภัย)','IM (ทีมนำบริหารระบบสารสนเทศ)','HRD (ทีมนำพัฒนาทรัพยากรบุคคล)','HPH (ทีมนำสร้างเสริมสุขภาพ)'];
   const[editDepts,sED]=useState({});
+  const[gk,sGk]=useState(geminiKey||'');
+  useEffect(()=>{sGk(geminiKey||'')},[geminiKey]);
+  const hSaveKey=()=>{
+    db.collection('settings').doc('ai').set({geminiKey:gk.trim()},{merge:true})
+      .then(()=>alert(gk.trim()?'บันทึก API Key เรียบร้อยแล้ว เมนู AI ช่วยวิเคราะห์เปิดใช้งานได้ทันที':'ลบ API Key แล้ว เมนู AI ถูกปิดใช้งาน'))
+      .catch(e=>alert('บันทึกไม่สำเร็จ: '+e.message));
+  };
   const pending=users.filter(u=>u.status==='pending');
   const approved=users.filter(u=>u.status==='approved');
   const hChangeDept=(uid,val)=>sED(p=>({...p,[uid]:val}));
@@ -531,6 +538,16 @@ function AdminPanel({users,onApprove,onReject}){
           </tr>
         ))}</tbody>
       </table>
+
+      <div style={{marginTop:24,background:'#f0f7ff',border:'1.5px solid var(--primary)',borderRadius:10,padding:16}}>
+        <h4 style={{fontSize:14,fontWeight:700,color:'var(--primary)',marginBottom:6}}>🤖 ตั้งค่า AI ช่วยวิเคราะห์ (Gemini API Key)</h4>
+        <p style={{fontSize:12,color:'var(--text-light)',marginBottom:10}}>สร้างคีย์ฟรีได้ที่ <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" style={{color:'var(--primary)',fontWeight:600}}>aistudio.google.com/apikey</a> แล้ววางที่นี่ — บันทึกครั้งเดียว เมนู "AI ช่วยวิเคราะห์ RCA" จะเปิดใช้งานให้ผู้ใช้ทุกคนทันที (คีย์เก็บในฐานข้อมูล ไม่หายเมื่อ deploy ใหม่)</p>
+        <div style={{display:'flex',gap:8}}>
+          <input type="password" value={gk} onChange={e=>sGk(e.target.value)} placeholder="วาง Gemini API Key ที่นี่ (AIza...)" style={{flex:1,padding:'8px 12px',border:'1.5px solid var(--border)',borderRadius:6,fontSize:13,fontFamily:'inherit'}}/>
+          <button className="btn btn-p btn-sm" onClick={hSaveKey}>💾 บันทึกคีย์</button>
+        </div>
+        <div style={{fontSize:11,color:geminiKey?'var(--success)':'var(--text-light)',marginTop:6}}>{geminiKey?'✅ เปิดใช้งาน AI อยู่':'⚪ ยังไม่ได้ตั้งค่า'}</div>
+      </div>
     </div>
   );
 }
@@ -1233,6 +1250,116 @@ function DBV({stats,rl}){
 }
 
 // ===== MAIN APP =====
+// ===== AI CHAT (Gemini) =====
+const AI_MODEL='gemini-2.5-flash';
+const AI_SYS=`คุณคือผู้ช่วย AI ด้านการบริหารความเสี่ยงและการวิเคราะห์สาเหตุราก (Root Cause Analysis) ของโรงพยาบาลมหาวิทยาลัยพะเยา
+ขอบเขตการตอบ: ตอบเฉพาะเรื่องการบริหารความเสี่ยง ความปลอดภัยผู้ป่วย อุบัติการณ์ในโรงพยาบาล การทำ RCA และคุณภาพบริการสุขภาพเท่านั้น หากถูกถามเรื่องนอกเหนือจากนี้ ให้ปฏิเสธอย่างสุภาพว่า "ขออภัยครับ ผมตอบได้เฉพาะเรื่องการบริหารความเสี่ยงและการวิเคราะห์ RCA เท่านั้น"
+กรอบการวิเคราะห์: ใช้ 2-Axis Swiss Cheese Model แยก Care Management Problems (CMPs) และปัจจัยสาเหตุ 5 Tiers ได้แก่ Tier 1 บุคคล (ผู้ป่วย/ผู้ปฏิบัติงาน), Tier 2 ทีมและลักษณะงาน, Tier 3 สิ่งแวดล้อม/เครื่องมือ/ระบบงาน/ข้อมูล, Tier 4 การบริหารและนโยบาย, Tier 5 ปัจจัยภายนอกองค์กร พร้อมระดับความรุนแรง NCC MERP (A-I) และ Safety Score (1-5)
+วิธีทำงาน: เมื่อผู้ใช้เล่าเหตุการณ์หรือแนบไฟล์ PDF ให้ (1) สรุปเหตุการณ์ที่เข้าใจ (2) ถามคำถามเพิ่มเติมครั้งละไม่เกิน 3 ข้อ เพื่อให้ได้ข้อมูลครบสำหรับแบบฟอร์ม RCA ได้แก่ หน่วยงาน, ชื่อเรื่อง, รหัสอุบัติการณ์, ระดับความรุนแรง, เกิดอะไรขึ้น/ที่ไหน/เมื่อไร, ขั้นตอนการดูแล (Flow of Steps), จุดเปลี่ยน/ปัญหา (CMP), Unsafe Act, ปัจจัยสาเหตุแต่ละ Tier (3) เมื่อข้อมูลเพียงพอ ให้วิเคราะห์สาเหตุรากและเสนอกลยุทธ์ป้องกันการเกิดซ้ำ แล้วแนะนำให้ผู้ใช้กดปุ่ม "นำลงแบบฟอร์ม RCA"
+ตอบเป็นภาษาไทย กระชับ ใช้หัวข้อและรายการเพื่อให้อ่านง่าย ไม่แต่งเติมข้อเท็จจริงที่ผู้ใช้ไม่ได้ให้`;
+
+function AiChatV({geminiKey,isAdmin,onApply}){
+  const[msgs,sMsgs]=useState([{role:'model',text:'สวัสดีครับ 🙏 ผมคือผู้ช่วย AI วิเคราะห์สาเหตุราก (RCA)\n\nคุณสามารถ:\n• พิมพ์เล่าเหตุการณ์/อุบัติการณ์ที่ต้องการวิเคราะห์ หรือ\n• แนบไฟล์ PDF รายงานเหตุการณ์ (ไม่เกิน 10 MB)\n\nผมจะช่วยวิเคราะห์ CMP และปัจจัยสาเหตุ 5 Tiers พร้อมถามข้อมูลเพิ่มเติมจนครบ จากนั้นกดปุ่ม "📝 นำลงแบบฟอร์ม RCA" เพื่อกรอกแบบฟอร์มให้อัตโนมัติได้เลยครับ'}]);
+  const[inp,sInp]=useState('');
+  const[pdf,sPdf]=useState(null);
+  const[busy,sBusy]=useState(false);
+  const endRef=useRef(null);
+  const fileRef=useRef(null);
+  useEffect(()=>{if(endRef.current)endRef.current.scrollIntoView({behavior:'smooth'})},[msgs,busy]);
+
+  const callAI=async(history)=>{
+    const contents=history.map(m=>({role:m.role==='model'?'model':'user',parts:[...(m.pdf?[{inline_data:{mime_type:'application/pdf',data:m.pdf.data}}]:[]),{text:m.text||''}]}));
+    const res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+AI_MODEL+':generateContent?key='+encodeURIComponent(geminiKey),{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({system_instruction:{parts:[{text:AI_SYS}]},contents,generationConfig:{temperature:0.4,maxOutputTokens:4096}})
+    });
+    if(!res.ok){const err=await res.json().catch(()=>({}));throw new Error(err.error&&err.error.message?err.error.message:('HTTP '+res.status))}
+    const j=await res.json();
+    const parts=j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts;
+    return parts?parts.map(p=>p.text||'').join(''):'(ไม่มีคำตอบ)';
+  };
+
+  const hFile=(e)=>{
+    const f=e.target.files[0];e.target.value='';
+    if(!f)return;
+    if(f.type!=='application/pdf'){alert('รองรับเฉพาะไฟล์ PDF');return}
+    if(f.size>10*1024*1024){alert('ไฟล์ต้องไม่เกิน 10 MB');return}
+    const r=new FileReader();
+    r.onload=()=>sPdf({name:f.name,data:String(r.result).split(',')[1]});
+    r.readAsDataURL(f);
+  };
+
+  const hSend=async()=>{
+    if(busy||(!inp.trim()&&!pdf))return;
+    const um={role:'user',text:inp.trim()||'ช่วยวิเคราะห์เหตุการณ์จากไฟล์ PDF ที่แนบมา',pdf,fileName:pdf?pdf.name:null};
+    const next=[...msgs,um];
+    sMsgs(next);sInp('');sPdf(null);sBusy(true);
+    try{
+      const reply=await callAI(next);
+      sMsgs(m=>[...m,{role:'model',text:reply}]);
+    }catch(e){sMsgs(m=>[...m,{role:'model',text:'⚠️ เกิดข้อผิดพลาด: '+e.message}])}
+    sBusy(false);
+  };
+
+  const hToForm=async()=>{
+    if(busy)return;
+    if(msgs.filter(m=>m.role==='user').length===0){alert('กรุณาเล่าเหตุการณ์และสนทนากับ AI ก่อน แล้วจึงกดนำลงแบบฟอร์ม');return}
+    sBusy(true);
+    const tierIds=TD.map(t=>'"'+t.id+'" = '+t.label).join('\n');
+    const instr={role:'user',text:'จากบทสนทนาทั้งหมดข้างต้น ให้ตอบกลับเป็น JSON เท่านั้น ห้ามมีข้อความอื่นนอก JSON ตามโครงสร้างนี้:\n{"department":"หน่วยงาน","title":"ชื่อเรื่อง/เหตุการณ์","incidentCode":"รหัสอุบัติการณ์ หรือค่าว่าง","sevL":"ตัวอักษรเดียว A-I หรือค่าว่าง","sevN":"ตัวเลข 1-5 หรือค่าว่าง","whatHappened":"รายละเอียดว่าเกิดอะไรขึ้น","where":"เกิดที่ไหน","when":"เกิดเมื่อไร","flowSteps":["ขั้นตอนการดูแลตามลำดับ"],"cmps":[{"step":"ขั้นตอนที่เกี่ยวข้อง","problem":"ปัญหา/จุดเปลี่ยน","unsafeAct":"Unsafe Act"}],"tiers":[{"id":"รหัสกลุ่มปัจจัย","desc":"รายละเอียดปัจจัยสาเหตุ","strat":"กลยุทธ์แก้ไข/ป้องกัน"}]}\nรหัสกลุ่มปัจจัย (id) ที่ใช้ได้มีเฉพาะ:\n'+tierIds+'\nกติกา: ใส่เฉพาะข้อมูลที่ได้จากบทสนทนาจริง ช่องที่ไม่มีข้อมูลให้ใส่ "" หรือ [] ห้ามแต่งเติมเอง'};
+    try{
+      const raw=await callAI([...msgs,instr]);
+      const m=raw.match(/\{[\s\S]*\}/);
+      if(!m)throw new Error('AI ไม่ได้ส่งข้อมูลรูปแบบ JSON กรุณาลองอีกครั้ง');
+      onApply(JSON.parse(m[0]));
+    }catch(e){alert('สรุปลงแบบฟอร์มไม่สำเร็จ: '+e.message)}
+    sBusy(false);
+  };
+
+  if(!geminiKey)return(
+    <div style={{padding:40,textAlign:'center'}}>
+      <div style={{fontSize:48,marginBottom:12}}>🤖</div>
+      <h3 style={{color:'var(--primary)',marginBottom:8}}>ยังไม่ได้เปิดใช้งาน AI ช่วยวิเคราะห์</h3>
+      <p style={{fontSize:13,color:'var(--text-light)'}}>{isAdmin?'ไปที่เมนู "จัดการผู้ใช้" แล้วใส่ Gemini API Key ในส่วน "ตั้งค่า AI" (สร้างคีย์ฟรีได้ที่ aistudio.google.com/apikey)':'กรุณาติดต่อผู้ดูแลระบบเพื่อเปิดใช้งาน'}</p>
+    </div>
+  );
+
+  return(
+    <div style={{display:'flex',flexDirection:'column',height:'calc(100vh - 220px)',minHeight:400}}>
+      <div style={{flex:1,overflowY:'auto',padding:20,background:'#f5f7fa'}}>
+        {msgs.map((m,i)=>(
+          <div key={i} style={{display:'flex',justifyContent:m.role==='user'?'flex-end':'flex-start',marginBottom:12}}>
+            <div style={{maxWidth:'75%',padding:'10px 14px',borderRadius:m.role==='user'?'14px 14px 4px 14px':'14px 14px 14px 4px',background:m.role==='user'?'var(--primary)':'#fff',color:m.role==='user'?'#fff':'var(--text)',boxShadow:'0 1px 3px rgba(0,0,0,0.1)',fontSize:14,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>
+              {m.fileName&&<div style={{fontSize:12,opacity:0.85,marginBottom:4}}>📎 {m.fileName}</div>}
+              {m.text}
+            </div>
+          </div>
+        ))}
+        {busy&&<div style={{display:'flex',justifyContent:'flex-start',marginBottom:12}}>
+          <div style={{padding:'10px 14px',borderRadius:'14px 14px 14px 4px',background:'#fff',boxShadow:'0 1px 3px rgba(0,0,0,0.1)',fontSize:14,color:'var(--text-light)'}}>⏳ กำลังคิด...</div>
+        </div>}
+        <div ref={endRef}></div>
+      </div>
+      <div style={{padding:12,background:'#fff',borderTop:'1px solid var(--border)'}}>
+        {pdf&&<div style={{fontSize:12,marginBottom:6,color:'var(--primary)'}}>📎 {pdf.name} <span style={{color:'#e74c3c',cursor:'pointer',fontWeight:700}} onClick={()=>sPdf(null)}>✕ เอาออก</span></div>}
+        <div style={{display:'flex',gap:8,alignItems:'flex-end'}}>
+          <input type="file" accept="application/pdf" ref={fileRef} style={{display:'none'}} onChange={hFile}/>
+          <button className="btn btn-o btn-sm" title="แนบไฟล์ PDF" onClick={()=>fileRef.current&&fileRef.current.click()} disabled={busy}>📎 PDF</button>
+          <textarea value={inp} onChange={e=>sInp(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();hSend()}}} placeholder="พิมพ์เล่าเหตุการณ์ หรือถามเกี่ยวกับการบริหารความเสี่ยง... (Enter = ส่ง, Shift+Enter = ขึ้นบรรทัดใหม่)" rows={2} style={{flex:1,padding:'8px 12px',border:'1.5px solid var(--border)',borderRadius:8,fontSize:14,fontFamily:'inherit',resize:'none'}} disabled={busy}/>
+          <button className="btn btn-p btn-sm" onClick={hSend} disabled={busy||(!inp.trim()&&!pdf)}>ส่ง ➤</button>
+        </div>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:8}}>
+          <span style={{fontSize:11,color:'var(--text-light)'}}>AI อาจให้ข้อมูลคลาดเคลื่อน กรุณาตรวจสอบก่อนบันทึกลงแบบฟอร์มทุกครั้ง</span>
+          <div style={{display:'flex',gap:6}}>
+            <button className="btn btn-w btn-sm" onClick={()=>{if(confirm('ล้างบทสนทนาทั้งหมด?'))sMsgs(msgs.slice(0,1))}} disabled={busy}>🗑 ล้างแชท</button>
+            <button className="btn btn-s btn-sm" onClick={hToForm} disabled={busy}>📝 นำลงแบบฟอร์ม RCA</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function App(){
   const[user,setUser]=useState(null);
   const[userData,setUserData]=useState(undefined);
@@ -1250,6 +1377,7 @@ function App(){
   const[sbCol,sSbCol]=useState(false);
   const[sch,sSch]=useState([]);
   const[unreadCount,setUnreadCount]=useState(0);
+  const[aiKey,sAiKey]=useState('');
 
   const st=m=>{sT(m);setTimeout(()=>sT(null),3000)};
   const uf=(f,v)=>sFD(p=>({...p,[f]:v}));
@@ -1283,6 +1411,15 @@ function App(){
       }
     });
   },[]);
+
+  // AI settings (Gemini API key from Firestore)
+  useEffect(()=>{
+    if(!user||!userData||userData.status!=='approved')return;
+    const unsub=db.collection('settings').doc('ai').onSnapshot(d=>{
+      sAiKey(d.exists?(d.data().geminiKey||''):'');
+    },()=>{sAiKey('')});
+    return()=>unsub();
+  },[user,userData]);
 
   // Admin: listen all users
   useEffect(()=>{
@@ -1396,6 +1533,33 @@ function App(){
       const w=window.open('https://accounts.google.com/Logout','_blank','width=400,height=300');
       setTimeout(()=>{if(w)w.close();window.location.reload()},1500);
     }catch(e){window.location.reload()}
+  };
+
+  // Apply AI analysis to RCA form
+  const hAiApply=(d)=>{
+    const ta=mkTD();
+    (d.tiers||[]).forEach(t=>{
+      const i=ta.findIndex(x=>x.id===t.id);
+      if(i<0)return;
+      const entry={ck:[],oc:false,ot:'',desc:t.desc||'',strat:t.strat||'',ind:'',tl:'',resp:'',linkedTo:null};
+      if(ta[i].en){ta[i]={...ta[i],entries:[...ta[i].entries,entry]}}
+      else{ta[i]={...ta[i],en:true,entries:[entry]}}
+    });
+    const fs=(d.flowSteps||[]).map(s=>String(s||'')).filter(s=>s);
+    while(fs.length<5)fs.push('');
+    const cmps=(d.cmps||[]).map(c=>({step:c.step||'',problem:c.problem||'',unsafeAct:c.unsafeAct||''})).filter(c=>c.step||c.problem||c.unsafeAct);
+    const sevL=String(d.sevL||'').trim().toUpperCase();
+    const sevN=String(d.sevN||'').trim();
+    sCI(null);
+    sFD({...DF,
+      department:d.department||'',title:d.title||'',incidentCode:d.incidentCode||'',
+      sevL:'ABCDEFGHI'.includes(sevL)&&sevL?sevL:'',sevN:'12345'.includes(sevN)&&sevN?sevN:'',
+      whatHappened:d.whatHappened||'',where:d.where||'',when:d.when||'',
+      flowSteps:fs.slice(0,Math.max(5,fs.length)),fsSaved:fs.some(s=>s),
+      cmps:cmps.length?cmps:[{step:'',problem:'',unsafeAct:''}],cmpsSaved:cmps.length>0,
+      ta});
+    sN('form');
+    st('📝 นำข้อมูลจาก AI ลงแบบฟอร์มแล้ว กรุณาตรวจสอบและแก้ไขก่อนบันทึก');
   };
 
   // RCA actions
@@ -1526,7 +1690,7 @@ function App(){
   }
 
   // Approved - show main app
-  const navTitle={form:'📋 แบบฟอร์มบันทึก RCA',list:'📁 รายการ RCA',cal:'📅 ปฏิทินกำหนดทำ RCA',kb:'📚 ความรู้ RCA',db:'📊 Dashboard',admin:'👑 จัดการผู้ใช้',board:'💬 กระดานแลกเปลี่ยน & RM News'};
+  const navTitle={form:'📋 แบบฟอร์มบันทึก RCA',list:'📁 รายการ RCA',cal:'📅 ปฏิทินกำหนดทำ RCA',kb:'📚 ความรู้ RCA',ai:'🤖 AI ช่วยวิเคราะห์สาเหตุ (RCA Assistant)',db:'📊 Dashboard',admin:'👑 จัดการผู้ใช้',board:'💬 กระดานแลกเปลี่ยน & RM News'};
 
   return(
     <div className="app-with-bar">
@@ -1553,6 +1717,7 @@ function App(){
             <div className="ns">เครื่องมือ</div>
             <div className={`ni ${nav==='cal'?'ac':''}`} onClick={()=>sN('cal')}><span className="ni-i">📅</span><span>ปฏิทินกำหนด RCA</span></div>
             <div className={`ni ${nav==='kb'?'ac':''}`} onClick={()=>sN('kb')}><span className="ni-i">📚</span><span>ความรู้ RCA</span></div>
+            <div className={`ni ${nav==='ai'?'ac':''}`} onClick={()=>sN('ai')}><span className="ni-i">🤖</span><span>AI ช่วยวิเคราะห์ RCA</span></div>
             <div className={`ni ${nav==='board'?'ac':''}`} onClick={()=>sN('board')}><span className="ni-i">💬</span><span>กระดานแลกเปลี่ยน & RM News</span></div>
             <div className="ns">รายงาน</div>
             <div className={`ni ${nav==='db'?'ac':''}`} onClick={()=>sN('db')}><span className="ni-i">📊</span><span>Dashboard</span></div>
@@ -1578,9 +1743,10 @@ function App(){
             {nav==='list'&&<ListV rl={rl} onL={hLoad} onN={hNew} sRL={sRL} isAdmin={isAdmin} onExportPdf={(r)=>{const rfd={...DF,...r,ta:(r.ta||mkTD()).map(migTier)};const w=window.open('','_blank');w.document.write(bExp(rfd,'pdf'));w.document.close()}}/>}
             {nav==='cal'&&<CalV sch={sch} sSch={schSetWrapper} st={st}/>}
             {nav==='kb'&&<KBV/>}
+            {nav==='ai'&&<AiChatV geminiKey={aiKey} isAdmin={isAdmin} onApply={hAiApply}/>}
             {nav==='db'&&<DBV stats={stats} rl={rl}/>}
             {nav==='board'&&<BoardV user={user} userData={userData} isAdmin={isAdmin}/>}
-            {nav==='admin'&&isAdmin&&<AdminPanel users={allUsers} onApprove={handleApprove} onReject={handleReject}/>}
+            {nav==='admin'&&isAdmin&&<AdminPanel users={allUsers} onApprove={handleApprove} onReject={handleReject} geminiKey={aiKey}/>}
           </div>
         </div>
       </div>

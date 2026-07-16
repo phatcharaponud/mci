@@ -467,10 +467,13 @@ function AdminPanel({users,onApprove,onReject}){
   const pending=users.filter(u=>u.status==='pending');
   const approved=users.filter(u=>u.status==='approved');
   const hChangeDept=(uid,val)=>sED(p=>({...p,[uid]:val}));
-  const hApproveWithDept=(uid)=>{
-    const newDept=editDepts[uid];
-    if(newDept!==undefined&&newDept!==''){db.collection('users').doc(uid).update({department:newDept})}
-    onApprove(uid);
+  const hApproveWithDept=async(uid)=>{
+    try{
+      const newDept=editDepts[uid];
+      if(newDept!==undefined&&newDept!==''){await db.collection('users').doc(uid).update({department:newDept})}
+      await onApprove(uid);
+      alert('อนุมัติเรียบร้อยแล้ว');
+    }catch(e){alert('อนุมัติไม่สำเร็จ: '+e.message)}
   };
   return(
     <div style={{padding:20}}>
@@ -520,8 +523,8 @@ function AdminPanel({users,onApprove,onReject}){
             <td style={{padding:8}}>{fmtDate(u.createdAt)}</td>
             <td style={{padding:8}}>
               <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
-                {u.email!==ADMIN_EMAIL&&<button className="btn btn-sm btn-w" onClick={()=>{if(confirm('ยกเลิกการอนุมัติผู้ใช้ '+u.fullName+'?'))db.collection('users').doc(u.id).update({status:'pending'})}}>ยกเลิกอนุมัติ</button>}
-                {u.email!==ADMIN_EMAIL&&<button className="btn btn-sm btn-p" onClick={()=>{const newRole=u.role==='admin'?'user':'admin';if(confirm('เปลี่ยนบทบาท '+u.fullName+' เป็น '+newRole+'?'))db.collection('users').doc(u.id).update({role:newRole})}}>{u.role==='admin'?'เปลี่ยนเป็น User':'เปลี่ยนเป็น Admin'}</button>}
+                {u.email!==ADMIN_EMAIL&&<button className="btn btn-sm btn-w" onClick={()=>{if(confirm('ยกเลิกการอนุมัติผู้ใช้ '+u.fullName+'?'))db.collection('users').doc(u.id).update({status:'pending'}).catch(e=>alert('ไม่สำเร็จ: '+e.message))}}>ยกเลิกอนุมัติ</button>}
+                {u.email!==ADMIN_EMAIL&&<button className="btn btn-sm btn-p" onClick={()=>{const newRole=u.role==='admin'?'user':'admin';if(confirm('เปลี่ยนบทบาท '+u.fullName+' เป็น '+newRole+'?'))db.collection('users').doc(u.id).update({role:newRole}).catch(e=>alert('ไม่สำเร็จ: '+e.message))}}>{u.role==='admin'?'เปลี่ยนเป็น User':'เปลี่ยนเป็น Admin'}</button>}
                 {u.email===ADMIN_EMAIL&&<span style={{fontSize:11,color:'var(--text-light)',fontStyle:'italic'}}>Admin หลัก</span>}
               </div>
             </td>
@@ -1380,7 +1383,8 @@ function App(){
     await db.collection('users').doc(uid).update({status:'approved',approvedAt:firebase.firestore.FieldValue.serverTimestamp()});
   };
   const handleReject=async(uid)=>{
-    if(confirm('ปฏิเสธผู้ใช้นี้?'))await db.collection('users').doc(uid).update({status:'rejected'});
+    if(!confirm('ปฏิเสธผู้ใช้นี้?'))return;
+    try{await db.collection('users').doc(uid).update({status:'rejected'})}catch(e){alert('ปฏิเสธไม่สำเร็จ: '+e.message)}
   };
 
   // Logout

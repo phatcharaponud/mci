@@ -1256,7 +1256,8 @@ const AI_SYS=`คุณคือผู้ช่วย AI ด้านการ�
 ขอบเขตการตอบ: ตอบเฉพาะเรื่องการบริหารความเสี่ยง ความปลอดภัยผู้ป่วย อุบัติการณ์ในโรงพยาบาล การทำ RCA และคุณภาพบริการสุขภาพเท่านั้น หากถูกถามเรื่องนอกเหนือจากนี้ ให้ปฏิเสธอย่างสุภาพว่า "ขออภัยครับ ผมตอบได้เฉพาะเรื่องการบริหารความเสี่ยงและการวิเคราะห์ RCA เท่านั้น"
 กรอบการวิเคราะห์: ใช้ 2-Axis Swiss Cheese Model แยก Care Management Problems (CMPs) และปัจจัยสาเหตุ 5 Tiers ได้แก่ Tier 1 บุคคล (ผู้ป่วย/ผู้ปฏิบัติงาน), Tier 2 ทีมและลักษณะงาน, Tier 3 สิ่งแวดล้อม/เครื่องมือ/ระบบงาน/ข้อมูล, Tier 4 การบริหารและนโยบาย, Tier 5 ปัจจัยภายนอกองค์กร พร้อมระดับความรุนแรง NCC MERP (A-I) และ Safety Score (1-5)
 วิธีทำงาน: เมื่อผู้ใช้เล่าเหตุการณ์หรือแนบไฟล์ PDF ให้ (1) สรุปเหตุการณ์ที่เข้าใจ (2) ถามคำถามเพิ่มเติมครั้งละไม่เกิน 3 ข้อ เพื่อให้ได้ข้อมูลครบสำหรับแบบฟอร์ม RCA ได้แก่ หน่วยงาน, ชื่อเรื่อง, รหัสอุบัติการณ์, ระดับความรุนแรง, เกิดอะไรขึ้น/ที่ไหน/เมื่อไร, ขั้นตอนการดูแล (Flow of Steps), จุดเปลี่ยน/ปัญหา (CMP), Unsafe Act, ปัจจัยสาเหตุแต่ละ Tier (3) เมื่อข้อมูลเพียงพอ ให้วิเคราะห์สาเหตุรากและเสนอกลยุทธ์ป้องกันการเกิดซ้ำ แล้วแนะนำให้ผู้ใช้กดปุ่ม "นำลงแบบฟอร์ม RCA"
-ตอบเป็นภาษาไทย กระชับ ใช้หัวข้อและรายการเพื่อให้อ่านง่าย ไม่แต่งเติมข้อเท็จจริงที่ผู้ใช้ไม่ได้ให้`;
+ตอบเป็นภาษาไทย กระชับ ใช้หัวข้อและรายการเพื่อให้อ่านง่าย ไม่แต่งเติมข้อเท็จจริงที่ผู้ใช้ไม่ได้ให้
+รูปแบบคำตอบ: ใช้ข้อความล้วน ห้ามใช้เครื่องหมาย Markdown เช่น ** หรือ ## ให้ใช้เลขข้อ ขีดหน้าข้อ (-) และเว้นบรรทัดแทน`;
 
 function AiChatV({geminiKey,isAdmin,onApply}){
   const[msgs,sMsgs]=useState([{role:'model',text:'สวัสดีครับ 🙏 ผมคือผู้ช่วย AI วิเคราะห์สาเหตุราก (RCA)\n\nคุณสามารถ:\n• พิมพ์เล่าเหตุการณ์/อุบัติการณ์ที่ต้องการวิเคราะห์ หรือ\n• แนบไฟล์ PDF รายงานเหตุการณ์ (ไม่เกิน 10 MB)\n\nผมจะช่วยวิเคราะห์ CMP และปัจจัยสาเหตุ 5 Tiers พร้อมถามข้อมูลเพิ่มเติมจนครบ จากนั้นกดปุ่ม "📝 นำลงแบบฟอร์ม RCA" เพื่อกรอกแบบฟอร์มให้อัตโนมัติได้เลยครับ'}]);
@@ -1267,16 +1268,19 @@ function AiChatV({geminiKey,isAdmin,onApply}){
   const fileRef=useRef(null);
   useEffect(()=>{if(endRef.current)endRef.current.scrollIntoView({behavior:'smooth'})},[msgs,busy]);
 
-  const callAI=async(history)=>{
+  const callAI=async(history,genCfg)=>{
     const contents=history.map(m=>({role:m.role==='model'?'model':'user',parts:[...(m.pdf?[{inline_data:{mime_type:'application/pdf',data:m.pdf.data}}]:[]),{text:m.text||''}]}));
     const res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+AI_MODEL+':generateContent?key='+encodeURIComponent(geminiKey),{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({system_instruction:{parts:[{text:AI_SYS}]},contents,generationConfig:{temperature:0.4,maxOutputTokens:4096}})
+      body:JSON.stringify({system_instruction:{parts:[{text:AI_SYS}]},contents,generationConfig:genCfg||{temperature:0.4,maxOutputTokens:8192}})
     });
     if(!res.ok){const err=await res.json().catch(()=>({}));throw new Error(err.error&&err.error.message?err.error.message:('HTTP '+res.status))}
     const j=await res.json();
-    const parts=j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts;
-    return parts?parts.map(p=>p.text||'').join(''):'(ไม่มีคำตอบ)';
+    const cand=j.candidates&&j.candidates[0];
+    const parts=cand&&cand.content&&cand.content.parts;
+    const text=parts?parts.map(p=>p.text||'').join(''):'';
+    if(!text)throw new Error('AI ไม่ส่งคำตอบกลับมา (สาเหตุ: '+((cand&&cand.finishReason)||(j.promptFeedback&&j.promptFeedback.blockReason)||'ไม่ทราบ')+') กรุณาลองอีกครั้ง');
+    return text;
   };
 
   const hFile=(e)=>{
@@ -1308,10 +1312,14 @@ function AiChatV({geminiKey,isAdmin,onApply}){
     const tierIds=TD.map(t=>'"'+t.id+'" = '+t.label).join('\n');
     const instr={role:'user',text:'จากบทสนทนาทั้งหมดข้างต้น ให้ตอบกลับเป็น JSON เท่านั้น ห้ามมีข้อความอื่นนอก JSON ตามโครงสร้างนี้:\n{"department":"หน่วยงาน","title":"ชื่อเรื่อง/เหตุการณ์","incidentCode":"รหัสอุบัติการณ์ หรือค่าว่าง","sevL":"ตัวอักษรเดียว A-I หรือค่าว่าง","sevN":"ตัวเลข 1-5 หรือค่าว่าง","whatHappened":"รายละเอียดว่าเกิดอะไรขึ้น","where":"เกิดที่ไหน","when":"เกิดเมื่อไร","flowSteps":["ขั้นตอนการดูแลตามลำดับ"],"cmps":[{"step":"ขั้นตอนที่เกี่ยวข้อง","problem":"ปัญหา/จุดเปลี่ยน","unsafeAct":"Unsafe Act"}],"tiers":[{"id":"รหัสกลุ่มปัจจัย","desc":"รายละเอียดปัจจัยสาเหตุ","strat":"กลยุทธ์แก้ไข/ป้องกัน"}]}\nรหัสกลุ่มปัจจัย (id) ที่ใช้ได้มีเฉพาะ:\n'+tierIds+'\nกติกา: ใส่เฉพาะข้อมูลที่ได้จากบทสนทนาจริง ช่องที่ไม่มีข้อมูลให้ใส่ "" หรือ [] ห้ามแต่งเติมเอง'};
     try{
-      const raw=await callAI([...msgs,instr]);
-      const m=raw.match(/\{[\s\S]*\}/);
-      if(!m)throw new Error('AI ไม่ได้ส่งข้อมูลรูปแบบ JSON กรุณาลองอีกครั้ง');
-      onApply(JSON.parse(m[0]));
+      const raw=await callAI([...msgs,instr],{temperature:0.2,maxOutputTokens:8192,responseMimeType:'application/json',thinkingConfig:{thinkingBudget:0}});
+      let d;
+      try{d=JSON.parse(raw)}catch(_){
+        const m=raw.match(/\{[\s\S]*\}/);
+        if(!m)throw new Error('AI ไม่ได้ส่งข้อมูลรูปแบบ JSON กรุณาลองอีกครั้ง');
+        d=JSON.parse(m[0]);
+      }
+      onApply(d);
     }catch(e){alert('สรุปลงแบบฟอร์มไม่สำเร็จ: '+e.message)}
     sBusy(false);
   };
@@ -1331,7 +1339,7 @@ function AiChatV({geminiKey,isAdmin,onApply}){
           <div key={i} style={{display:'flex',justifyContent:m.role==='user'?'flex-end':'flex-start',marginBottom:12}}>
             <div style={{maxWidth:'75%',padding:'10px 14px',borderRadius:m.role==='user'?'14px 14px 4px 14px':'14px 14px 14px 4px',background:m.role==='user'?'var(--primary)':'#fff',color:m.role==='user'?'#fff':'var(--text)',boxShadow:'0 1px 3px rgba(0,0,0,0.1)',fontSize:14,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>
               {m.fileName&&<div style={{fontSize:12,opacity:0.85,marginBottom:4}}>📎 {m.fileName}</div>}
-              {m.text}
+              {String(m.text).split(/\*\*/).map((s,j)=>j%2===1?<strong key={j}>{s}</strong>:s)}
             </div>
           </div>
         ))}

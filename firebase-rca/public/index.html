@@ -254,6 +254,10 @@ const DF={department:'',date:'',title:'',incidentCode:'',sevL:'',sevN:'',whatHap
 function gid(){return'RCA-'+Date.now().toString(36).toUpperCase()}
 function schId(){return'SCH-'+Date.now().toString(36).toUpperCase()}
 
+// ===== PIN helpers (SHA-256 + salt, ไม่เก็บ PIN ตรงๆ) =====
+async function hashPin(salt,pin){const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(salt+':'+pin));return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('')}
+function mkSalt(){return Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b=>b.toString(16).padStart(2,'0')).join('')}
+
 // ===== Date Format Helper (ค.ศ.) =====
 function fmtDate(dateStr){
   if(!dateStr)return'-';
@@ -461,6 +465,78 @@ function PendingPage({user,userData,onSubmitReg,onLogout}){
   );
 }
 
+// ===== PIN PAGE =====
+function PinPage({user,userData,onOk,onLogout}){
+  const hasPin=!!userData.pinHash;
+  const[p1,sP1]=useState('');
+  const[p2,sP2]=useState('');
+  const[msg,sMsg]=useState('');
+  const[busy,sBusy]=useState(false);
+  const[now,sNow]=useState(Date.now());
+  useEffect(()=>{const t=setInterval(()=>sNow(Date.now()),1000);return()=>clearInterval(t)},[]);
+  const lockLeft=userData.pinLockUntil&&userData.pinLockUntil>now?Math.ceil((userData.pinLockUntil-now)/1000):0;
+  const digits=v=>v.replace(/\D/g,'').slice(0,6);
+  const inpStyle={width:'100%',padding:12,fontSize:22,letterSpacing:8,textAlign:'center',border:'1.5px solid var(--border)',borderRadius:8,marginBottom:10,fontFamily:'inherit'};
+
+  const hSet=async()=>{
+    if(p1.length!==6){sMsg('PIN ต้องเป็นตัวเลข 6 หลัก');return}
+    if(/^(\d)\1{5}$/.test(p1)||p1==='123456'||p1==='654321'){sMsg('PIN นี้ง่ายเกินไป กรุณาตั้งใหม่');return}
+    if(p1!==p2){sMsg('PIN ทั้งสองช่องไม่ตรงกัน');return}
+    sBusy(true);
+    try{
+      const salt=mkSalt();
+      const h=await hashPin(salt,p1);
+      await db.collection('users').doc(user.uid).update({pinHash:h,pinSalt:salt,pinFails:0,pinLockUntil:null});
+      onOk();
+    }catch(e){sMsg('บันทึกไม่สำเร็จ: '+e.message)}
+    sBusy(false);
+  };
+
+  const hEnter=async()=>{
+    if(lockLeft>0||busy)return;
+    if(p1.length!==6){sMsg('กรุณาใส่ PIN 6 หลัก');return}
+    sBusy(true);
+    try{
+      const h=await hashPin(userData.pinSalt||'',p1);
+      if(h===userData.pinHash){
+        db.collection('users').doc(user.uid).update({pinFails:0}).catch(()=>{});
+        onOk();
+      }else{
+        const fails=(userData.pinFails||0)+1;
+        if(fails>=5){
+          await db.collection('users').doc(user.uid).update({pinFails:0,pinLockUntil:Date.now()+15*60*1000});
+          sMsg('ใส่ PIN ผิดครบ 5 ครั้ง ระบบล็อก 15 นาที');
+        }else{
+          await db.collection('users').doc(user.uid).update({pinFails:fails});
+          sMsg('PIN ไม่ถูกต้อง (เหลือโอกาสอีก '+(5-fails)+' ครั้ง)');
+        }
+        sP1('');
+      }
+    }catch(e){sMsg('เกิดข้อผิดพลาด: '+e.message)}
+    sBusy(false);
+  };
+
+  return(
+    <div className="pending-page"><div className="pending-card">
+      <div style={{fontSize:48,marginBottom:12}}>🔐</div>
+      <h2>{hasPin?'ใส่รหัส PIN':'ตั้งรหัส PIN ครั้งแรก'}</h2>
+      <p style={{fontSize:13,color:'var(--text-light)',margin:'8px 0 16px'}}>{hasPin?('ยืนยันตัวตน: '+(userData.fullName||user.email)):'เพื่อความปลอดภัย กรุณาตั้ง PIN 6 หลัก ใช้ยืนยันตัวตนทุกครั้งที่เข้าระบบ'}</p>
+      {lockLeft>0?(
+        <div style={{background:'#fdecea',border:'1px solid #e74c3c',borderRadius:8,padding:12,marginBottom:12,color:'#c0392b',fontWeight:600,fontSize:14}}>🔒 ถูกล็อกชั่วคราว กรุณารออีก {Math.floor(lockLeft/60)}:{String(lockLeft%60).padStart(2,'0')} นาที</div>
+      ):(
+        <>
+          <input type="password" inputMode="numeric" autoFocus value={p1} onChange={e=>{sP1(digits(e.target.value));sMsg('')}} onKeyDown={e=>{if(e.key==='Enter'&&hasPin)hEnter()}} placeholder={hasPin?'PIN 6 หลัก':'ตั้ง PIN 6 หลัก'} style={inpStyle}/>
+          {!hasPin&&<input type="password" inputMode="numeric" value={p2} onChange={e=>{sP2(digits(e.target.value));sMsg('')}} onKeyDown={e=>{if(e.key==='Enter')hSet()}} placeholder="ยืนยัน PIN อีกครั้ง" style={inpStyle}/>}
+          {msg&&<div style={{color:'#c0392b',fontSize:13,marginBottom:10,fontWeight:600}}>{msg}</div>}
+          <button className="btn btn-p" style={{width:'100%',marginBottom:8}} onClick={hasPin?hEnter:hSet} disabled={busy}>{busy?'กำลังตรวจสอบ...':(hasPin?'✅ ยืนยัน PIN':'💾 บันทึก PIN')}</button>
+        </>
+      )}
+      {hasPin&&lockLeft===0&&<p style={{fontSize:12,color:'var(--text-light)',marginBottom:8}}>ลืม PIN? ติดต่อ Admin (งานบริหารความเสี่ยง) เพื่อรีเซ็ต</p>}
+      <button className="btn btn-o" style={{width:'100%'}} onClick={onLogout}>ออกจากระบบ</button>
+    </div></div>
+  );
+}
+
 function AdminPanel({users,onApprove,onReject,geminiKey}){
   const DEPTS=['งานพยาบาลแผนก ER','งานการพยาบาลผู้ป่วยนอก (OPD)','งานพยาบาลแผนก IPD 1/1 (ผู้ป่วยในสามัญ)','งานพยาบาลแผนก IPD3 (ผู้ป่วยในพิเศษ)','งานพยาบาลแผนก ICU','งานการพยาบาลห้องผ่าตัด','งานการพยาบาลห้องคลอด','งานการพยาบาลคลินิกพิเศษ','งานพยาบาลแผนกไตเทียม','งานวิสัญญี','งานธาลัสซีเมีย','งานปฐมภูมิและเสริมสร้างสุขภาพ','งานเภสัชกรรม','งานเทคนิคการแพทย์','งานธนาคารเลือด','งานรังสี','งานกายภาพบำบัด','งานเทคโนโลยีสารสนเทศและนวัตกรรมดิจิทัลทางการแพทย์','งานเวชระเบียนและเวชสถิติ','งานการเงินและบัญชี','งานประกันสุขภาพ','งานบริหารบุคคล','งานพัสดุ','งานโครงสร้างพื้นฐานและวิศวกรรมทางการแพทย์','งาน ENV','งานควบคุมและป้องกันการติดเชื้อ (IC)','งานวิชาการ','QMC (ทีมนำบริหารงานคุณภาพ)','RM (ทีมนำบริหารความเสี่ยง)','PCT sx (ทีมนำการดูแลผู้ป่วยศัลยกรรม)','PCT med (ทีมนำการดูแลผู้ป่วยอายุรกรรม)','PCT ObsGynPed (ทีมนำการดูแลผู้ป่วยสูติ-นรีเวชกรรมและกุมารเวชกรรม)','PTC (ทีมนำเภสัชกรรมและการบำบัด)','IC (ทีมนำป้องกันและควบคุมการติดเชื้อ)','ENV (ทีมนำสิ่งแวดล้อมและความปลอดภัย)','IM (ทีมนำบริหารระบบสารสนเทศ)','HRD (ทีมนำพัฒนาทรัพยากรบุคคล)','HPH (ทีมนำสร้างเสริมสุขภาพ)'];
   const[editDepts,sED]=useState({});
@@ -519,6 +595,7 @@ function AdminPanel({users,onApprove,onReject,geminiKey}){
           <th style={{padding:8,textAlign:'left'}}>หน่วยงาน</th>
           <th style={{padding:8,textAlign:'left'}}>บทบาท</th>
           <th style={{padding:8,textAlign:'left'}}>วันที่สมัคร</th>
+          <th style={{padding:8,textAlign:'left'}}>PIN</th>
           <th style={{padding:8,textAlign:'left'}}>จัดการ</th>
         </tr></thead>
         <tbody>{approved.map(u=>(
@@ -528,8 +605,10 @@ function AdminPanel({users,onApprove,onReject,geminiKey}){
             <td style={{padding:8}}>{u.department}</td>
             <td style={{padding:8}}><span style={{background:u.role==='admin'?'var(--accent-warm)':'#e3f2fd',color:u.role==='admin'?'#fff':'var(--primary)',padding:'2px 8px',borderRadius:10,fontSize:11,fontWeight:600}}>{u.role==='admin'?'Admin':'User'}</span></td>
             <td style={{padding:8}}>{fmtDate(u.createdAt)}</td>
+            <td style={{padding:8,fontSize:12}}>{u.pinHash?'🔒 ตั้งแล้ว':'⚪ ยังไม่ตั้ง'}</td>
             <td style={{padding:8}}>
               <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+                {u.pinHash&&<button className="btn btn-sm btn-o" onClick={()=>{if(confirm('รีเซ็ต PIN ของ '+u.fullName+'?\nผู้ใช้จะต้องตั้ง PIN ใหม่ในการเข้าระบบครั้งถัดไป'))db.collection('users').doc(u.id).update({pinHash:firebase.firestore.FieldValue.delete(),pinSalt:firebase.firestore.FieldValue.delete(),pinFails:0,pinLockUntil:null}).then(()=>alert('รีเซ็ต PIN เรียบร้อยแล้ว')).catch(e=>alert('ไม่สำเร็จ: '+e.message))}}>รีเซ็ต PIN</button>}
                 {u.email!==ADMIN_EMAIL&&<button className="btn btn-sm btn-w" onClick={()=>{if(confirm('ยกเลิกการอนุมัติผู้ใช้ '+u.fullName+'?'))db.collection('users').doc(u.id).update({status:'pending'}).catch(e=>alert('ไม่สำเร็จ: '+e.message))}}>ยกเลิกอนุมัติ</button>}
                 {u.email!==ADMIN_EMAIL&&<button className="btn btn-sm btn-p" onClick={()=>{const newRole=u.role==='admin'?'user':'admin';if(confirm('เปลี่ยนบทบาท '+u.fullName+' เป็น '+newRole+'?'))db.collection('users').doc(u.id).update({role:newRole}).catch(e=>alert('ไม่สำเร็จ: '+e.message))}}>{u.role==='admin'?'เปลี่ยนเป็น User':'เปลี่ยนเป็น Admin'}</button>}
                 {u.email===ADMIN_EMAIL&&<span style={{fontSize:11,color:'var(--text-light)',fontStyle:'italic'}}>Admin หลัก</span>}
@@ -1460,6 +1539,13 @@ function App(){
   const[unreadCount,setUnreadCount]=useState(0);
   const[aiKey,sAiKey]=useState('');
   const[aiNotice,sAiNotice]=useState(false);
+  const[pinOk,sPinOk]=useState(false);
+
+  // PIN pass persists within the same tab only
+  useEffect(()=>{
+    if(user){try{if(sessionStorage.getItem('pinOk')===user.uid)sPinOk(true)}catch(e){}}
+    else{sPinOk(false);try{sessionStorage.removeItem('pinOk')}catch(e){}}
+  },[user]);
 
   const st=m=>{sT(m);setTimeout(()=>sT(null),3000)};
   const uf=(f,v)=>sFD(p=>({...p,[f]:v}));
@@ -1609,6 +1695,7 @@ function App(){
   // Logout - ออกเฉพาะระบบ RCA ไม่กระทบบัญชี Google อื่นในเบราว์เซอร์
   const handleLogout=async()=>{
     try{await auth.signOut()}catch(e){}
+    try{sessionStorage.removeItem('pinOk')}catch(e){}
     setUser(null);setUserData(undefined);
     window.location.reload();
   };
@@ -1766,6 +1853,11 @@ function App(){
   // Rejected
   if(userData.status==='rejected'){
     return<div className="pending-page"><div className="pending-card"><div style={{fontSize:48}}>❌</div><h2>คำขอถูกปฏิเสธ</h2><p>กรุณาติดต่อ Admin</p><button className="btn btn-o" onClick={handleLogout}>ออกจากระบบ</button></div></div>;
+  }
+
+  // PIN gate - ตั้ง PIN ครั้งแรก หรือใส่ PIN ก่อนเข้าระบบ
+  if(!pinOk){
+    return<PinPage user={user} userData={userData} onOk={()=>{try{sessionStorage.setItem('pinOk',user.uid)}catch(e){};sPinOk(true)}} onLogout={handleLogout}/>;
   }
 
   // Approved - show main app

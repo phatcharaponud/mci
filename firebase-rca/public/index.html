@@ -1259,6 +1259,21 @@ const AI_SYS=`คุณคือผู้ช่วย AI ด้านการ�
 ตอบเป็นภาษาไทย กระชับ ใช้หัวข้อและรายการเพื่อให้อ่านง่าย ไม่แต่งเติมข้อเท็จจริงที่ผู้ใช้ไม่ได้ให้
 รูปแบบคำตอบ: ใช้ข้อความล้วน ห้ามใช้เครื่องหมาย Markdown เช่น ** หรือ ## ให้ใช้เลขข้อ ขีดหน้าข้อ (-) และเว้นบรรทัดแทน`;
 
+async function gemCall(key,contents,genCfg){
+  const res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+AI_MODEL+':generateContent?key='+encodeURIComponent(key),{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({system_instruction:{parts:[{text:AI_SYS}]},contents,generationConfig:genCfg||{temperature:0.4,maxOutputTokens:8192}})
+  });
+  if(!res.ok){const err=await res.json().catch(()=>({}));throw new Error(err.error&&err.error.message?err.error.message:('HTTP '+res.status))}
+  const j=await res.json();
+  const cand=j.candidates&&j.candidates[0];
+  const parts=cand&&cand.content&&cand.content.parts;
+  const text=parts?parts.map(p=>p.text||'').join(''):'';
+  if(!text)throw new Error('AI ไม่ส่งคำตอบกลับมา (สาเหตุ: '+((cand&&cand.finishReason)||(j.promptFeedback&&j.promptFeedback.blockReason)||'ไม่ทราบ')+') กรุณาลองอีกครั้ง');
+  return text;
+}
+function aiBold(text){return String(text).split(/\*\*/).map((s,j)=>j%2===1?<strong key={j}>{s}</strong>:s)}
+
 function AiChatV({geminiKey,isAdmin,onApply}){
   const[msgs,sMsgs]=useState([{role:'model',text:'สวัสดีครับ 🙏 ผมคือผู้ช่วย AI วิเคราะห์สาเหตุราก (RCA)\n\nคุณสามารถ:\n• พิมพ์เล่าเหตุการณ์/อุบัติการณ์ที่ต้องการวิเคราะห์ หรือ\n• แนบไฟล์ PDF รายงานเหตุการณ์ (ไม่เกิน 10 MB)\n\nผมจะช่วยวิเคราะห์ CMP และปัจจัยสาเหตุ 5 Tiers พร้อมถามข้อมูลเพิ่มเติมจนครบ จากนั้นกดปุ่ม "📝 นำลงแบบฟอร์ม RCA" เพื่อกรอกแบบฟอร์มให้อัตโนมัติได้เลยครับ'}]);
   const[inp,sInp]=useState('');
@@ -1268,20 +1283,7 @@ function AiChatV({geminiKey,isAdmin,onApply}){
   const fileRef=useRef(null);
   useEffect(()=>{if(endRef.current)endRef.current.scrollIntoView({behavior:'smooth'})},[msgs,busy]);
 
-  const callAI=async(history,genCfg)=>{
-    const contents=history.map(m=>({role:m.role==='model'?'model':'user',parts:[...(m.pdf?[{inline_data:{mime_type:'application/pdf',data:m.pdf.data}}]:[]),{text:m.text||''}]}));
-    const res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+AI_MODEL+':generateContent?key='+encodeURIComponent(geminiKey),{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({system_instruction:{parts:[{text:AI_SYS}]},contents,generationConfig:genCfg||{temperature:0.4,maxOutputTokens:8192}})
-    });
-    if(!res.ok){const err=await res.json().catch(()=>({}));throw new Error(err.error&&err.error.message?err.error.message:('HTTP '+res.status))}
-    const j=await res.json();
-    const cand=j.candidates&&j.candidates[0];
-    const parts=cand&&cand.content&&cand.content.parts;
-    const text=parts?parts.map(p=>p.text||'').join(''):'';
-    if(!text)throw new Error('AI ไม่ส่งคำตอบกลับมา (สาเหตุ: '+((cand&&cand.finishReason)||(j.promptFeedback&&j.promptFeedback.blockReason)||'ไม่ทราบ')+') กรุณาลองอีกครั้ง');
-    return text;
-  };
+  const callAI=(history,genCfg)=>gemCall(geminiKey,history.map(m=>({role:m.role==='model'?'model':'user',parts:[...(m.pdf?[{inline_data:{mime_type:'application/pdf',data:m.pdf.data}}]:[]),{text:m.text||''}]})),genCfg);
 
   const hFile=(e)=>{
     const f=e.target.files[0];e.target.value='';
@@ -1339,7 +1341,7 @@ function AiChatV({geminiKey,isAdmin,onApply}){
           <div key={i} style={{display:'flex',justifyContent:m.role==='user'?'flex-end':'flex-start',marginBottom:12}}>
             <div style={{maxWidth:'75%',padding:'10px 14px',borderRadius:m.role==='user'?'14px 14px 4px 14px':'14px 14px 14px 4px',background:m.role==='user'?'var(--primary)':'#fff',color:m.role==='user'?'#fff':'var(--text)',boxShadow:'0 1px 3px rgba(0,0,0,0.1)',fontSize:14,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>
               {m.fileName&&<div style={{fontSize:12,opacity:0.85,marginBottom:4}}>📎 {m.fileName}</div>}
-              {String(m.text).split(/\*\*/).map((s,j)=>j%2===1?<strong key={j}>{s}</strong>:s)}
+              {aiBold(m.text)}
             </div>
           </div>
         ))}
@@ -1365,6 +1367,77 @@ function AiChatV({geminiKey,isAdmin,onApply}){
         </div>
       </div>
     </div>
+  );
+}
+
+// Floating AI assistant on the RCA form page - sees current form data
+function AiFloat({geminiKey,fd}){
+  const[open,sOpen]=useState(false);
+  const[msgs,sMsgs]=useState([{role:'model',text:'สวัสดีครับ 🙏 ผมเห็นข้อมูลที่คุณกำลังกรอกในแบบฟอร์มนี้ ถามได้เลย เช่น\n- ช่วยเสนอ CMP จากเหตุการณ์นี้\n- ปัจจัยสาเหตุ Tier ไหนน่าจะเกี่ยวข้อง\n- ช่วยเสนอกลยุทธ์แก้ไขและตัวชี้วัด'}]);
+  const[inp,sInp]=useState('');
+  const[busy,sBusy]=useState(false);
+  const endRef=useRef(null);
+  useEffect(()=>{if(open&&endRef.current)endRef.current.scrollIntoView({behavior:'smooth'})},[msgs,busy,open]);
+
+  const ctx=()=>{
+    const tiers=(fd.ta||[]).filter(t=>t.en).map(t=>{const d=TD.find(x=>x.id===t.id);return(d?d.label:t.id)+': '+(t.entries||[]).map(e=>[...(e.ck||[]),e.desc].filter(Boolean).join(', ')).filter(Boolean).join(' | ')}).join('\n');
+    return 'ข้อมูลในแบบฟอร์ม RCA ที่ผู้ใช้กำลังกรอกอยู่ขณะนี้ (ใช้เป็นบริบทในการตอบ):\n'
+      +'หน่วยงาน: '+(fd.department||'-')+'\nเรื่อง: '+(fd.title||'-')+'\nระดับความรุนแรง: '+(fd.sevL||'-')+' / '+(fd.sevN||'-')
+      +'\nเกิดอะไรขึ้น: '+(fd.whatHappened||'-')+'\nเกิดที่ไหน: '+(fd.where||'-')+'\nเกิดเมื่อไร: '+(fd.when||'-')
+      +'\nFlow of Steps: '+((fd.flowSteps||[]).filter(Boolean).join(' → ')||'-')
+      +'\nCMPs: '+((fd.cmps||[]).filter(c=>c.problem||c.step||c.unsafeAct).map((c,i)=>(i+1)+'. ['+(c.step||'-')+'] '+(c.problem||'-')+(c.unsafeAct?' (Unsafe Act: '+c.unsafeAct+')':'')).join(' | ')||'-')
+      +'\nปัจจัยสาเหตุที่เลือกไว้:\n'+(tiers||'-');
+  };
+
+  const send=async(text)=>{
+    const t=String(text||'').trim();
+    if(busy||!t)return;
+    const next=[...msgs,{role:'user',text:t}];
+    sMsgs(next);sInp('');sBusy(true);
+    try{
+      const contents=[
+        {role:'user',parts:[{text:ctx()}]},
+        {role:'model',parts:[{text:'รับทราบข้อมูลในแบบฟอร์มแล้วครับ มีอะไรให้ช่วยวิเคราะห์บ้างครับ'}]},
+        ...next.map(m=>({role:m.role==='model'?'model':'user',parts:[{text:m.text}]}))
+      ];
+      const reply=await gemCall(geminiKey,contents,{temperature:0.4,maxOutputTokens:4096});
+      sMsgs(m=>[...m,{role:'model',text:reply}]);
+    }catch(e){sMsgs(m=>[...m,{role:'model',text:'⚠️ เกิดข้อผิดพลาด: '+e.message}])}
+    sBusy(false);
+  };
+
+  const QUICK=['ช่วยเสนอ CMP จากเหตุการณ์นี้','ปัจจัยสาเหตุ 5 Tiers ที่น่าจะเกี่ยวข้อง','เสนอกลยุทธ์แก้ไขและตัวชี้วัด'];
+
+  return(
+    <>
+      {open&&<div style={{position:'fixed',bottom:150,right:24,width:380,maxWidth:'calc(100vw - 32px)',height:'min(540px, calc(100vh - 200px))',background:'#fff',borderRadius:14,boxShadow:'0 8px 32px rgba(0,0,0,0.3)',zIndex:998,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+        <div style={{background:'var(--primary)',color:'#fff',padding:'10px 14px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+          <div style={{fontWeight:700,fontSize:14}}>🤖 AI ผู้ช่วยวิเคราะห์ (เห็นข้อมูลในฟอร์ม)</div>
+          <span onClick={()=>sOpen(false)} style={{cursor:'pointer',fontWeight:700,fontSize:16}}>✕</span>
+        </div>
+        <div style={{flex:1,overflowY:'auto',padding:12,background:'#f5f7fa'}}>
+          {msgs.map((m,i)=>(
+            <div key={i} style={{display:'flex',justifyContent:m.role==='user'?'flex-end':'flex-start',marginBottom:10}}>
+              <div style={{maxWidth:'85%',padding:'8px 12px',borderRadius:m.role==='user'?'12px 12px 4px 12px':'12px 12px 12px 4px',background:m.role==='user'?'var(--primary)':'#fff',color:m.role==='user'?'#fff':'var(--text)',boxShadow:'0 1px 3px rgba(0,0,0,0.1)',fontSize:13,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>
+                {aiBold(m.text)}
+              </div>
+            </div>
+          ))}
+          {busy&&<div style={{fontSize:13,color:'var(--text-light)',padding:'4px 8px'}}>⏳ กำลังคิด...</div>}
+          <div ref={endRef}></div>
+        </div>
+        <div style={{padding:'8px 10px',borderTop:'1px solid var(--border)',background:'#fff'}}>
+          <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:8}}>
+            {QUICK.map(q=><button key={q} onClick={()=>send(q)} disabled={busy} style={{fontSize:11,padding:'4px 10px',border:'1px solid var(--primary)',borderRadius:12,background:'#f0f7ff',color:'var(--primary)',cursor:'pointer',fontFamily:'inherit'}}>{q}</button>)}
+          </div>
+          <div style={{display:'flex',gap:6}}>
+            <textarea value={inp} onChange={e=>sInp(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send(inp)}}} placeholder="ถามเกี่ยวกับเคสนี้..." rows={1} style={{flex:1,padding:'7px 10px',border:'1.5px solid var(--border)',borderRadius:8,fontSize:13,fontFamily:'inherit',resize:'none'}} disabled={busy}/>
+            <button className="btn btn-p btn-sm" onClick={()=>send(inp)} disabled={busy||!inp.trim()}>➤</button>
+          </div>
+        </div>
+      </div>}
+      <div onClick={()=>sOpen(o=>!o)} title="AI ผู้ช่วยวิเคราะห์" style={{position:'fixed',bottom:84,right:24,width:56,height:56,borderRadius:'50%',background:open?'#e67e22':'var(--primary)',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:26,cursor:'pointer',boxShadow:'0 4px 14px rgba(0,0,0,0.35)',zIndex:999,userSelect:'none',transition:'background 0.2s'}}>{open?'✕':'🤖'}</div>
+    </>
   );
 }
 
@@ -1769,7 +1842,8 @@ function App(){
           </div>
         </div>
       </div>
-      {saving&&<div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:999}}>
+      {nav==='form'&&aiKey&&<AiFloat geminiKey={aiKey} fd={fd}/>}
+      {saving&&<div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000}}>
         <div style={{background:'#fff',borderRadius:16,padding:'32px 48px',textAlign:'center',boxShadow:'0 8px 32px rgba(0,0,0,0.3)'}}>
           <div style={{width:48,height:48,border:'4px solid #dce1e8',borderTopColor:'var(--primary)',borderRadius:'50%',animation:'sp 0.8s linear infinite',margin:'0 auto 16px'}}></div>
           <div style={{fontSize:16,fontWeight:700,color:'var(--primary)'}}>ระบบกำลังบันทึก...</div>

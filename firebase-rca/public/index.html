@@ -1606,15 +1606,11 @@ function App(){
     try{await db.collection('users').doc(uid).update({status:'rejected'})}catch(e){alert('ปฏิเสธไม่สำเร็จ: '+e.message)}
   };
 
-  // Logout
+  // Logout - ออกเฉพาะระบบ RCA ไม่กระทบบัญชี Google อื่นในเบราว์เซอร์
   const handleLogout=async()=>{
     try{await auth.signOut()}catch(e){}
     setUser(null);setUserData(undefined);
-    // Open Google logout in a hidden popup to clear Google session, then reload
-    try{
-      const w=window.open('https://accounts.google.com/Logout','_blank','width=400,height=300');
-      setTimeout(()=>{if(w)w.close();window.location.reload()},1500);
-    }catch(e){window.location.reload()}
+    window.location.reload();
   };
 
   // Apply AI analysis to RCA form

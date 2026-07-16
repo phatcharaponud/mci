@@ -1386,6 +1386,7 @@ function App(){
   const[sch,sSch]=useState([]);
   const[unreadCount,setUnreadCount]=useState(0);
   const[aiKey,sAiKey]=useState('');
+  const[aiNotice,sAiNotice]=useState(false);
 
   const st=m=>{sT(m);setTimeout(()=>sT(null),3000)};
   const uf=(f,v)=>sFD(p=>({...p,[f]:v}));
@@ -1566,12 +1567,13 @@ function App(){
       flowSteps:fs.slice(0,Math.max(5,fs.length)),fsSaved:fs.some(s=>s),
       cmps:cmps.length?cmps:[{step:'',problem:'',unsafeAct:''}],cmpsSaved:cmps.length>0,
       ta});
+    sAiNotice(true);
     sN('form');
     st('📝 นำข้อมูลจาก AI ลงแบบฟอร์มแล้ว กรุณาตรวจสอบและแก้ไขก่อนบันทึก');
   };
 
   // RCA actions
-  const hNew=()=>{sCI(null);sFD({...DF,ta:mkTD()});sN('form')};
+  const hNew=()=>{sCI(null);sFD({...DF,ta:mkTD()});sAiNotice(false);sN('form')};
   const hSave=async()=>{
     sSaving(true);
     // Deep clean: remove undefined values recursively for Firestore compatibility
@@ -1619,7 +1621,7 @@ function App(){
       sSaving(false);st('เกิดข้อผิดพลาด: '+e.message);
     }
   };
-  const hLoad=r=>{sCI(r.id);sFD({...DF,...r,ta:(r.ta||mkTD()).map(migTier)});sN('form');if(isAdmin&&r.adminViewed===false){db.collection('rca').doc(r.id).update({adminViewed:true}).catch(()=>{})}};
+  const hLoad=r=>{sCI(r.id);sFD({...DF,...r,ta:(r.ta||mkTD()).map(migTier)});sAiNotice(false);sN('form');if(isAdmin&&r.adminViewed===false){db.collection('rca').doc(r.id).update({adminViewed:true}).catch(()=>{})}};
   const hExp=f2=>{const w=window.open('','_blank');w.document.write(bExp(fd,f2));w.document.close();st(f2==='pdf'?'เปิดหน้า PDF':'เปิด Word')};
 
   // Auto-save every 5 minutes when editing RCA form
@@ -1747,6 +1749,15 @@ function App(){
             </div>
           </div>
           <div className="cb">
+            {nav==='form'&&aiNotice&&<div style={{margin:'16px 20px 0',background:'#fff8e1',border:'1.5px solid #ffc107',borderRadius:10,padding:'12px 40px 12px 16px',position:'relative'}}>
+              <span onClick={()=>sAiNotice(false)} title="ปิดข้อความนี้" style={{position:'absolute',top:8,right:12,cursor:'pointer',fontWeight:700,fontSize:16,color:'#e67e22'}}>✕</span>
+              <div style={{fontWeight:700,fontSize:14,color:'#e67e22',marginBottom:6}}>🤖 AI กรอกส่วนการวิเคราะห์ให้แล้ว — กรุณาตรวจสอบความถูกต้องทุกช่อง และกรอกส่วนต่อไปนี้เพิ่มด้วยตนเอง</div>
+              <ul style={{fontSize:13,margin:'0 0 0 18px',lineHeight:1.9}}>
+                <li><strong>ตอนที่ 1:</strong> วันที่จัดทำ, วิชาชีพที่เกี่ยวข้อง, หน่วยงานหลัก/หน่วยงานร่วมแก้ไข, ผู้เข้าร่วมทำ RCA และวันที่/เวลาการทำ RCA</li>
+                <li><strong>ตอนที่ 2-3:</strong> ติ๊ก ☑ ปัจจัยย่อยในแต่ละ Tier ตามจริง, ตัวชี้วัด, ระยะเวลา, ผู้รับผิดชอบ และเลือก 🔗 เชื่อมโยงกับ CMP/Tier (เพื่อให้แผนภาพข้อ 4 แสดงลูกศรถูกต้อง)</li>
+                <li><strong>แถบสรุปผลและติดตาม:</strong> รายชื่อผู้บันทึก/หัวหน้างาน/เลขานุการ/ประธาน, ข้อมูลการติดตามผล และติ๊กเมื่อลงระบบ HRMS แล้ว</li>
+              </ul>
+            </div>}
             {nav==='form'&&<FormV fd={fd} sFD={sFD} uf={uf}/>}
             {nav==='list'&&<ListV rl={rl} onL={hLoad} onN={hNew} sRL={sRL} isAdmin={isAdmin} onExportPdf={(r)=>{const rfd={...DF,...r,ta:(r.ta||mkTD()).map(migTier)};const w=window.open('','_blank');w.document.write(bExp(rfd,'pdf'));w.document.close()}}/>}
             {nav==='cal'&&<CalV sch={sch} sSch={schSetWrapper} st={st}/>}

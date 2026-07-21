@@ -465,6 +465,116 @@ function PendingPage({user,userData,onSubmitReg,onLogout}){
   );
 }
 
+// ===== USER MANUAL PAGE =====
+function ManualV({isAdmin}){
+  const[openIdx,sOpenIdx]=useState(0);
+  const B=({children})=><strong style={{color:'var(--primary)'}}>{children}</strong>;
+  const Li=({children})=><li style={{marginBottom:6,lineHeight:1.7}}>{children}</li>;
+  const secs=[
+    {icon:'🚪',title:'1. การเข้าใช้งานครั้งแรก',body:<ul style={{paddingLeft:20,fontSize:14}}>
+      <Li>เปิดเว็บ <B>https://rca-up-hospital.web.app</B> แล้วกด <B>"เข้าสู่ระบบด้วยอีเมล"</B></Li>
+      <Li>เลือกบัญชี Google ของมหาวิทยาลัย (<B>@up.ac.th เท่านั้น</B>)</Li>
+      <Li>กรอก <B>ชื่อ-นามสกุลจริง</B> และเลือก <B>หน่วยงาน</B> แล้วกดส่งคำขอ</Li>
+      <Li>รอ <B>Admin อนุมัติ</B> จึงจะเข้าใช้ระบบได้ (หากรอนาน ติดต่องานบริหารความเสี่ยง)</Li>
+      <Li>เข้าระบบครั้งแรกหลังอนุมัติ ระบบจะให้ <B>ตั้งรหัส PIN 6 หลัก</B> ใช้ยืนยันตัวตนทุกครั้ง</Li>
+    </ul>},
+    {icon:'🔐',title:'2. การเข้าระบบครั้งถัดไป และรหัส PIN',body:<ul style={{paddingLeft:20,fontSize:14}}>
+      <Li>ทุกครั้งที่เข้าระบบ: login Google → <B>ใส่ PIN 6 หลัก</B> → เข้าใช้งาน</Li>
+      <Li>ใส่ PIN ผิด <B>5 ครั้ง ระบบล็อก 15 นาที</B> (มีตัวนับเวลาถอยหลัง)</Li>
+      <Li><B>ลืม PIN</B>: แจ้ง Admin กด "รีเซ็ต PIN" แล้วตั้งใหม่ในการเข้าครั้งถัดไป</Li>
+      <Li>ระบบเก็บ PIN แบบเข้ารหัส ไม่มีใครเห็น PIN ของคุณได้ แม้แต่ Admin</Li>
+      <Li>ไม่มีการใช้งาน <B>2 ชั่วโมง</B> ระบบออกจากระบบให้อัตโนมัติ / ปิดเบราว์เซอร์ = ออกจากระบบ</Li>
+    </ul>},
+    {icon:'📋',title:'3. การบันทึกแบบฟอร์ม RCA',body:<div style={{fontSize:14}}>
+      <p style={{fontWeight:700,marginBottom:4}}>ตอนที่ 1: ข้อมูลเบื้องต้น</p>
+      <ul style={{paddingLeft:20,marginBottom:10}}>
+        <Li>กรอกหน่วยงาน, วันที่, เรื่อง, รหัสอุบัติการณ์ และเลือก<B>ระดับความรุนแรง</B> (วางเมาส์บน A-I หรือ 1-5 เพื่อดูคำอธิบาย)</Li>
+        <Li>กรอกรายละเอียดเหตุการณ์ ผู้เข้าร่วมทำ RCA และแนบไฟล์รูป/PDF ได้ (ไม่เกิน 10 MB/ไฟล์ คลิกรูปเพื่อขยาย)</Li>
+      </ul>
+      <p style={{fontWeight:700,marginBottom:4}}>ตอนที่ 2-3: จุดเปลี่ยนและปัจจัยสาเหตุ</p>
+      <ul style={{paddingLeft:20,marginBottom:10}}>
+        <Li><B>Flow of Steps</B>: กรอกขั้นตอนการดูแล แล้วกด "บันทึกขั้นตอน"</Li>
+        <Li><B>CMPs</B>: เลือกขั้นตอน กรอกปัญหาและ Unsafe Act แล้วกด "บันทึก CMP"</Li>
+        <Li><B>Tier 1-5</B>: ติ๊ก ☑ Tier ที่เกี่ยวข้อง เลือก 🔗 เชื่อมโยงกับ CMP/Tier ก่อนหน้า กรอกรายละเอียด กลยุทธ์ ตัวชี้วัด ผู้รับผิดชอบ (กด "+ เพิ่มรายการ" ได้หลายรายการต่อ Tier)</Li>
+      </ul>
+      <p style={{fontWeight:700,marginBottom:4}}>แถบสรุปผลและติดตาม</p>
+      <ul style={{paddingLeft:20,marginBottom:10}}>
+        <Li>ระบบสรุปข้อมูลอัตโนมัติ ข้อ 4 แสดง<B>แผนภาพความเชื่อมโยง</B> (Swiss Cheese Model) ตามที่เชื่อมโยงไว้</Li>
+        <Li>กรอกการติดตามผล รายชื่อผู้เกี่ยวข้อง และติ๊กเมื่อลงระบบ HRMS แล้ว</Li>
+      </ul>
+      <p style={{fontWeight:700,marginBottom:4}}>การบันทึกและ Export</p>
+      <ul style={{paddingLeft:20}}>
+        <Li>กด <B>💾 บันทึก</B> มุมขวาบน รอจนขึ้น "บันทึกเรียบร้อยแล้ว" (ระบบ<B>บันทึกอัตโนมัติทุก 5 นาที</B>ด้วย)</Li>
+        <Li>กด <B>📄 PDF</B> หรือ <B>📝 Word</B> เพื่อออกรายงานฉบับเต็ม จัดหน้า A4 ให้อัตโนมัติ</Li>
+      </ul>
+    </div>},
+    {icon:'🤖',title:'4. น้องริ้กกี้ AI ช่วยวิเคราะห์ RCA',body:<ul style={{paddingLeft:20,fontSize:14}}>
+      <Li>เมนู <B>"น้องริ้กกี้ AI ช่วยวิเคราะห์"</B>: พิมพ์เล่าเหตุการณ์ หรือกด <B>📎 PDF</B> แนบรายงาน (ไม่เกิน 10 MB)</Li>
+      <Li>น้องริ้กกี้จะสรุปเหตุการณ์ วิเคราะห์ CMP + ปัจจัย 5 Tiers และ<B>ถามคำถามเพิ่ม</B>จนข้อมูลครบ</Li>
+      <Li>กด <B>"📝 นำลงแบบฟอร์ม RCA"</B> ระบบกรอกแบบฟอร์มให้อัตโนมัติ พร้อมแถบเหลืองบอกช่องที่ต้องกรอกเพิ่มเอง</Li>
+      <Li><B>ปุ่มลอย 🤖 ในหน้าแบบฟอร์ม</B>: กดคุยกับน้องริ้กกี้ได้ระหว่างกรอก — น้องริ้กกี้เห็นข้อมูลที่กรอกอยู่ จึงช่วยเสนอ CMP/ปัจจัย/กลยุทธ์ได้ตรงเคส</Li>
+      <Li>⚠️ AI อาจให้ข้อมูลคลาดเคลื่อน <B>ต้องตรวจสอบก่อนบันทึกทุกครั้ง</B> และไม่ควรพิมพ์ชื่อผู้ป่วย/HN ลงในแชท</Li>
+      <Li>น้องริ้กกี้ตอบเฉพาะเรื่องการบริหารความเสี่ยงและ RCA เท่านั้น</Li>
+    </ul>},
+    {icon:'📁',title:'5. รายการ RCA',body:<ul style={{paddingLeft:20,fontSize:14}}>
+      <Li>เห็นเฉพาะรายการ<B>ที่ตนเองสร้าง</B> (Admin เห็นทุกรายการ)</Li>
+      <Li>ใช้กล่องค้นหาจากชื่อเรื่อง หน่วยงาน หรือรหัส RCA</Li>
+      <Li>กด <B>"เปิด"</B> เพื่อแก้ไข, กด <B>📄</B> เพื่อดูเป็น PDF (ปุ่ม "ลบ" มีเฉพาะ Admin)</Li>
+    </ul>},
+    {icon:'📅',title:'6. ปฏิทินกำหนด RCA และแจ้งเตือน Line',body:<ul style={{paddingLeft:20,fontSize:14}}>
+      <Li>คลิกวันที่ในปฏิทิน หรือกด <B>"+ เพิ่มกำหนดการ RCA"</B> กรอกเรื่อง หน่วยงาน วันที่ (ปี ค.ศ.) เวลา สถานที่</Li>
+      <Li>Line OA แจ้งเตือนอัตโนมัติ: <B>3 วันก่อน</B>ถึงกำหนด และ <B>7 วันหลัง</B>ทำ RCA (เตือนบันทึกรายงานและลง HRMS)</Li>
+    </ul>},
+    {icon:'💬',title:'7. กระดานแลกเปลี่ยน & RM News',body:<ul style={{paddingLeft:20,fontSize:14}}>
+      <Li><B>RM News</B> แสดงบนสุดเสมอ</Li>
+      <Li>สร้างโพสต์ แนบไฟล์/รูป/ลิงก์ได้ (ไม่เกิน 10 MB) ตอบกลับโพสต์ได้ทุกคน</Li>
+      <Li>แก้ไขโพสต์ของตนเองได้ (แสดงเวลาแก้ไข) ลบได้เฉพาะ Admin</Li>
+    </ul>},
+    {icon:'🧭',title:'8. เมนูอื่นๆ',body:<ul style={{paddingLeft:20,fontSize:14}}>
+      <Li><B>📚 ความรู้ RCA</B>: แนวคิด RCA, Swiss Cheese Model, 5 Tiers</Li>
+      <Li><B>📊 Dashboard</B>: สถิติจำนวน RCA, การลง HRMS, การติดตามผล</Li>
+      <Li><B>🔗 ระบบ HRMS</B>: ลิงก์ไปยังระบบ HRMS ของโรงพยาบาล</Li>
+    </ul>},
+    ...(isAdmin?[{icon:'👑',title:'9. สำหรับ Admin',body:<ul style={{paddingLeft:20,fontSize:14}}>
+      <Li><B>อนุมัติ/ปฏิเสธ</B>ผู้ใช้ใหม่ (แก้ไขหน่วยงานก่อนอนุมัติได้), ยกเลิกอนุมัติ, เปลี่ยนบทบาท user ↔ admin</Li>
+      <Li><B>รีเซ็ต PIN</B> ให้ผู้ใช้ที่ลืม</Li>
+      <Li>ตั้งค่า <B>Gemini API Key</B> เพื่อเปิด/ปิดน้องริ้กกี้ AI</Li>
+      <Li>ตัวเลขสีแดงที่ "รายการ RCA" = รายการใหม่ที่ยังไม่ได้เปิดดู</Li>
+    </ul>}]:[]),
+    {icon:'❓',title:(isAdmin?'10':'9')+'. ปัญหาที่พบบ่อย',body:<table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+      <thead><tr style={{background:'var(--primary)',color:'#fff'}}><th style={{padding:8,textAlign:'left'}}>ปัญหา</th><th style={{padding:8,textAlign:'left'}}>วิธีแก้</th></tr></thead>
+      <tbody>
+        {[['เข้าระบบไม่ได้','ตรวจว่าใช้อีเมล @up.ac.th และได้รับอนุมัติแล้ว'],
+          ['ค้างหน้า "รอการอนุมัติ"','ติดต่อ Admin (งานบริหารความเสี่ยง)'],
+          ['ลืม PIN / PIN ถูกล็อก','ติดต่อ Admin เพื่อรีเซ็ต (กรณีล็อก 15 นาที รอครบเวลาแล้วลองใหม่)'],
+          ['บันทึกไม่สำเร็จ','ตรวจขนาดไฟล์แนบ (ไม่เกิน 10 MB) และสัญญาณอินเทอร์เน็ต'],
+          ['น้องริ้กกี้ไม่ตอบ / ขึ้น error','โควตาฟรีอาจหมดชั่วคราว รอสักครู่แล้วลองใหม่ หรือแจ้ง Admin'],
+          ['ข้อมูลไม่อัปเดต','กด Refresh (Ctrl+Shift+R)']].map((r,i)=>(
+          <tr key={i} style={{borderBottom:'1px solid var(--border)'}}><td style={{padding:8,fontWeight:600}}>{r[0]}</td><td style={{padding:8}}>{r[1]}</td></tr>
+        ))}
+      </tbody>
+    </table>},
+  ];
+  return(
+    <div style={{padding:20,maxWidth:900}}>
+      <div style={{background:'linear-gradient(135deg,var(--primary),#3498db)',color:'#fff',borderRadius:12,padding:'18px 22px',marginBottom:16}}>
+        <div style={{fontSize:18,fontWeight:800}}>📖 คู่มือการใช้งานระบบ RCA Management System</div>
+        <div style={{fontSize:13,opacity:0.9,marginTop:4}}>โรงพยาบาลมหาวิทยาลัยพะเยา — กดที่หัวข้อเพื่อเปิด/ปิดเนื้อหา</div>
+      </div>
+      {secs.map((s,i)=>(
+        <div key={i} style={{border:'1px solid var(--border)',borderRadius:10,marginBottom:10,overflow:'hidden',background:'#fff'}}>
+          <div onClick={()=>sOpenIdx(openIdx===i?-1:i)} style={{padding:'12px 16px',cursor:'pointer',display:'flex',justifyContent:'space-between',alignItems:'center',background:openIdx===i?'#f0f7ff':'#fff'}}>
+            <span style={{fontWeight:700,fontSize:15,color:'var(--primary)'}}>{s.icon} {s.title}</span>
+            <span style={{color:'var(--text-light)'}}>{openIdx===i?'▲':'▼'}</span>
+          </div>
+          {openIdx===i&&<div style={{padding:'4px 16px 16px'}}>{s.body}</div>}
+        </div>
+      ))}
+      <div style={{textAlign:'center',fontSize:12,color:'var(--text-light)',marginTop:16}}>ระบบพัฒนาโดยแนวคิดของ PhatcharaponUd | งานบริหารความเสี่ยง โรงพยาบาลมหาวิทยาลัยพะเยา</div>
+    </div>
+  );
+}
+
 // ===== PIN PAGE =====
 function PinPage({user,userData,onOk,onLogout}){
   const hasPin=!!userData.pinHash;
@@ -1861,7 +1971,7 @@ function App(){
   }
 
   // Approved - show main app
-  const navTitle={form:'📋 แบบฟอร์มบันทึก RCA',list:'📁 รายการ RCA',cal:'📅 ปฏิทินกำหนดทำ RCA',kb:'📚 ความรู้ RCA',ai:'🤖 น้องริ้กกี้ AI ช่วยวิเคราะห์ RCA',db:'📊 Dashboard',admin:'👑 จัดการผู้ใช้',board:'💬 กระดานแลกเปลี่ยน & RM News'};
+  const navTitle={form:'📋 แบบฟอร์มบันทึก RCA',list:'📁 รายการ RCA',cal:'📅 ปฏิทินกำหนดทำ RCA',kb:'📚 ความรู้ RCA',ai:'🤖 น้องริ้กกี้ AI ช่วยวิเคราะห์ RCA',manual:'📖 คู่มือการใช้งาน',db:'📊 Dashboard',admin:'👑 จัดการผู้ใช้',board:'💬 กระดานแลกเปลี่ยน & RM News'};
 
   return(
     <div className="app-with-bar">
@@ -1889,6 +1999,7 @@ function App(){
             <div className={`ni ${nav==='cal'?'ac':''}`} onClick={()=>sN('cal')}><span className="ni-i">📅</span><span>ปฏิทินกำหนด RCA</span></div>
             <div className={`ni ${nav==='kb'?'ac':''}`} onClick={()=>sN('kb')}><span className="ni-i">📚</span><span>ความรู้ RCA</span></div>
             <div className={`ni ${nav==='ai'?'ac':''}`} onClick={()=>sN('ai')}><span className="ni-i">🤖</span><span>น้องริ้กกี้ AI ช่วยวิเคราะห์</span></div>
+            <div className={`ni ${nav==='manual'?'ac':''}`} onClick={()=>sN('manual')}><span className="ni-i">📖</span><span>คู่มือการใช้งาน</span></div>
             <div className={`ni ${nav==='board'?'ac':''}`} onClick={()=>sN('board')}><span className="ni-i">💬</span><span>กระดานแลกเปลี่ยน & RM News</span></div>
             <div className="ns">รายงาน</div>
             <div className={`ni ${nav==='db'?'ac':''}`} onClick={()=>sN('db')}><span className="ni-i">📊</span><span>Dashboard</span></div>
@@ -1924,6 +2035,7 @@ function App(){
             {nav==='cal'&&<CalV sch={sch} sSch={schSetWrapper} st={st}/>}
             {nav==='kb'&&<KBV/>}
             {nav==='ai'&&<AiChatV geminiKey={aiKey} isAdmin={isAdmin} onApply={hAiApply}/>}
+            {nav==='manual'&&<ManualV isAdmin={isAdmin}/>}
             {nav==='db'&&<DBV stats={stats} rl={rl}/>}
             {nav==='board'&&<BoardV user={user} userData={userData} isAdmin={isAdmin}/>}
             {nav==='admin'&&isAdmin&&<AdminPanel users={allUsers} onApprove={handleApprove} onReject={handleReject} geminiKey={aiKey}/>}

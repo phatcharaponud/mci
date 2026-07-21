@@ -18,7 +18,10 @@ service cloud.firestore {
         request.auth.uid in resource.data.collaborators ||
         request.auth.token.email == 'phatcharapon.ud@up.ac.th'
       );
-      allow delete: if request.auth != null && request.auth.token.email == 'phatcharapon.ud@up.ac.th';
+      allow delete: if request.auth != null && (
+        resource.data.ownerUid == request.auth.uid ||
+        request.auth.token.email == 'phatcharapon.ud@up.ac.th'
+      );
     }
 
     // คำขอร่วมแก้ไข RCA - ใครก็ส่งคำขอได้, เจ้าของรายการ/admin อนุมัติหรือปฏิเสธ

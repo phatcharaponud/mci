@@ -521,7 +521,8 @@ function ManualV({isAdmin}){
       <Li>รายการของตนเอง: กด <B>"เปิด"</B> เพื่อแก้ไข / รายการของผู้อื่น: กด <B>"👁 ดู"</B> ได้อย่างเดียว</Li>
       <Li>ต้องการแก้ไขรายการของผู้อื่น: กด <B>"🙋 ขอร่วมแก้ไข"</B> ระบุหน่วยงานที่ขอ แล้วรอ<B>ผู้จัดทำอนุมัติ</B></Li>
       <Li>เมื่อมีคนขอร่วมแก้ไขรายการของคุณ จะมี<B>กล่องสีเหลือง</B>ด้านบนรายการ RCA ให้กดอนุมัติ/ปฏิเสธ (มี badge 🙋 ที่เมนูด้วย)</Li>
-      <Li>ใช้กล่องค้นหาจากชื่อเรื่อง หน่วยงาน รหัส หรือชื่อผู้จัดทำ, กด <B>📄</B> เพื่อดูเป็น PDF (ปุ่ม "ลบ" มีเฉพาะ Admin)</Li>
+      <Li>ใช้กล่องค้นหาจากชื่อเรื่อง หน่วยงาน รหัส หรือชื่อผู้จัดทำ, กด <B>📄</B> เพื่อดูเป็น PDF</Li>
+      <Li>ปุ่ม <B>"ลบ"</B> มีเฉพาะ<B>ผู้จัดทำ</B> (ลบได้เฉพาะรายการของตนเอง) และ Admin — ผู้อื่นรวมถึงผู้ร่วมแก้ไขลบไม่ได้</Li>
     </ul>},
     {icon:'📅',title:'6. ปฏิทินกำหนด RCA และแจ้งเตือน Line',body:<ul style={{paddingLeft:20,fontSize:14}}>
       <Li>คลิกวันที่ในปฏิทิน หรือกด <B>"+ เพิ่มกำหนดการ RCA"</B> กรอกเรื่อง หน่วยงาน วันที่ (ปี ค.ศ.) เวลา สถานที่</Li>
@@ -1331,7 +1332,7 @@ function ListV({rl,onL,onN,sRL,isAdmin,onExportPdf,user,canEdit,editReqs,onReque
         {editable?<button className="btn btn-sm btn-p" onClick={()=>onL(r)}>เปิด</button>:<button className="btn btn-sm btn-o" onClick={()=>onL(r)} title="เปิดดูอย่างเดียว">👁 ดู</button>}
         {!editable&&(pendReq?<button className="btn btn-sm btn-w" disabled title="รอผู้จัดทำอนุมัติ">⏳ รออนุมัติ</button>:<button className="btn btn-sm btn-s" onClick={()=>onRequestEdit(r)}>🙋 ขอร่วมแก้ไข</button>)}
         <button className="btn btn-sm btn-w" onClick={()=>onExportPdf(r)} title="Export PDF">📄</button>
-        {isAdmin&&<button className="btn btn-sm btn-d" onClick={()=>{if(confirm('ลบ RCA '+r.id+' ('+( r.title||'-')+') ?')){db.collection('rca').doc(r.id).delete().then(()=>{sRL(prev=>prev.filter(x=>x.id!==r.id))})}}} title="ลบ">ลบ</button>}
+        {(isAdmin||r.ownerUid===user.uid)&&<button className="btn btn-sm btn-d" onClick={()=>{if(confirm('ลบ RCA '+r.id+' ('+( r.title||'-')+') ?')){db.collection('rca').doc(r.id).delete().then(()=>{sRL(prev=>prev.filter(x=>x.id!==r.id))}).catch(e=>alert('ลบไม่สำเร็จ: '+e.message))}}} title="ลบ">ลบ</button>}
       </div></td></tr>})}</tbody></table>}
   </div>;
 }

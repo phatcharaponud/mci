@@ -9,13 +9,9 @@ service cloud.firestore {
       allow update: if request.auth != null && (request.auth.uid == userId || request.auth.token.email == 'phatcharapon.ud@up.ac.th');
     }
 
-    // RCA records - เจ้าของดู/แก้ไขได้, ผู้ร่วมแก้ไขดู/แก้ไขได้, admin ดูทั้งหมด
+    // RCA records - ทุกคนที่ login เปิดดูได้, แก้ไขได้เฉพาะเจ้าของ/ผู้ร่วมแก้ไข/admin
     match /rca/{rcaId} {
-      allow read: if request.auth != null && (
-        resource.data.ownerUid == request.auth.uid ||
-        request.auth.uid in resource.data.collaborators ||
-        request.auth.token.email == 'phatcharapon.ud@up.ac.th'
-      );
+      allow read: if request.auth != null;
       allow create: if request.auth != null;
       allow update: if request.auth != null && (
         resource.data.ownerUid == request.auth.uid ||
@@ -23,6 +19,16 @@ service cloud.firestore {
         request.auth.token.email == 'phatcharapon.ud@up.ac.th'
       );
       allow delete: if request.auth != null && request.auth.token.email == 'phatcharapon.ud@up.ac.th';
+    }
+
+    // คำขอร่วมแก้ไข RCA - ใครก็ส่งคำขอได้, เจ้าของรายการ/admin อนุมัติหรือปฏิเสธ
+    match /editRequests/{reqId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.requesterUid == request.auth.uid;
+      allow update, delete: if request.auth != null && (
+        resource.data.ownerUid == request.auth.uid ||
+        request.auth.token.email == 'phatcharapon.ud@up.ac.th'
+      );
     }
 
     // Schedules - ผู้ใช้ที่อนุมัติแล้วอ่าน/เขียนได้

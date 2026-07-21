@@ -516,10 +516,12 @@ function ManualV({isAdmin}){
       <Li>⚠️ AI อาจให้ข้อมูลคลาดเคลื่อน <B>ต้องตรวจสอบก่อนบันทึกทุกครั้ง</B> และไม่ควรพิมพ์ชื่อผู้ป่วย/HN ลงในแชท</Li>
       <Li>น้องริ้กกี้ตอบเฉพาะเรื่องการบริหารความเสี่ยงและ RCA เท่านั้น</Li>
     </ul>},
-    {icon:'📁',title:'5. รายการ RCA',body:<ul style={{paddingLeft:20,fontSize:14}}>
-      <Li>เห็นเฉพาะรายการ<B>ที่ตนเองสร้าง</B> (Admin เห็นทุกรายการ)</Li>
-      <Li>ใช้กล่องค้นหาจากชื่อเรื่อง หน่วยงาน หรือรหัส RCA</Li>
-      <Li>กด <B>"เปิด"</B> เพื่อแก้ไข, กด <B>📄</B> เพื่อดูเป็น PDF (ปุ่ม "ลบ" มีเฉพาะ Admin)</Li>
+    {icon:'📁',title:'5. รายการ RCA และการขอร่วมแก้ไข',body:<ul style={{paddingLeft:20,fontSize:14}}>
+      <Li>ทุกคนเห็นรายการทั้งหมด แต่<B>แก้ไข/บันทึกได้เฉพาะผู้จัดทำ</B> (และผู้ที่ได้รับอนุมัติร่วมแก้ไข)</Li>
+      <Li>รายการของตนเอง: กด <B>"เปิด"</B> เพื่อแก้ไข / รายการของผู้อื่น: กด <B>"👁 ดู"</B> ได้อย่างเดียว</Li>
+      <Li>ต้องการแก้ไขรายการของผู้อื่น: กด <B>"🙋 ขอร่วมแก้ไข"</B> ระบุหน่วยงานที่ขอ แล้วรอ<B>ผู้จัดทำอนุมัติ</B></Li>
+      <Li>เมื่อมีคนขอร่วมแก้ไขรายการของคุณ จะมี<B>กล่องสีเหลือง</B>ด้านบนรายการ RCA ให้กดอนุมัติ/ปฏิเสธ (มี badge 🙋 ที่เมนูด้วย)</Li>
+      <Li>ใช้กล่องค้นหาจากชื่อเรื่อง หน่วยงาน รหัส หรือชื่อผู้จัดทำ, กด <B>📄</B> เพื่อดูเป็น PDF (ปุ่ม "ลบ" มีเฉพาะ Admin)</Li>
     </ul>},
     {icon:'📅',title:'6. ปฏิทินกำหนด RCA และแจ้งเตือน Line',body:<ul style={{paddingLeft:20,fontSize:14}}>
       <Li>คลิกวันที่ในปฏิทิน หรือกด <B>"+ เพิ่มกำหนดการ RCA"</B> กรอกเรื่อง หน่วยงาน วันที่ (ปี ค.ศ.) เวลา สถานที่</Li>
@@ -1298,14 +1300,39 @@ function TC({tier,idx,td,hd,fd,uT,uTE,tTCE,aTE,rTE}){
 }
 
 // ===== LIST VIEW =====
-function ListV({rl,onL,onN,sRL,isAdmin,onExportPdf}){
+function ListV({rl,onL,onN,sRL,isAdmin,onExportPdf,user,canEdit,editReqs,onRequestEdit,onApproveReq,onRejectReq}){
   const[srch,sSrch]=useState('');
-  const filtered=srch.trim()?rl.filter(r=>{const q=srch.toLowerCase();return(r.title||'').toLowerCase().includes(q)||(r.department||'').toLowerCase().includes(q)||(r.incidentCode||'').toLowerCase().includes(q)||(r.id||'').toLowerCase().includes(q)}):rl;
+  const filtered=srch.trim()?rl.filter(r=>{const q=srch.toLowerCase();return(r.title||'').toLowerCase().includes(q)||(r.department||'').toLowerCase().includes(q)||(r.incidentCode||'').toLowerCase().includes(q)||(r.id||'').toLowerCase().includes(q)||(r.ownerName||'').toLowerCase().includes(q)}):rl;
+  const incoming=(editReqs||[]).filter(q=>q.status==='pending'&&(q.ownerUid===user.uid||isAdmin));
+  const myPendingFor=rid=>(editReqs||[]).find(q=>q.rcaId===rid&&q.requesterUid===user.uid&&q.status==='pending');
   if(!rl.length)return<div style={{textAlign:'center',padding:60,color:'var(--text-light)'}}><div style={{fontSize:48}}>📋</div><div style={{fontSize:16,fontWeight:600,marginTop:8}}>ยังไม่มี RCA</div><button className="btn btn-p" style={{marginTop:16}} onClick={onN}>➕ สร้างใหม่</button></div>;
   return<div>
-    <div style={{marginBottom:12}}><input className="fi" value={srch} onChange={e=>sSrch(e.target.value)} placeholder="🔍 ค้นหา RCA ตามชื่อเรื่อง, หน่วยงาน, รหัสอุบัติการณ์, หรือ ID..." style={{maxWidth:500}}/></div>
+    {incoming.length>0&&<div style={{background:'#fff8e1',border:'1.5px solid #ffc107',borderRadius:10,padding:'12px 16px',marginBottom:14}}>
+      <div style={{fontWeight:700,fontSize:14,color:'#e67e22',marginBottom:8}}>🙋 คำขอร่วมแก้ไขที่รอการอนุมัติ ({incoming.length})</div>
+      {incoming.map(rq=>(
+        <div key={rq.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,flexWrap:'wrap',padding:'8px 0',borderTop:'1px solid #ffe082'}}>
+          <div style={{fontSize:13}}>
+            <strong>{rq.requesterName}</strong> <span style={{color:'var(--text-light)'}}>({rq.requesterEmail})</span><br/>
+            หน่วยงานที่ขอ: <strong>{rq.department}</strong> — ขอร่วมแก้ไข <strong style={{color:'var(--primary)'}}>{rq.rcaId}</strong> {rq.rcaTitle?'('+rq.rcaTitle+')':''}
+          </div>
+          <div style={{display:'flex',gap:6}}>
+            <button className="btn btn-sm btn-p" onClick={()=>onApproveReq(rq)}>✅ อนุมัติ</button>
+            <button className="btn btn-sm btn-d" onClick={()=>onRejectReq(rq)}>❌ ปฏิเสธ</button>
+          </div>
+        </div>
+      ))}
+    </div>}
+    <div style={{marginBottom:12}}><input className="fi" value={srch} onChange={e=>sSrch(e.target.value)} placeholder="🔍 ค้นหา RCA ตามชื่อเรื่อง, หน่วยงาน, รหัสอุบัติการณ์, ผู้จัดทำ, หรือ ID..." style={{maxWidth:500}}/></div>
     {filtered.length===0?<div style={{textAlign:'center',padding:30,color:'var(--text-light)',fontSize:14}}>ไม่พบผลลัพธ์สำหรับ "{srch}"</div>:
-    <table className="rlt"><thead><tr><th>รหัส</th><th>เรื่อง</th><th>หน่วยงาน</th><th>วันที่</th><th>ระดับ</th><th>HRMS</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody>{filtered.map(r=><tr key={r.id}><td style={{fontWeight:600,color:'var(--primary)'}}>{r.id}</td><td>{r.title||'-'}</td><td>{r.department||'-'}</td><td>{fmtDate(r.date)}</td><td>{r.sevL||'-'}{r.sevN?'/'+r.sevN:''}</td><td>{r.hrms?<span className="stb sth">✅</span>:<span style={{color:'var(--accent)'}}>❌</span>}</td><td><span className={`stb ${r.followUpStatus==='completed'?'stc':'std'}`}>{r.followUpStatus==='completed'?'เสร็จ':r.followUpStatus==='in_progress'?'ดำเนินการ':'รอ'}</span></td><td><div style={{display:'flex',gap:4,flexWrap:'wrap'}}><button className="btn btn-sm btn-p" onClick={()=>onL(r)}>เปิด</button><button className="btn btn-sm btn-w" onClick={()=>onExportPdf(r)} title="Export PDF">📄</button>{isAdmin&&<button className="btn btn-sm btn-d" onClick={()=>{if(confirm('ลบ RCA '+r.id+' ('+( r.title||'-')+') ?')){db.collection('rca').doc(r.id).delete().then(()=>{sRL(prev=>prev.filter(x=>x.id!==r.id))})}}} title="ลบ">ลบ</button>}</div></td></tr>)}</tbody></table>}
+    <table className="rlt"><thead><tr><th>รหัส</th><th>เรื่อง</th><th>หน่วยงาน</th><th>ผู้จัดทำ</th><th>วันที่</th><th>ระดับ</th><th>HRMS</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody>{filtered.map(r=>{
+      const editable=canEdit(r);
+      const pendReq=myPendingFor(r.id);
+      return<tr key={r.id}><td style={{fontWeight:600,color:'var(--primary)'}}>{r.id}</td><td>{r.title||'-'}</td><td>{r.department||'-'}</td><td style={{fontSize:12}}>{r.ownerName||'-'}{(r.collaborators||[]).includes(user.uid)&&<span style={{display:'block',fontSize:10,color:'var(--success)'}}>✅ คุณร่วมแก้ไขได้</span>}</td><td>{fmtDate(r.date)}</td><td>{r.sevL||'-'}{r.sevN?'/'+r.sevN:''}</td><td>{r.hrms?<span className="stb sth">✅</span>:<span style={{color:'var(--accent)'}}>❌</span>}</td><td><span className={`stb ${r.followUpStatus==='completed'?'stc':'std'}`}>{r.followUpStatus==='completed'?'เสร็จ':r.followUpStatus==='in_progress'?'ดำเนินการ':'รอ'}</span></td><td><div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+        {editable?<button className="btn btn-sm btn-p" onClick={()=>onL(r)}>เปิด</button>:<button className="btn btn-sm btn-o" onClick={()=>onL(r)} title="เปิดดูอย่างเดียว">👁 ดู</button>}
+        {!editable&&(pendReq?<button className="btn btn-sm btn-w" disabled title="รอผู้จัดทำอนุมัติ">⏳ รออนุมัติ</button>:<button className="btn btn-sm btn-s" onClick={()=>onRequestEdit(r)}>🙋 ขอร่วมแก้ไข</button>)}
+        <button className="btn btn-sm btn-w" onClick={()=>onExportPdf(r)} title="Export PDF">📄</button>
+        {isAdmin&&<button className="btn btn-sm btn-d" onClick={()=>{if(confirm('ลบ RCA '+r.id+' ('+( r.title||'-')+') ?')){db.collection('rca').doc(r.id).delete().then(()=>{sRL(prev=>prev.filter(x=>x.id!==r.id))})}}} title="ลบ">ลบ</button>}
+      </div></td></tr>})}</tbody></table>}
   </div>;
 }
 
@@ -1711,27 +1738,27 @@ function App(){
   // Load RCA records from Firestore
   useEffect(()=>{
     if(!user||!userData||userData.status!=='approved')return;
-    let q;
-    if(user.email===ADMIN_EMAIL){
-      q=db.collection('rca').orderBy('savedAt','desc');
-    }else{
-      q=db.collection('rca').where('ownerUid','==',user.uid).orderBy('savedAt','desc');
-    }
+    // ทุกคนเห็นรายการทั้งหมด (แก้ไขได้เฉพาะผู้จัดทำ/ผู้ร่วมแก้ไข/admin)
+    const q=db.collection('rca').orderBy('savedAt','desc');
     const unsub=q.onSnapshot(snap=>{
       sRL(snap.docs.map(d=>({id:d.id,...d.data()})));
     },err=>{
       console.error('RCA load error:',err);
       // Fallback without orderBy if index not ready
-      let q2;
-      if(user.email===ADMIN_EMAIL){
-        q2=db.collection('rca');
-      }else{
-        q2=db.collection('rca').where('ownerUid','==',user.uid);
-      }
-      q2.get().then(snap=>{
+      db.collection('rca').get().then(snap=>{
         sRL(snap.docs.map(d=>({id:d.id,...d.data()})));
       });
     });
+    return()=>unsub();
+  },[user,userData]);
+
+  // Edit-collaboration requests
+  const[editReqs,sEditReqs]=useState([]);
+  useEffect(()=>{
+    if(!user||!userData||userData.status!=='approved')return;
+    const unsub=db.collection('editRequests').onSnapshot(snap=>{
+      sEditReqs(snap.docs.map(d=>({id:d.id,...d.data()})));
+    },()=>{});
     return()=>unsub();
   },[user,userData]);
 
@@ -1840,7 +1867,36 @@ function App(){
 
   // RCA actions
   const hNew=()=>{sCI(null);sFD({...DF,ta:mkTD()});sAiNotice(false);sN('form')};
-  const hSave=async()=>{
+  // Edit permission: owner, approved collaborator, or admin
+  const canEditRec=r=>!!user&&!!r&&(isAdmin||r.ownerUid===user.uid||(r.collaborators||[]).includes(user.uid));
+  const curRec=ci?rl.find(x=>x.id===ci):null;
+  const formEditable=!ci||(curRec?canEditRec(curRec):true);
+
+  // Request to co-edit an RCA (with requesting department)
+  const hRequestEdit=(r)=>{
+    const dept=prompt('ขอร่วมแก้ไข '+r.id+' ('+(r.title||'-')+')\nกรุณาระบุหน่วยงานที่ขอ:',userData.department||'');
+    if(dept===null)return;
+    if(!dept.trim()){alert('กรุณาระบุหน่วยงานที่ขอ');return}
+    db.collection('editRequests').add({
+      rcaId:r.id,rcaTitle:r.title||'',ownerUid:r.ownerUid||'',ownerName:r.ownerName||'',
+      requesterUid:user.uid,requesterName:userData.fullName||'',requesterEmail:user.email,
+      department:dept.trim(),status:'pending',createdAt:new Date().toISOString()
+    }).then(()=>st('📨 ส่งคำขอร่วมแก้ไขแล้ว รอผู้จัดทำอนุมัติ')).catch(e=>alert('ส่งคำขอไม่สำเร็จ: '+e.message));
+  };
+  const hApproveReq=async(rq)=>{
+    try{
+      await db.collection('rca').doc(rq.rcaId).update({collaborators:firebase.firestore.FieldValue.arrayUnion(rq.requesterUid)});
+      await db.collection('editRequests').doc(rq.id).update({status:'approved',decidedAt:new Date().toISOString()});
+      st('✅ อนุมัติให้ '+rq.requesterName+' ร่วมแก้ไข '+rq.rcaId+' แล้ว');
+    }catch(e){alert('อนุมัติไม่สำเร็จ: '+e.message)}
+  };
+  const hRejectReq=(rq)=>{
+    if(!confirm('ปฏิเสธคำขอร่วมแก้ไขของ '+rq.requesterName+' ('+rq.department+')?'))return;
+    db.collection('editRequests').doc(rq.id).update({status:'rejected',decidedAt:new Date().toISOString()}).catch(e=>alert('ไม่สำเร็จ: '+e.message));
+  };
+
+  const hSave=async(silent)=>{
+    if(!formEditable){if(silent!==true)alert('คุณไม่ใช่ผู้จัดทำรายการนี้ จึงไม่สามารถบันทึกได้\nหากต้องการแก้ไข กรุณากด "ขอร่วมแก้ไข" ในหน้ารายการ RCA และรอผู้จัดทำอนุมัติ');return}
     sSaving(true);
     // Deep clean: remove undefined values recursively for Firestore compatibility
     const cleanForFirestore=(obj)=>{
@@ -1868,7 +1924,10 @@ function App(){
         }catch(e){console.error('Upload error:',e);uploadedAttachments.push({name:a.name,type:a.type,size:a.size,url:''})}
       }
     }
-    const docData=cleanForFirestore({...fd,attachments:uploadedAttachments,savedAt:new Date().toISOString(),status:'draft',ownerUid:user.uid,ownerEmail:user.email,ownerName:userData.fullName});
+    // กำหนดเจ้าของเฉพาะตอนสร้างใหม่ - การบันทึกโดยผู้ร่วมแก้ไขต้องไม่เปลี่ยนเจ้าของเดิม
+    const base={...fd,attachments:uploadedAttachments,savedAt:new Date().toISOString(),status:'draft'};
+    if(!ci){base.ownerUid=user.uid;base.ownerEmail=user.email;base.ownerName=userData.fullName}
+    const docData=cleanForFirestore(base);
     try{
       if(ci){
         await db.collection('rca').doc(ci).set(docData,{merge:true});
@@ -1895,7 +1954,7 @@ function App(){
   useEffect(()=>{
     if(nav!=='form'||!user){clearInterval(autoSaveRef.current);return}
     autoSaveRef.current=setInterval(()=>{
-      if(fd.title||fd.whatHappened||fd.department){hSave().then(()=>{}).catch(()=>{})}
+      if(fd.title||fd.whatHappened||fd.department){hSave(true).then(()=>{}).catch(()=>{})}
     },5*60*1000);
     return()=>clearInterval(autoSaveRef.current);
   },[nav,user,fd]);
@@ -1994,7 +2053,7 @@ function App(){
           <div className="sb-n">
             <div className="ns">แบบฟอร์ม</div>
             <div className={`ni ${nav==='form'?'ac':''}`} onClick={()=>sN('form')}><span className="ni-i">📋</span><span>แบบฟอร์ม RCA</span></div>
-            <div className={`ni ${nav==='list'?'ac':''}`} onClick={()=>sN('list')}><span className="ni-i">📁</span><span>รายการ RCA</span>{isAdmin&&unreadCount>0&&<span className="ni-b" style={{background:'#e74c3c'}}>{unreadCount}</span>}{rl.length>0&&<span className="ni-b">{rl.length}</span>}</div>
+            <div className={`ni ${nav==='list'?'ac':''}`} onClick={()=>sN('list')}><span className="ni-i">📁</span><span>รายการ RCA</span>{isAdmin&&unreadCount>0&&<span className="ni-b" style={{background:'#e74c3c'}}>{unreadCount}</span>}{editReqs.filter(q=>q.status==='pending'&&(q.ownerUid===user.uid||isAdmin)).length>0&&<span className="ni-b" style={{background:'#e67e22'}}>🙋{editReqs.filter(q=>q.status==='pending'&&(q.ownerUid===user.uid||isAdmin)).length}</span>}{rl.length>0&&<span className="ni-b">{rl.length}</span>}</div>
             <div className="ns">เครื่องมือ</div>
             <div className={`ni ${nav==='cal'?'ac':''}`} onClick={()=>sN('cal')}><span className="ni-i">📅</span><span>ปฏิทินกำหนด RCA</span></div>
             <div className={`ni ${nav==='kb'?'ac':''}`} onClick={()=>sN('kb')}><span className="ni-i">📚</span><span>ความรู้ RCA</span></div>
@@ -2016,11 +2075,15 @@ function App(){
           <div className="ch">
             <h2>{navTitle[nav]||''}</h2>
             <div className="ha">
-              {nav==='form'&&<><button className="btn btn-o btn-sm" onClick={hNew}>➕ ใหม่</button><button className="btn btn-p btn-sm" onClick={hSave}>💾 บันทึก</button><button className="btn btn-w btn-sm" onClick={()=>hExp('pdf')}>📄 PDF</button><button className="btn btn-s btn-sm" onClick={()=>hExp('word')}>📝 Word</button></>}
+              {nav==='form'&&<><button className="btn btn-o btn-sm" onClick={hNew}>➕ ใหม่</button>{formEditable&&<button className="btn btn-p btn-sm" onClick={hSave}>💾 บันทึก</button>}<button className="btn btn-w btn-sm" onClick={()=>hExp('pdf')}>📄 PDF</button><button className="btn btn-s btn-sm" onClick={()=>hExp('word')}>📝 Word</button></>}
               {nav==='list'&&<button className="btn btn-p btn-sm" onClick={hNew}>➕ ใหม่</button>}
             </div>
           </div>
           <div className="cb">
+            {nav==='form'&&!formEditable&&<div style={{margin:'16px 20px 0',background:'#fdecea',border:'1.5px solid #e74c3c',borderRadius:10,padding:'10px 16px',fontSize:13}}>
+              <strong style={{color:'#c0392b'}}>👁 โหมดดูอย่างเดียว</strong> — รายการนี้จัดทำโดย <strong>{(curRec&&curRec.ownerName)||'ผู้ใช้อื่น'}</strong> คุณไม่สามารถบันทึกการแก้ไขได้
+              {curRec&&!(editReqs||[]).find(q=>q.rcaId===curRec.id&&q.requesterUid===user.uid&&q.status==='pending')?<button className="btn btn-sm btn-s" style={{marginLeft:10}} onClick={()=>hRequestEdit(curRec)}>🙋 ขอร่วมแก้ไข</button>:<span style={{marginLeft:10,color:'#e67e22',fontWeight:600}}>⏳ ส่งคำขอแล้ว รอผู้จัดทำอนุมัติ</span>}
+            </div>}
             {nav==='form'&&aiNotice&&<div style={{margin:'16px 20px 0',background:'#fff8e1',border:'1.5px solid #ffc107',borderRadius:10,padding:'12px 40px 12px 16px',position:'relative'}}>
               <span onClick={()=>sAiNotice(false)} title="ปิดข้อความนี้" style={{position:'absolute',top:8,right:12,cursor:'pointer',fontWeight:700,fontSize:16,color:'#e67e22'}}>✕</span>
               <div style={{fontWeight:700,fontSize:14,color:'#e67e22',marginBottom:6}}>🤖 AI กรอกส่วนการวิเคราะห์ให้แล้ว — กรุณาตรวจสอบความถูกต้องทุกช่อง และกรอกส่วนต่อไปนี้เพิ่มด้วยตนเอง</div>
@@ -2031,7 +2094,7 @@ function App(){
               </ul>
             </div>}
             {nav==='form'&&<FormV fd={fd} sFD={sFD} uf={uf}/>}
-            {nav==='list'&&<ListV rl={rl} onL={hLoad} onN={hNew} sRL={sRL} isAdmin={isAdmin} onExportPdf={(r)=>{const rfd={...DF,...r,ta:(r.ta||mkTD()).map(migTier)};const w=window.open('','_blank');w.document.write(bExp(rfd,'pdf'));w.document.close()}}/>}
+            {nav==='list'&&<ListV rl={rl} onL={hLoad} onN={hNew} sRL={sRL} isAdmin={isAdmin} user={user} canEdit={canEditRec} editReqs={editReqs} onRequestEdit={hRequestEdit} onApproveReq={hApproveReq} onRejectReq={hRejectReq} onExportPdf={(r)=>{const rfd={...DF,...r,ta:(r.ta||mkTD()).map(migTier)};const w=window.open('','_blank');w.document.write(bExp(rfd,'pdf'));w.document.close()}}/>}
             {nav==='cal'&&<CalV sch={sch} sSch={schSetWrapper} st={st}/>}
             {nav==='kb'&&<KBV/>}
             {nav==='ai'&&<AiChatV geminiKey={aiKey} isAdmin={isAdmin} onApply={hAiApply}/>}

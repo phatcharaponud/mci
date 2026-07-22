@@ -250,7 +250,7 @@ const KS=[
 // ===== Helper Functions =====
 function mkTD(){return TD.map(t=>({id:t.id,en:false,entries:[{ck:[],oc:false,ot:'',desc:'',strat:'',ind:'',tl:'',resp:'',linkedTo:null}]}))}
 function migTier(t){if(t.entries)return{...t,entries:t.entries.map(e=>e.linkedTo!==undefined?e:{...e,linkedTo:null})};return{id:t.id,en:t.en,entries:[{ck:t.ck||[],oc:t.oc||false,ot:t.ot||'',desc:t.desc||'',strat:t.strat||'',ind:t.ind||'',tl:t.tl||'',resp:t.resp||'',linkedTo:null}]}}
-const DF={department:'',date:'',title:'',incidentCode:'',sevL:'',sevN:'',whatHappened:'',where:'',when:'',eventDate:'',professions:'',relatedDepts:'',mainFixDept:'',subFixDept:'',rcaParticipants:'',rcaDate:'',rcaTime:'',flowSteps:['','','','',''],fsSaved:false,cmps:[{step:'',problem:'',unsafeAct:''}],cmpsSaved:false,ta:mkTD(),summaryDate:'',daysToSubmit:'',followUpMonth:'',followUpStatus:'',ownerName:'',headName:'',secretaryName:'',chairName:'',hrms:false,attachments:[]};
+const DF={department:'',date:'',title:'',incidentCode:'',incidentType:'',sevL:'',sevN:'',whatHappened:'',where:'',when:'',eventDate:'',professions:'',relatedDepts:'',mainFixDept:'',subFixDept:'',rcaParticipants:'',rcaDate:'',rcaTime:'',flowSteps:['','','','',''],fsSaved:false,cmps:[{step:'',problem:'',unsafeAct:''}],cmpsSaved:false,ta:mkTD(),summaryDate:'',daysToSubmit:'',followUpMonth:'',followUpStatus:'',ownerName:'',headName:'',secretaryName:'',chairName:'',hrms:false,attachments:[]};
 function gid(){return'RCA-'+Date.now().toString(36).toUpperCase()}
 function schId(){return'SCH-'+Date.now().toString(36).toUpperCase()}
 
@@ -259,6 +259,7 @@ async function hashPin(salt,pin){const buf=await crypto.subtle.digest('SHA-256',
 function mkSalt(){return Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b=>b.toString(16).padStart(2,'0')).join('')}
 
 // ===== Date Format Helper (ค.ศ.) =====
+function fmtMonth(m){if(!m)return'-';const p=String(m).split('-');if(p.length!==2)return m;const names=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];const mi=parseInt(p[1],10)-1;return(names[mi]||p[1])+' '+p[0]}
 function fmtDate(dateStr){
   if(!dateStr)return'-';
   let d;
@@ -349,8 +350,8 @@ function bExp(fd,fmt){
 <h1>บันทึกข้อมูลการทำ Root Cause Analysis (RCA)</h1>
 <div class="sub">โรงพยาบาลมหาวิทยาลัยพะเยา</div>
 <table><tr><td style="width:50%"><b>หน่วยงาน/ทีมนำ:</b> ${fd.department||'-'}</td><td><b>วันที่:</b> ${fmtDate(fd.date)}</td></tr>
-<tr><td><b>เรื่อง:</b> ${fd.title||'-'}</td><td><b>รหัสอุบัติการณ์:</b> ${fd.incidentCode||'-'}</td></tr>
-<tr><td colspan="2"><b>ระดับความรุนแรง:</b> ${fd.sevL||'-'} / ${fd.sevN||'-'}</td></tr></table>
+<tr><td><b>เรื่อง:</b> ${fd.title||'-'}</td><td><b>รหัสรายงาน:</b> ${fd.incidentCode||'-'}</td></tr>
+<tr><td><b>ประเภทอุบัติการณ์:</b> ${fd.incidentType||'-'}</td><td><b>ระดับความรุนแรง:</b> ${fd.sevL||'-'} / ${fd.sevN||'-'}</td></tr></table>
 <h2>ตอนที่ 1: การเตรียมข้อมูลเพื่อทำ RCA</h2>
 <p><b>1.1 เกิดอะไรขึ้น:</b><br>${(fd.whatHappened||'').replace(/\n/g,'<br>')}</p>
 <p><b>1.2 เกิดที่:</b> ${fd.where||'-'} &nbsp; <b>1.3 เวลา:</b> ${fd.when||'-'} &nbsp; <b>วันที่:</b> ${fmtDate(fd.eventDate)}</p>
@@ -488,7 +489,7 @@ function ManualV({isAdmin}){
     {icon:'📋',title:'3. การบันทึกแบบฟอร์ม RCA',body:<div style={{fontSize:14}}>
       <p style={{fontWeight:700,marginBottom:4}}>ตอนที่ 1: ข้อมูลเบื้องต้น</p>
       <ul style={{paddingLeft:20,marginBottom:10}}>
-        <Li>กรอกหน่วยงาน, วันที่, เรื่อง, รหัสอุบัติการณ์ และเลือก<B>ระดับความรุนแรง</B> (วางเมาส์บน A-I หรือ 1-5 เพื่อดูคำอธิบาย)</Li>
+        <Li>กรอกหน่วยงาน, วันที่, เรื่อง, <B>รหัสรายงาน</B> (ตัวเลข — หากซ้ำกับผู้อื่น ระบบเตือนและเติมวงเล็บอักษรท้ายรหัสให้), <B>ประเภทอุบัติการณ์</B> (อังกฤษ 3 ตัว + เลข 3 ตัว เช่น CPE101) และเลือก<B>ระดับความรุนแรง</B> (วางเมาส์บน A-I หรือ 1-5 เพื่อดูคำอธิบาย)</Li>
         <Li>กรอกรายละเอียดเหตุการณ์ ผู้เข้าร่วมทำ RCA และแนบไฟล์รูป/PDF ได้ (ไม่เกิน 10 MB/ไฟล์ คลิกรูปเพื่อขยาย)</Li>
       </ul>
       <p style={{fontWeight:700,marginBottom:4}}>ตอนที่ 2-3: จุดเปลี่ยนและปัจจัยสาเหตุ</p>
@@ -521,7 +522,8 @@ function ManualV({isAdmin}){
       <Li>รายการของตนเอง: กด <B>"เปิด"</B> เพื่อแก้ไข / รายการของผู้อื่น: กด <B>"👁 ดู"</B> ได้อย่างเดียว</Li>
       <Li>ต้องการแก้ไขรายการของผู้อื่น: กด <B>"🙋 ขอร่วมแก้ไข"</B> ระบุหน่วยงานที่ขอ แล้วรอ<B>ผู้จัดทำอนุมัติ</B></Li>
       <Li>เมื่อมีคนขอร่วมแก้ไขรายการของคุณ จะมี<B>กล่องสีเหลือง</B>ด้านบนรายการ RCA ให้กดอนุมัติ/ปฏิเสธ (มี badge 🙋 ที่เมนูด้วย)</Li>
-      <Li>ใช้กล่องค้นหาจากชื่อเรื่อง หน่วยงาน รหัส หรือชื่อผู้จัดทำ, กด <B>📄</B> เพื่อดูเป็น PDF</Li>
+      <Li>ใช้กล่องค้นหาจากชื่อเรื่อง หน่วยงาน รหัสรายงาน หรือชื่อผู้จัดทำ, กด <B>📄</B> เพื่อดูเป็น PDF</Li>
+      <Li>เลือกเดือนแล้วกด <B>"📌 แสดงรายการติดตามในเดือนที่เลือก"</B> เพื่อดูรายการที่ต้องติดตามผลในเดือนนั้น (มีคอลัมน์เดือนติดตามผลในตารางด้วย)</Li>
       <Li>ปุ่ม <B>"ลบ"</B> มีเฉพาะ<B>ผู้จัดทำ</B> (ลบได้เฉพาะรายการของตนเอง) และ Admin — ผู้อื่นรวมถึงผู้ร่วมแก้ไขลบไม่ได้</Li>
     </ul>},
     {icon:'📅',title:'6. ปฏิทินกำหนด RCA และแจ้งเตือน Line',body:<ul style={{paddingLeft:20,fontSize:14}}>
@@ -1029,7 +1031,8 @@ function FormV({fd,sFD,uf}){
       {tab==='p1'&&<>
         <div className="fc"><div className="fch">📋 ข้อมูลทั่วไป</div><div className="fcb">
           <div className="fr"><div className="fg"><label className="fl">หน่วยงาน/ทีมนำ <span className="rq">*</span></label><input className="fi" value={fd.department} onChange={e=>uf('department',e.target.value)} placeholder="ระบุหน่วยงาน"/></div><div className="fg"><label className="fl">วันที่จัดทำ (ปี ค.ศ.)</label><input className="fi" type="date" value={fd.date} onChange={e=>uf('date',e.target.value)}/></div></div>
-          <div className="fr"><div className="fg"><label className="fl">เรื่อง <span className="rq">*</span></label><input className="fi" value={fd.title} onChange={e=>uf('title',e.target.value)} placeholder="ชื่อเหตุการณ์"/></div><div className="fg"><label className="fl">รหัสอุบัติการณ์</label><input className="fi" value={fd.incidentCode} onChange={e=>uf('incidentCode',e.target.value)} placeholder="IR-XXXX"/></div></div>
+          <div className="fr"><div className="fg"><label className="fl">เรื่อง <span className="rq">*</span></label><input className="fi" value={fd.title} onChange={e=>uf('title',e.target.value)} placeholder="ชื่อเหตุการณ์"/></div><div className="fg"><label className="fl">รหัสรายงาน</label><input className="fi" inputMode="numeric" value={fd.incidentCode} onChange={e=>uf('incidentCode',e.target.value.replace(/\D/g,''))} placeholder="ระบุตัวเลข เช่น 680001"/></div></div>
+          <div className="fg" style={{marginBottom:14}}><label className="fl">ประเภทอุบัติการณ์ <span style={{fontWeight:400,color:'var(--text-light)'}}>(ตัวอักษรภาษาอังกฤษ 3 หลัก ตามด้วยตัวเลข 3 หลัก เช่น CPE101)</span></label><input className="fi" value={fd.incidentType||''} onChange={e=>{const v=e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6);let out='';for(const ch of v){if(out.length<3){if(/[A-Z]/.test(ch))out+=ch}else if(/[0-9]/.test(ch))out+=ch}uf('incidentType',out)}} placeholder="เช่น CPE101" style={{maxWidth:220}}/></div>
           <div className="fg"><label className="fl">ระดับความรุนแรง</label><div style={{display:'flex',gap:24,flexWrap:'wrap'}}><div><div style={{fontSize:11,color:'var(--text-light)',marginBottom:4}}>NCC MERP (A-I) <span style={{color:'var(--primary-light)'}}>- วางเมาส์เพื่อดูคำอธิบาย</span></div><div className="sg">{SEV_L.map(s=><span key={s} className="tp-wrap"><span className={`sb2 ${fd.sevL===s?'sel':''}`} onClick={()=>uf('sevL',s)}>{s}</span><span className="tp-box"><b>{s}:</b> {SEV_L_TIP[s]}</span></span>)}</div></div><div><div style={{fontSize:11,color:'var(--text-light)',marginBottom:4}}>Safety Score (1-5) <span style={{color:'var(--primary-light)'}}>- วางเมาส์เพื่อดูคำอธิบาย</span></div><div className="sg">{SEV_N.map(s=><span key={s} className="tp-wrap"><span className={`sb2 ${fd.sevN===s?'sel':''}`} onClick={()=>uf('sevN',s)}>{s}</span><span className="tp-box"><b>ระดับ {s}:</b> {SEV_N_TIP[s]}</span></span>)}</div></div></div></div>
         </div></div>
         <div className="fc"><div className="fch">📝 บรรยายสรุป</div><div className="fcb">
@@ -1303,7 +1306,10 @@ function TC({tier,idx,td,hd,fd,uT,uTE,tTCE,aTE,rTE}){
 // ===== LIST VIEW =====
 function ListV({rl,onL,onN,sRL,isAdmin,onExportPdf,user,canEdit,editReqs,onRequestEdit,onApproveReq,onRejectReq}){
   const[srch,sSrch]=useState('');
+  const[fMonth,sFMonth]=useState('');
+  const[fOn,sFOn]=useState(false);
   const filtered=srch.trim()?rl.filter(r=>{const q=srch.toLowerCase();return(r.title||'').toLowerCase().includes(q)||(r.department||'').toLowerCase().includes(q)||(r.incidentCode||'').toLowerCase().includes(q)||(r.id||'').toLowerCase().includes(q)||(r.ownerName||'').toLowerCase().includes(q)}):rl;
+  const shown=(fOn&&fMonth)?filtered.filter(r=>String(r.followUpMonth||'')===fMonth):filtered;
   const incoming=(editReqs||[]).filter(q=>q.status==='pending'&&(q.ownerUid===user.uid||isAdmin));
   const myPendingFor=rid=>(editReqs||[]).find(q=>q.rcaId===rid&&q.requesterUid===user.uid&&q.status==='pending');
   if(!rl.length)return<div style={{textAlign:'center',padding:60,color:'var(--text-light)'}}><div style={{fontSize:48}}>📋</div><div style={{fontSize:16,fontWeight:600,marginTop:8}}>ยังไม่มี RCA</div><button className="btn btn-p" style={{marginTop:16}} onClick={onN}>➕ สร้างใหม่</button></div>;
@@ -1323,12 +1329,17 @@ function ListV({rl,onL,onN,sRL,isAdmin,onExportPdf,user,canEdit,editReqs,onReque
         </div>
       ))}
     </div>}
-    <div style={{marginBottom:12}}><input className="fi" value={srch} onChange={e=>sSrch(e.target.value)} placeholder="🔍 ค้นหา RCA ตามชื่อเรื่อง, หน่วยงาน, รหัสอุบัติการณ์, ผู้จัดทำ, หรือ ID..." style={{maxWidth:500}}/></div>
-    {filtered.length===0?<div style={{textAlign:'center',padding:30,color:'var(--text-light)',fontSize:14}}>ไม่พบผลลัพธ์สำหรับ "{srch}"</div>:
-    <table className="rlt"><thead><tr><th>รหัส</th><th>เรื่อง</th><th>หน่วยงาน</th><th>ผู้จัดทำ</th><th>วันที่</th><th>ระดับ</th><th>HRMS</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody>{filtered.map(r=>{
+    <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:12,flexWrap:'wrap'}}>
+      <input className="fi" value={srch} onChange={e=>sSrch(e.target.value)} placeholder="🔍 ค้นหา RCA ตามชื่อเรื่อง, หน่วยงาน, รหัสรายงาน, ผู้จัดทำ..." style={{maxWidth:420}}/>
+      <input className="fi" type="month" value={fMonth} onChange={e=>{sFMonth(e.target.value);if(!e.target.value)sFOn(false)}} style={{maxWidth:180}} title="เลือกเดือนที่ติดตามผล"/>
+      <button className={`btn btn-sm ${fOn?'btn-p':'btn-o'}`} onClick={()=>{if(!fMonth){alert('กรุณาเลือกเดือนก่อน');return}sFOn(!fOn)}}>{fOn?'✕ ยกเลิกกรองเดือน':'📌 แสดงรายการติดตามในเดือนที่เลือก'}</button>
+      {fOn&&fMonth&&<span style={{fontSize:13,color:'var(--primary)',fontWeight:700}}>ต้องติดตามใน {fmtMonth(fMonth)}: {shown.length} รายการ</span>}
+    </div>
+    {shown.length===0?<div style={{textAlign:'center',padding:30,color:'var(--text-light)',fontSize:14}}>{fOn?'ไม่มีรายการที่ต้องติดตามใน '+fmtMonth(fMonth):'ไม่พบผลลัพธ์สำหรับ "'+srch+'"'}</div>:
+    <table className="rlt"><thead><tr><th>รหัสรายงาน</th><th>เรื่อง</th><th>หน่วยงาน</th><th>ผู้จัดทำ</th><th>วันที่</th><th>ระดับ</th><th>เดือนติดตามผล</th><th>HRMS</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody>{shown.map(r=>{
       const editable=canEdit(r);
       const pendReq=myPendingFor(r.id);
-      return<tr key={r.id}><td style={{fontWeight:600,color:'var(--primary)'}}>{r.id}</td><td>{r.title||'-'}</td><td>{r.department||'-'}</td><td style={{fontSize:12}}>{r.ownerName||'-'}{(r.collaborators||[]).includes(user.uid)&&<span style={{display:'block',fontSize:10,color:'var(--success)'}}>✅ คุณร่วมแก้ไขได้</span>}</td><td>{fmtDate(r.date)}</td><td>{r.sevL||'-'}{r.sevN?'/'+r.sevN:''}</td><td>{r.hrms?<span className="stb sth">✅</span>:<span style={{color:'var(--accent)'}}>❌</span>}</td><td><span className={`stb ${r.followUpStatus==='completed'?'stc':'std'}`}>{r.followUpStatus==='completed'?'เสร็จ':r.followUpStatus==='in_progress'?'ดำเนินการ':'รอ'}</span></td><td><div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+      return<tr key={r.id}><td><div style={{fontWeight:600,color:'var(--primary)'}}>{r.incidentCode||'-'}</div><div style={{fontSize:10,color:'var(--text-light)'}}>{r.id}</div></td><td>{r.title||'-'}</td><td>{r.department||'-'}</td><td style={{fontSize:12}}>{r.ownerName||'-'}{(r.collaborators||[]).includes(user.uid)&&<span style={{display:'block',fontSize:10,color:'var(--success)'}}>✅ คุณร่วมแก้ไขได้</span>}</td><td>{fmtDate(r.date)}</td><td>{r.sevL||'-'}{r.sevN?'/'+r.sevN:''}</td><td style={{fontSize:12}}>{fmtMonth(r.followUpMonth)}</td><td>{r.hrms?<span className="stb sth">✅</span>:<span style={{color:'var(--accent)'}}>❌</span>}</td><td><span className={`stb ${r.followUpStatus==='completed'?'stc':'std'}`}>{r.followUpStatus==='completed'?'เสร็จ':r.followUpStatus==='in_progress'?'ดำเนินการ':'รอ'}</span></td><td><div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
         {editable?<button className="btn btn-sm btn-p" onClick={()=>onL(r)}>เปิด</button>:<button className="btn btn-sm btn-o" onClick={()=>onL(r)} title="เปิดดูอย่างเดียว">👁 ดู</button>}
         {!editable&&(pendReq?<button className="btn btn-sm btn-w" disabled title="รอผู้จัดทำอนุมัติ">⏳ รออนุมัติ</button>:<button className="btn btn-sm btn-s" onClick={()=>onRequestEdit(r)}>🙋 ขอร่วมแก้ไข</button>)}
         <button className="btn btn-sm btn-w" onClick={()=>onExportPdf(r)} title="Export PDF">📄</button>
@@ -1529,7 +1540,7 @@ function AiChatV({geminiKey,isAdmin,onApply}){
     if(msgs.filter(m=>m.role==='user').length===0){alert('กรุณาเล่าเหตุการณ์และสนทนากับ AI ก่อน แล้วจึงกดนำลงแบบฟอร์ม');return}
     sBusy(true);
     const tierIds=TD.map(t=>'"'+t.id+'" = '+t.label).join('\n');
-    const instr={role:'user',text:'จากบทสนทนาทั้งหมดข้างต้น ให้ตอบกลับเป็น JSON เท่านั้น ห้ามมีข้อความอื่นนอก JSON ตามโครงสร้างนี้:\n{"department":"หน่วยงาน","title":"ชื่อเรื่อง/เหตุการณ์","incidentCode":"รหัสอุบัติการณ์ หรือค่าว่าง","sevL":"ตัวอักษรเดียว A-I หรือค่าว่าง","sevN":"ตัวเลข 1-5 หรือค่าว่าง","whatHappened":"รายละเอียดว่าเกิดอะไรขึ้น","where":"เกิดที่ไหน","when":"เกิดเมื่อไร","flowSteps":["ขั้นตอนการดูแลตามลำดับ"],"cmps":[{"step":"ขั้นตอนที่เกี่ยวข้อง","problem":"ปัญหา/จุดเปลี่ยน","unsafeAct":"Unsafe Act"}],"tiers":[{"id":"รหัสกลุ่มปัจจัย","desc":"รายละเอียดปัจจัยสาเหตุ","strat":"กลยุทธ์แก้ไข/ป้องกัน"}]}\nรหัสกลุ่มปัจจัย (id) ที่ใช้ได้มีเฉพาะ:\n'+tierIds+'\nกติกา: ใส่เฉพาะข้อมูลที่ได้จากบทสนทนาจริง ช่องที่ไม่มีข้อมูลให้ใส่ "" หรือ [] ห้ามแต่งเติมเอง'};
+    const instr={role:'user',text:'จากบทสนทนาทั้งหมดข้างต้น ให้ตอบกลับเป็น JSON เท่านั้น ห้ามมีข้อความอื่นนอก JSON ตามโครงสร้างนี้:\n{"department":"หน่วยงาน","title":"ชื่อเรื่อง/เหตุการณ์","incidentCode":"รหัสรายงานเป็นตัวเลข หรือค่าว่าง","sevL":"ตัวอักษรเดียว A-I หรือค่าว่าง","sevN":"ตัวเลข 1-5 หรือค่าว่าง","whatHappened":"รายละเอียดว่าเกิดอะไรขึ้น","where":"เกิดที่ไหน","when":"เกิดเมื่อไร","flowSteps":["ขั้นตอนการดูแลตามลำดับ"],"cmps":[{"step":"ขั้นตอนที่เกี่ยวข้อง","problem":"ปัญหา/จุดเปลี่ยน","unsafeAct":"Unsafe Act"}],"tiers":[{"id":"รหัสกลุ่มปัจจัย","desc":"รายละเอียดปัจจัยสาเหตุ","strat":"กลยุทธ์แก้ไข/ป้องกัน"}]}\nรหัสกลุ่มปัจจัย (id) ที่ใช้ได้มีเฉพาะ:\n'+tierIds+'\nกติกา: ใส่เฉพาะข้อมูลที่ได้จากบทสนทนาจริง ช่องที่ไม่มีข้อมูลให้ใส่ "" หรือ [] ห้ามแต่งเติมเอง'};
     try{
       const raw=await callAI([...msgs,instr],{temperature:0.2,maxOutputTokens:8192,responseMimeType:'application/json',thinkingConfig:{thinkingBudget:0}});
       let d;
@@ -1898,6 +1909,21 @@ function App(){
 
   const hSave=async(silent)=>{
     if(!formEditable){if(silent!==true)alert('คุณไม่ใช่ผู้จัดทำรายการนี้ จึงไม่สามารถบันทึกได้\nหากต้องการแก้ไข กรุณากด "ขอร่วมแก้ไข" ในหน้ารายการ RCA และรอผู้จัดทำอนุมัติ');return}
+    // ตรวจรหัสรายงานซ้ำ: เตือนก่อนบันทึก และเสนอรหัสใหม่ต่อท้ายด้วยวงเล็บอักษร เช่น 680001(A)
+    let icode=String(fd.incidentCode||'').trim();
+    if(icode){
+      const clash=rl.find(r=>r.id!==ci&&String(r.incidentCode||'').trim()===icode);
+      if(clash){
+        if(silent===true)return; // autosave: ข้ามไว้ให้ผู้ใช้ตัดสินใจตอนกดบันทึกเอง
+        const bcode=icode.replace(/\([A-Z]\)$/,'');
+        let newCode='';
+        for(let i=0;i<26;i++){const cand=bcode+'('+String.fromCharCode(65+i)+')';if(!rl.find(r=>r.id!==ci&&String(r.incidentCode||'').trim()===cand)){newCode=cand;break}}
+        if(!newCode)newCode=bcode+'(ซ้ำ)';
+        if(!confirm('⚠️ รหัสรายงาน "'+icode+'" ถูกใช้แล้วโดย '+clash.id+' ('+(clash.title||'-')+' โดย '+(clash.ownerName||'-')+')\n\nระบบจะบันทึกรายการนี้เป็นรหัส "'+newCode+'" แทน\n\nกด OK เพื่อบันทึกด้วยรหัสใหม่ หรือ Cancel เพื่อกลับไปแก้รหัสเอง'))return;
+        icode=newCode;
+        uf('incidentCode',newCode);
+      }
+    }
     sSaving(true);
     // Deep clean: remove undefined values recursively for Firestore compatibility
     const cleanForFirestore=(obj)=>{
@@ -1926,7 +1952,7 @@ function App(){
       }
     }
     // กำหนดเจ้าของเฉพาะตอนสร้างใหม่ - การบันทึกโดยผู้ร่วมแก้ไขต้องไม่เปลี่ยนเจ้าของเดิม
-    const base={...fd,attachments:uploadedAttachments,savedAt:new Date().toISOString(),status:'draft'};
+    const base={...fd,incidentCode:icode,attachments:uploadedAttachments,savedAt:new Date().toISOString(),status:'draft'};
     if(!ci){base.ownerUid=user.uid;base.ownerEmail=user.email;base.ownerName=userData.fullName}
     const docData=cleanForFirestore(base);
     try{

@@ -1,0 +1,31 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function isUpMail() {
+      return isSignedIn() && request.auth.token.email.matches('.*@up[.]ac[.]th');
+    }
+    function isAdmin() {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    match /users/{userId} {
+      // อ่าน: เจ้าของ doc หรือ admin
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+
+      // สร้าง: เจ้าของ doc เท่านั้น (ลงทะเบียนครั้งแรก) และต้องเป็นอีเมล @up.ac.th
+      allow create: if isUpMail() && request.auth.uid == userId
+        && request.resource.data.status in ['pending', 'approved']
+        && request.resource.data.email == request.auth.token.email;
+
+      // แก้ไข: เจ้าของ (ตั้ง/ใส่ PIN) หรือ admin (อนุมัติ/เปลี่ยน role/reset PIN)
+      allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+
+      // ลบ: admin เท่านั้น
+      allow delete: if isAdmin();
+    }
+  }
+}

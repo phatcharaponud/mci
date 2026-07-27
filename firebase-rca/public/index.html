@@ -1303,23 +1303,44 @@ function WBoard({fd,sFD,uFS,aFS,rFS,uT,uTE,tTCE,aTE,rTE,uC,aC,rC}){
     return gs.slice().sort((a,b)=>(orderKey(a.gi)-orderKey(b.gi))||(a.gi-b.gi));
   };
 
-  // คำนวณเส้นลูกศรตามการเชื่อมโยง
+  // คำนวณเส้นลูกศรตามการเชื่อมโยง - เส้นวิ่งตามขอบแถวและอ้อมข้างกล่อง ไม่ทับกล่อง
   useEffect(()=>{
     const compute=()=>{
       const root=boardRef.current;
       if(!root){sLines([]);return}
       const rr=root.getBoundingClientRect();
+      const rel=el=>{const r=el.getBoundingClientRect();return{left:r.left-rr.left,right:r.right-rr.left,top:r.top-rr.top,bottom:r.bottom-rr.top,cx:r.left-rr.left+r.width/2}};
+      // เส้นทางฉาก: ลงจากกล่องต้นทาง -> วิ่งตามเส้นขอบล่างของแถว -> อ้อมข้างกล่องปลายทาง -> เข้าด้านบนกล่อง
+      const mkPath=(fr,tr2,b1)=>{
+        const x1=fr.cx,y1=fr.bottom+1,x2=tr2.cx,y2=tr2.top-1;
+        if(Math.abs(x2-x1)<26)return`M ${x1} ${y1} L ${x2} ${y2}`;
+        const xv=x2>x1?tr2.left-10:tr2.right+10;
+        const ym=y2-5;
+        return`M ${x1} ${y1} L ${x1} ${b1} L ${xv} ${b1} L ${xv} ${ym} L ${x2} ${ym} L ${x2} ${y2}`;
+      };
       const ls=[];
+      // Tier entries -> CMP หรือ Tier ก่อนหน้า
       (fd.ta||[]).forEach((g,gi)=>{(g.entries||[]).forEach((e,ei)=>{
         if(!e.linkedTo)return;
         const from=boxRefs.current['t-'+gi+'-'+ei];
         let to=null;
         if(e.linkedTo.type==='cmp')to=boxRefs.current['c-'+e.linkedTo.index];
         else{const tgi=TD.findIndex(x=>x.id===e.linkedTo.tierId);to=boxRefs.current['t-'+tgi+'-'+e.linkedTo.entryIndex]}
-        if(!from||!to||!from.isConnected||!to.isConnected)return;
-        const fr=from.getBoundingClientRect(),tr2=to.getBoundingClientRect();
-        ls.push({x1:fr.left-rr.left+fr.width/2,y1:fr.bottom-rr.top,x2:tr2.left-rr.left+tr2.width/2,y2:tr2.top-rr.top});
+        const rowEl=boxRefs.current['row-'+TD[gi].tier];
+        if(!from||!to||!rowEl||!from.isConnected||!to.isConnected)return;
+        ls.push({d:mkPath(rel(from),rel(to),rel(rowEl).bottom-1),c:'#1f2d3d'});
       })});
+      // CMP -> ขั้นตอนใน Flow of Steps
+      (fd.cmps||[]).forEach((c,i)=>{
+        if(!c.step)return;
+        const si=(fd.flowSteps||[]).findIndex(s=>s===c.step);
+        if(si<0)return;
+        const from=boxRefs.current['c-'+i];
+        const to=boxRefs.current['f-'+si];
+        const rowEl=boxRefs.current['row-cmp'];
+        if(!from||!to||!rowEl||!from.isConnected||!to.isConnected)return;
+        ls.push({d:mkPath(rel(from),rel(to),rel(rowEl).bottom-1),c:'#1e8449'});
+      });
       sLines(ls);
     };
     const t=setTimeout(compute,180);
@@ -1376,12 +1397,12 @@ function WBoard({fd,sFD,uFS,aFS,rFS,uT,uTE,tTCE,aTE,rTE,uC,aC,rC}){
       <div ref={boardRef} style={{position:'relative',border:'1px solid #b8c9dd',borderRadius:8,overflow:'hidden',minWidth:720}}>
         {/* Contributing factors: Tier 5 -> Tier 1 */}
         {TIER_ROWS.map(row=>(
-          <div key={row.t} style={{display:'flex',borderBottom:'1px solid #b8c9dd',background:'#e8f0fa'}}>
+          <div key={row.t} ref={el=>{boxRefs.current['row-'+row.t]=el}} style={{display:'flex',borderBottom:'1px solid #b8c9dd',background:'#e8f0fa'}}>
             <div style={{width:LABEL_W,flexShrink:0,padding:'10px 12px',borderRight:'1px solid #b8c9dd'}}>
               <div style={{fontWeight:800,fontSize:13,color:'#1f2d3d'}}>{row.name}</div>
               <div style={{fontSize:11,color:'#2e6fb7',lineHeight:1.4}}>{row.sub}</div>
             </div>
-            <div style={{flex:1,padding:8,display:'flex',flexWrap:'wrap',gap:8,alignItems:'flex-start',alignContent:'flex-start'}}>
+            <div style={{flex:1,padding:8,display:'flex',flexWrap:'wrap',gap:8,justifyContent:'center',alignItems:'center',alignContent:'center'}}>
               {rowGroups(row.t).map(({g,gi})=>{
                 const grp=fd.ta[gi]||{};const entries=grp.entries||[];
                 if(!grp.en)return(
@@ -1419,13 +1440,13 @@ function WBoard({fd,sFD,uFS,aFS,rFS,uT,uTE,tTCE,aTE,rTE,uC,aC,rC}){
           </div>
         ))}
         {/* Unsafe act / Potential change (CMPs) */}
-        <div style={{display:'flex',borderBottom:'1px solid #b8c9dd',background:'#e6f4ea'}}>
+        <div ref={el=>{boxRefs.current['row-cmp']=el}} style={{display:'flex',borderBottom:'1px solid #b8c9dd',background:'#e6f4ea'}}>
           <div style={{width:LABEL_W,flexShrink:0,padding:'10px 12px',borderRight:'1px solid #b8c9dd'}}>
             <div style={{fontWeight:800,fontSize:12.5,color:'#1f2d3d'}}>Unsafe act/</div>
             <div style={{fontWeight:800,fontSize:12.5,color:'#1f2d3d'}}>Potential change</div>
             <div style={{fontSize:11,color:'#27ae60'}}>(CMP)</div>
           </div>
-          <div style={{flex:1,padding:8,display:'flex',flexWrap:'wrap',gap:8,alignItems:'flex-start'}}>
+          <div style={{flex:1,padding:8,display:'flex',flexWrap:'wrap',gap:8,justifyContent:'center',alignItems:'center',alignContent:'center'}}>
             {(fd.cmps||[]).map((c,i)=>(
               <div key={i} ref={el=>{boxRefs.current['c-'+i]=el}} style={{background:'#fff',border:'2px solid #27ae60',borderRadius:10,padding:'7px 9px',width:210}}>
                 <select value={c.step||''} onChange={e=>uC(i,'step',e.target.value)} style={{width:'100%',border:'none',borderBottom:'1px dashed #bfe3cc',fontSize:10.5,color:'#1e8449',fontFamily:'inherit',marginBottom:3,background:'transparent'}}>
@@ -1450,7 +1471,7 @@ function WBoard({fd,sFD,uFS,aFS,rFS,uT,uTE,tTCE,aTE,rTE,uC,aC,rC}){
             {(fd.flowSteps||[]).map((s,i)=>(
               <React.Fragment key={i}>
                 {i>0&&<span style={{color:'#b9770e',fontWeight:700}}>→</span>}
-                <div style={{position:'relative'}}>
+                <div ref={el=>{boxRefs.current['f-'+i]=el}} style={{position:'relative'}}>
                   <input value={s} onChange={e=>uFS(i,e.target.value)} placeholder={'ขั้นตอนที่ '+(i+1)} style={{width:130,padding:'8px 22px 8px 10px',border:'1.5px solid #1f2d3d',borderRadius:10,fontSize:11.5,fontFamily:'inherit',background:'#fff',textAlign:'center'}}/>
                   {(fd.flowSteps||[]).length>2&&<span style={{position:'absolute',right:6,top:8,cursor:'pointer',fontSize:11,color:'#999'}} onClick={()=>rFS(i)}>✕</span>}
                 </div>
@@ -1461,8 +1482,11 @@ function WBoard({fd,sFD,uFS,aFS,rFS,uT,uTE,tTCE,aTE,rTE,uC,aC,rC}){
         </div>
         {/* เส้นลูกศรการเชื่อมโยง */}
         <svg style={{position:'absolute',top:0,left:0,width:'100%',height:'100%',pointerEvents:'none'}}>
-          <defs><marker id="wbArrow" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#1f2d3d"/></marker></defs>
-          {lines.map((l,i)=><path key={i} d={`M ${l.x1} ${l.y1} C ${l.x1} ${(l.y1+l.y2)/2}, ${l.x2} ${(l.y1+l.y2)/2}, ${l.x2} ${l.y2-2}`} fill="none" stroke="#1f2d3d" strokeWidth="1.6" markerEnd="url(#wbArrow)"/>)}
+          <defs>
+            <marker id="wbArrow" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#1f2d3d"/></marker>
+            <marker id="wbArrowG" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#1e8449"/></marker>
+          </defs>
+          {lines.map((l,i)=><path key={i} d={l.d} fill="none" stroke={l.c} strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" markerEnd={l.c==='#1e8449'?'url(#wbArrowG)':'url(#wbArrow)'}/>)}
         </svg>
       </div>
     </div>

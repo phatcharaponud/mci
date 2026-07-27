@@ -1306,21 +1306,41 @@ function WBoard({fd,sFD,uFS,aFS,rFS,uT,uTE,tTCE,aTE,rTE,uC,aC,rC}){
   // ลากกล่องซ้าย-ขวาภายในแถว (เก็บระยะเลื่อนต่อกล่อง)
   const[offsets,sOffsets]=useState({});
   const dragRef=useRef(null);
+
+  // Fullscreen fit-to-screen: ย่อ/ขยายแผนภาพให้พอดีจออัตโนมัติ ไม่ต้อง scroll
+  const FIT_W=1400;
+  const[fit,sFit]=useState({s:1,h:0});
+  useEffect(()=>{
+    if(!full){sFit({s:1,h:0});return}
+    const measure=()=>{
+      const el=boardRef.current;if(!el)return;
+      const outer=el.parentElement;
+      const nH=(outer?outer.offsetHeight:el.offsetHeight)||1;
+      const availW=window.innerWidth-40;
+      const availH=window.innerHeight-64;
+      const s=Math.min(availW/FIT_W,availH/nH,1);
+      sFit({s,h:nH});
+    };
+    const t=setTimeout(measure,100);
+    window.addEventListener('resize',measure);
+    return()=>{clearTimeout(t);window.removeEventListener('resize',measure)};
+  },[full,fd,offsets,tick,guide]);
   const startDrag=(key,rowKey)=>(ev)=>{
     const tag=(ev.target.tagName||'').toLowerCase();
     if(['input','textarea','select','button'].includes(tag))return;
     const box=boxRefs.current[key],row=boxRefs.current[rowKey];
     if(!box||!row)return;
     ev.preventDefault();
+    const s0=(full&&fit.s)?fit.s:1;
     const base=offsets[key]||0;
     const bx=box.getBoundingClientRect();
     const rw=row.getBoundingClientRect();
-    const natLeft=bx.left-base;
-    const minOff=(rw.left+LABEL_W+9)-natLeft;
-    const maxOff=(rw.right-9-bx.width)-natLeft;
+    const natLeft=bx.left-base*s0;
+    const minOff=((rw.left+(LABEL_W+9)*s0)-natLeft)/s0;
+    const maxOff=((rw.right-9*s0-bx.width)-natLeft)/s0;
     const startX=ev.clientX;
     const move=(e)=>{
-      let off=base+(e.clientX-startX);
+      let off=base+(e.clientX-startX)/s0;
       if(off<minOff)off=minOff;
       if(off>maxOff)off=maxOff;
       sOffsets(p=>({...p,[key]:off}));
@@ -1336,7 +1356,8 @@ function WBoard({fd,sFD,uFS,aFS,rFS,uT,uTE,tTCE,aTE,rTE,uC,aC,rC}){
       const root=boardRef.current;
       if(!root){sLines([]);return}
       const rr=root.getBoundingClientRect();
-      const rel=el=>{const r=el.getBoundingClientRect();return{left:r.left-rr.left,right:r.right-rr.left,top:r.top-rr.top,bottom:r.bottom-rr.top,cx:r.left-rr.left+r.width/2}};
+      const k=(full&&fit.s)?fit.s:1;
+      const rel=el=>{const r=el.getBoundingClientRect();return{left:(r.left-rr.left)/k,right:(r.right-rr.left)/k,top:(r.top-rr.top)/k,bottom:(r.bottom-rr.top)/k,cx:(r.left-rr.left+r.width/2)/k}};
       const mkPath=(fr,tr2,b1)=>{
         const x1=fr.cx,y1=fr.bottom,x2=tr2.cx,y2=tr2.top;
         if(Math.abs(x2-x1)<26)return`M ${x1} ${y1} L ${x2} ${y2}`;
@@ -1374,7 +1395,7 @@ function WBoard({fd,sFD,uFS,aFS,rFS,uT,uTE,tTCE,aTE,rTE,uC,aC,rC}){
     const t=setTimeout(compute,60);
     window.addEventListener('resize',compute);
     return()=>{clearTimeout(t);window.removeEventListener('resize',compute)};
-  },[fd,full,autoSort,tick,offsets]);
+  },[fd,full,autoSort,tick,offsets,fit]);
 
   const btnMini={fontSize:10,padding:'2px 8px',border:'1px solid var(--primary)',borderRadius:6,background:'#f0f7ff',color:'var(--primary)',cursor:'pointer',fontFamily:'inherit'};
   const btnMiniRed={fontSize:10,padding:'2px 8px',border:'1px solid #e74c3c',borderRadius:6,background:'#fff5f5',color:'#e74c3c',cursor:'pointer',fontFamily:'inherit'};
@@ -1440,19 +1461,17 @@ function WBoard({fd,sFD,uFS,aFS,rFS,uT,uTE,tTCE,aTE,rTE,uC,aC,rC}){
                   <React.Fragment key={g.id}>
                     {entries.map((e,ei)=>(
                       <div key={ei} ref={el=>{boxRefs.current['t-'+gi+'-'+ei]=el}} style={{background:'#fff',border:'2px solid #1a5fb4',borderRadius:10,padding:'7px 9px',width:240,boxShadow:'0 1px 4px rgba(26,95,180,0.18)',transform:`translateX(${offsets['t-'+gi+'-'+ei]||0}px)`}}>
-                        <div onPointerDown={startDrag('t-'+gi+'-'+ei,'row-'+row.t)} title="กดค้างแล้วลากเพื่อเลื่อนซ้าย-ขวา" style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4,cursor:'grab',touchAction:'none',userSelect:'none'}}>
-                          <strong style={{fontSize:12,color:'#12325c'}}>⠿ {shortName(g)}{entries.length>1?' #'+(ei+1):''}</strong>
-                          <span onPointerDown={e2=>e2.stopPropagation()} onClick={()=>{const hasData=(e.ck||[]).length>0||e.desc||e.strat;if(hasData&&!confirm('ลบกล่องประเด็นนี้?'))return;removeEntry(gi,ei)}} title="ลบกล่องนี้" style={{cursor:'pointer',color:'#e74c3c',fontWeight:700,fontSize:13}}>✕</span>
-                        </div>
-                        {(e.ck||[]).length>0&&<div style={{display:'flex',flexWrap:'wrap',gap:3,marginBottom:3}}>{e.ck.map(c=><span key={c} onClick={()=>tTCE(gi,ei,c)} title="คลิกเพื่อเอาออก" style={{background:'#eaf2fd',border:'1px solid #1a5fb4',borderRadius:10,padding:'1px 8px',fontSize:10,color:'#12325c',cursor:'pointer'}}>{c} ✕</span>)}</div>}
-                        <textarea value={e.desc||''} onChange={ev=>uTE(gi,ei,'desc',ev.target.value)} placeholder="พิมพ์ข้อความประเด็น..." style={{width:'100%',minHeight:32,border:'none',fontSize:11.5,fontFamily:'inherit',resize:'vertical',background:'transparent',color:'#1f2d3d'}}/>
-                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:4}}>
-                          <span style={{fontSize:9,color:'#7f9cbf'}}>{e.linkedTo?'🔗 เชื่อมโยงแล้ว':''}{e.strat?' ✅':''}</span>
-                          <div style={{display:'flex',gap:4,flexShrink:0}}>
-                            <button style={btnMini} onClick={()=>sGuide(guide&&guide.gi===gi&&guide.ei===ei?null:{gi,ei})}>🧭 Guide</button>
-                            <button style={btnMini} onClick={()=>sDtl({gi,ei})}>📝 รายละเอียด</button>
+                        <div onPointerDown={startDrag('t-'+gi+'-'+ei,'row-'+row.t)} title="กดค้างแล้วลากเพื่อเลื่อนซ้าย-ขวา" style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:4,marginBottom:4,cursor:'grab',touchAction:'none',userSelect:'none'}}>
+                          <div style={{display:'flex',alignItems:'center',gap:4,minWidth:0}}>
+                            <strong style={{fontSize:12,color:'#12325c',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>⠿ {shortName(g)}{entries.length>1?' #'+(ei+1):''}</strong>
+                            <button style={{...btnMini,flexShrink:0}} title="Guide: เลือกปัจจัยแนะนำ" onPointerDown={e2=>e2.stopPropagation()} onClick={()=>sGuide(guide&&guide.gi===gi&&guide.ei===ei?null:{gi,ei})}>🧭</button>
+                            <button style={{...btnMini,flexShrink:0}} title="กรอกรายละเอียด/กลยุทธ์/เชื่อมโยง" onPointerDown={e2=>e2.stopPropagation()} onClick={()=>sDtl({gi,ei})}>📝</button>
                           </div>
+                          <span onPointerDown={e2=>e2.stopPropagation()} onClick={()=>{const hasData=(e.ck||[]).length>0||e.desc||e.strat;if(hasData&&!confirm('ลบกล่องประเด็นนี้?'))return;removeEntry(gi,ei)}} title="ลบกล่องนี้" style={{cursor:'pointer',color:'#e74c3c',fontWeight:700,fontSize:13,flexShrink:0}}>✕</span>
                         </div>
+                        {(e.ck||[]).length>0&&<div style={{display:'flex',flexWrap:'wrap',gap:3,marginBottom:3}}>{e.ck.map(c=><span key={c} onClick={()=>tTCE(gi,ei,c)} title="คลิกเพื่อเอาออก" style={{background:'#eaf2fd',border:'1px solid #1a5fb4',borderRadius:10,padding:'1px 8px',fontSize:10,color:'#12325c',cursor:'pointer'}}>{c}</span>)}</div>}
+                        <textarea value={e.desc||''} onChange={ev=>uTE(gi,ei,'desc',ev.target.value)} placeholder="พิมพ์ข้อความประเด็น..." style={{width:'100%',minHeight:32,border:'none',fontSize:11.5,fontFamily:'inherit',resize:'vertical',background:'transparent',color:'#1f2d3d'}}/>
+                        {(e.linkedTo||e.strat)&&<div style={{fontSize:9,color:'#7f9cbf'}}>{e.linkedTo?'🔗 เชื่อมโยงแล้ว ':''}{e.strat?'✅ มีกลยุทธ์':''}</div>}
                         {guide&&guide.gi===gi&&guide.ei===ei&&<div style={{marginTop:4,paddingTop:4,borderTop:'1px dashed #cfe0f4',display:'flex',flexWrap:'wrap',gap:3}}>
                           <div style={{width:'100%',fontSize:9.5,color:'#7f9cbf'}}>🧭 Guide: คลิกเลือกปัจจัยที่เกี่ยวข้อง</div>
                           {g.items.map(item=>{const on=(e.ck||[]).includes(item);return<span key={item} onClick={()=>tTCE(gi,ei,item)} style={{border:on?'1px solid #1a5fb4':'1px dashed #a9bed6',background:on?'#eaf2fd':'#fff',color:on?'#12325c':'#6b8299',borderRadius:10,padding:'2px 8px',fontSize:10,cursor:'pointer',opacity:on?1:0.7}}>{on?'☑ ':''}{item}</span>})}
@@ -1523,12 +1542,16 @@ function WBoard({fd,sFD,uFS,aFS,rFS,uT,uTE,tTCE,aTE,rTE,uC,aC,rC}){
   return(
     <>
       {full?(
-        <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'#fff',zIndex:1500,overflowY:'auto',padding:'16px 20px'}}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
-            <strong style={{fontSize:16,color:'var(--primary)'}}>🧩 ไวท์บอร์ด: Care Process × 5 Tiers</strong>
+        <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'#fff',zIndex:1500,overflow:'hidden',padding:'10px 20px'}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+            <strong style={{fontSize:16,color:'var(--primary)'}}>🧩 ไวท์บอร์ด: Care Process × 5 Tiers <span style={{fontSize:11,color:'var(--text-light)',fontWeight:400}}>(ย่อ-ขยายให้พอดีจออัตโนมัติ)</span></strong>
             <button className="btn btn-sm btn-d" onClick={()=>sFull(false)}>✕ ปิดเต็มจอ</button>
           </div>
-          {board}
+          <div style={{display:'flex',justifyContent:'center',overflow:'hidden'}}>
+            <div style={{width:FIT_W*fit.s,height:(fit.h||600)*fit.s,overflow:'hidden'}}>
+              <div style={{width:FIT_W,transform:`scale(${fit.s})`,transformOrigin:'top left'}}>{board}</div>
+            </div>
+          </div>
         </div>
       ):board}
       <Modal/>

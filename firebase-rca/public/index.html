@@ -1090,12 +1090,12 @@ function FormV({fd,sFD,uf}){
           </div>
         ))}<div style={{display:'flex',gap:6,marginTop:8}}><button className="btn btn-sm btn-p" onClick={aC}>+ เพิ่ม CMP</button><button className="btn btn-sm btn-s" onClick={()=>uf('cmpsSaved',true)}>💾 บันทึก CMP</button></div></div></div>
 
-        <div className="fc"><div className="fch"><span>🧩 แผนภาพ Interactive: Care Process × 5 Tiers (ไวท์บอร์ด)</span></div>
-        <div className="fcb"><WBoard fd={fd} sFD={sFD} uFS={uFS} aFS={aFS} rFS={rFS} uTE={uTE} aTE={aTE} rTE={rTE}/></div></div>
-
         <div style={{margin:'16px 0 10px',display:'flex',alignItems:'center',gap:10}}><h3 style={{fontSize:15,fontWeight:700,color:'var(--primary-dark)'}}>🔍 ตอนที่ 3: ปัจจัยสาเหตุ (Contributing Factors)</h3></div>
         <div style={{fontSize:12,color:'var(--text-light)',marginBottom:12}}>เลือก ☑ ที่หัวข้อ Tier ที่เกี่ยวข้อง แล้วกด ▼ เพื่อขยายรายละเอียด เฉพาะ Tier ที่เลือกจะแสดงใน Export</div>
         {TD.map((tier,idx)=>{const td=fd.ta[idx]||{};const hd=td.en&&(td.entries||[]).some(e=>e.desc||(e.ck||[]).length>0||(e.oc&&e.ot));return<TC key={tier.id} tier={tier} idx={idx} td={td} hd={!!hd} fd={fd} uT={uT} uTE={uTE} tTCE={tTCE} aTE={aTE} rTE={rTE}/>})}
+
+        <div className="fc" style={{marginTop:16}}><div className="fch"><span>🧩 แผนภาพ Interactive: Care Process × 5 Tiers (ไวท์บอร์ด)</span></div>
+        <div className="fcb" style={{overflowX:'auto'}}><WBoard fd={fd} sFD={sFD} uFS={uFS} aFS={aFS} rFS={rFS} uTE={uTE} aTE={aTE} rTE={rTE} uC={uC} aC={aC} rC={rC}/></div></div>
       </>}
 
       {tab==='sm'&&<SummaryTab fd={fd} uf={uf}/>}
@@ -1262,27 +1262,39 @@ function LinkageDiagram({fd}){
 }
 
 // ===== TIER CARD =====
-// ===== INTERACTIVE WHITEBOARD (Care Process x 5 Tiers) =====
-function WBoard({fd,sFD,uFS,aFS,rFS,uTE,aTE,rTE}){
+// ===== INTERACTIVE WHITEBOARD (2-Axis: Care Process x 5 Tiers) =====
+function WBoard({fd,sFD,uFS,aFS,rFS,uTE,aTE,rTE,uC,aC,rC}){
   const[full,sFull]=useState(false);
   const[dtl,sDtl]=useState(null); // {gi,ei} = เปิด modal รายละเอียด
-  const tierColors={1:'#27ae60',2:'#2980b9',3:'#e67e22',4:'#c0392b',5:'#8e44ad'};
-  const tierBgs={1:'var(--tier1)',2:'var(--tier2)',3:'var(--tier3)',4:'var(--tier4)',5:'var(--tier5)'};
+  const TIER_ROWS=[
+    {t:5,name:'Tier 5',sub:'สังคม / นอกองค์กร'},
+    {t:4,name:'Tier 4',sub:'การบริหารจัดการ นโยบาย'},
+    {t:3,name:'Tier 3',sub:'สวล., เครื่องมือ, ข้อมูล, ระบบ'},
+    {t:2,name:'Tier 2',sub:'ลักษณะงาน ทีม'},
+    {t:1,name:'Tier 1',sub:'ผู้ป่วย บุคลากร'},
+  ];
+  const ss=(fd.flowSteps||[]).filter(s=>s.trim());
+  const blankE={ck:[],oc:false,ot:'',desc:'',strat:'',ind:'',tl:'',resp:'',linkedTo:null};
 
   const isChecked=(gi,item)=>((fd.ta[gi]||{}).entries||[]).some(e=>(e.ck||[]).includes(item));
-  const tickFactor=(gi,item,checked)=>sFD(p=>{
+  const tickFactor=(gi,item)=>sFD(p=>{
     const ta=[...p.ta];const g={...ta[gi]};let es=[...(g.entries||[])];
-    if(checked){
-      const bi=es.findIndex(e=>(!e.ck||e.ck.length===0)&&!e.desc);
-      if(bi>=0)es[bi]={...es[bi],ck:[...(es[bi].ck||[]),item]};
-      else es.push({ck:[item],oc:false,ot:'',desc:'',strat:'',ind:'',tl:'',resp:'',linkedTo:null});
-      g.en=true;
-    }else{
-      es=es.map(e=>(e.ck||[]).includes(item)?{...e,ck:e.ck.filter(x=>x!==item)}:e);
-    }
-    g.entries=es.length?es:[{ck:[],oc:false,ot:'',desc:'',strat:'',ind:'',tl:'',resp:'',linkedTo:null}];
-    ta[gi]=g;return{...p,ta}
+    const bi=es.findIndex(e=>(!e.ck||e.ck.length===0)&&!e.desc&&!e.oc);
+    if(bi>=0)es[bi]={...es[bi],ck:[item]};
+    else es.push({...blankE,ck:[item]});
+    g.en=true;g.entries=es;ta[gi]=g;return{...p,ta};
   });
+  const clearEntry=(gi,ei)=>sFD(p=>{const ta=[...p.ta];const g={...ta[gi]};const es=[...(g.entries||[])];es[ei]={...blankE};g.entries=es;ta[gi]=g;return{...p,ta}});
+  const removeBox=(gi,ei)=>{const n=((fd.ta[gi]||{}).entries||[]).length;n>1?rTE(gi,ei):clearEntry(gi,ei)};
+  const addFree=(tierNum)=>{
+    const gi=TD.findIndex(g=>g.tier===tierNum);
+    if(gi<0)return;
+    sFD(p=>{const ta=[...p.ta];const g={...ta[gi]};g.en=true;g.entries=[...(g.entries||[]),{...blankE,oc:true}];ta[gi]=g;return{...p,ta}});
+  };
+
+  const btnMini={fontSize:10,padding:'2px 8px',border:'1px solid var(--primary)',borderRadius:6,background:'#f0f7ff',color:'var(--primary)',cursor:'pointer',fontFamily:'inherit'};
+  const btnMiniRed={fontSize:10,padding:'2px 8px',border:'1px solid #e74c3c',borderRadius:6,background:'#fff5f5',color:'#e74c3c',cursor:'pointer',fontFamily:'inherit'};
+  const LABEL_W=128;
 
   const Modal=()=>{
     if(!dtl)return null;
@@ -1291,16 +1303,17 @@ function WBoard({fd,sFD,uFS,aFS,rFS,uTE,aTE,rTE}){
     if(!e)return null;
     const linkOpts=[];
     (fd.cmps||[]).forEach((c,i)=>{if(c.step||c.problem||c.unsafeAct)linkOpts.push({val:JSON.stringify({type:'cmp',index:i}),label:`CMP #${i+1}: ${c.unsafeAct||c.problem||c.step||''}`})});
-    (fd.ta||[]).forEach((t,ti)=>{if(!t.en)return;const tin=TD[ti];if(tin.tier>info.tier||(tin.tier===info.tier&&t.id===info.id))return;(t.entries||[]).forEach((te,tei)=>{const txt=te.desc||(te.ck||[]).slice(0,2).join(', ')||'';if(!txt)return;linkOpts.push({val:JSON.stringify({type:'tier',tierId:t.id,entryIndex:tei}),label:`${tin.label} #${tei+1}: ${txt.length>30?txt.slice(0,30)+'…':txt}`})});
+    (fd.ta||[]).forEach((t,ti)=>{if(!t.en)return;const tin=TD[ti];if(tin.tier>info.tier||(tin.tier===info.tier&&t.id===info.id))return;(t.entries||[]).forEach((te,tei)=>{const txt=te.desc||(te.ck||[]).slice(0,2).join(', ')||te.ot||'';if(!txt)return;linkOpts.push({val:JSON.stringify({type:'tier',tierId:t.id,entryIndex:tei}),label:`${tin.label} #${tei+1}: ${txt.length>30?txt.slice(0,30)+'…':txt}`})});
     });
     return(
       <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.5)',zIndex:1600,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onClick={()=>sDtl(null)}>
         <div style={{background:'#fff',borderRadius:12,padding:20,width:560,maxWidth:'95vw',maxHeight:'85vh',overflowY:'auto'}} onClick={ev=>ev.stopPropagation()}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
-            <strong style={{color:tierColors[info.tier]}}>📝 รายละเอียด — {info.label} (รายการที่ {ei+1})</strong>
+            <strong style={{color:'#1a5fb4'}}>📝 รายละเอียด — {info.label} (รายการที่ {ei+1})</strong>
             <span style={{cursor:'pointer',fontWeight:700,fontSize:18}} onClick={()=>sDtl(null)}>✕</span>
           </div>
-          {(e.ck||[]).length>0&&<div style={{marginBottom:10,display:'flex',gap:6,flexWrap:'wrap'}}>{e.ck.map(c=><span key={c} style={{background:tierBgs[info.tier],border:'1px solid '+tierColors[info.tier],borderRadius:12,padding:'2px 10px',fontSize:12}}>{c}</span>)}</div>}
+          {(e.ck||[]).length>0&&<div style={{marginBottom:10,display:'flex',gap:6,flexWrap:'wrap'}}>{e.ck.map(c=><span key={c} style={{background:'#eaf2fd',border:'1px solid #1a5fb4',borderRadius:12,padding:'2px 10px',fontSize:12,color:'#12325c'}}>{c}</span>)}</div>}
+          {e.oc&&<div className="fg"><label className="fl">หัวข้อปัจจัย (กำหนดเอง)</label><input className="fi" value={e.ot||''} onChange={ev=>uTE(gi,ei,'ot',ev.target.value)} placeholder="ระบุหัวข้อปัจจัย"/></div>}
           <div className="fg"><label className="fl">🔗 เชื่อมโยงกับ (CMP หรือ Tier ก่อนหน้า)</label>
             <select className="fs" value={e.linkedTo?JSON.stringify(e.linkedTo):''} onChange={ev=>uTE(gi,ei,'linkedTo',ev.target.value?JSON.parse(ev.target.value):null)}>
               <option value="">— ไม่เชื่อมโยง —</option>
@@ -1320,74 +1333,91 @@ function WBoard({fd,sFD,uFS,aFS,rFS,uTE,aTE,rTE}){
   const board=(
     <div>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8,marginBottom:10}}>
-        <div style={{fontSize:12,color:'var(--text-light)'}}>ติ๊ก ☑ ปัจจัย (Factor) ในแต่ละ Tier → พิมพ์ข้อความในกล่อง → กด 📝 เพื่อเพิ่มรายละเอียด/เชื่อมโยง — ข้อมูลซิงก์กับตอนที่ 3 ด้านล่างอัตโนมัติ</div>
+        <div style={{fontSize:12,color:'var(--text-light)'}}>คลิกที่<b>เงาปัจจัย (จางๆ)</b>ในแต่ละแถว Tier เพื่อเลือก → กล่องจะเข้มขึ้นเป็นกรอบน้ำเงิน พิมพ์รายละเอียดหรือกด 📝 เพื่อกรอกกลยุทธ์/เชื่อมโยง — ข้อมูลซิงก์กับตอนที่ 2-3 ด้านบนอัตโนมัติ</div>
         <button className="btn btn-sm btn-o" onClick={()=>sFull(!full)}>{full?'✕ ออกจากเต็มจอ':'⛶ ขยายเต็มจอ (ไวท์บอร์ด)'}</button>
       </div>
-      {/* Care Process row */}
-      <div style={{background:'#f0f4f8',border:'2px solid var(--primary)',borderRadius:10,padding:12,marginBottom:12}}>
-        <div style={{fontWeight:700,fontSize:13,color:'var(--primary)',marginBottom:8}}>🔄 Care Process (Flow of Steps)</div>
-        <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
-          {(fd.flowSteps||[]).map((s,i)=>(
-            <React.Fragment key={i}>
-              {i>0&&<span style={{color:'var(--primary)',fontWeight:700}}>→</span>}
-              <div style={{position:'relative'}}>
-                <input value={s} onChange={e=>uFS(i,e.target.value)} placeholder={'ขั้นตอนที่ '+(i+1)} style={{width:150,padding:'8px 24px 8px 10px',border:'1.5px solid var(--primary)',borderRadius:8,fontSize:12,fontFamily:'inherit',background:'#fff'}}/>
-                {(fd.flowSteps||[]).length>2&&<span style={{position:'absolute',right:6,top:8,cursor:'pointer',fontSize:11,color:'#999'}} onClick={()=>rFS(i)}>✕</span>}
-              </div>
-            </React.Fragment>
-          ))}
-          <button className="btn btn-sm btn-p" onClick={aFS}>＋</button>
-        </div>
-      </div>
-      {/* Tier bands */}
-      {[1,2,3,4,5].map(tl2=>(
-        <div key={tl2} style={{border:'2px solid '+tierColors[tl2],borderRadius:10,marginBottom:10,overflow:'hidden'}}>
-          <div style={{background:tierColors[tl2],color:'#fff',padding:'6px 12px',fontWeight:700,fontSize:13}}>Tier {tl2}</div>
-          <div style={{display:'flex',gap:10,padding:10,overflowX:'auto',alignItems:'flex-start',background:'#fff'}}>
-            {TD.map((g,gi)=>{if(g.tier!==tl2)return null;const grp=fd.ta[gi]||{};const entries=grp.entries||[];
-              return(
-                <div key={g.id} style={{minWidth:250,maxWidth:290,flex:'1 0 250px',background:tierBgs[tl2],border:'1px solid '+tierColors[tl2],borderRadius:8,padding:10}}>
-                  <div style={{fontWeight:700,fontSize:12,color:tierColors[tl2],marginBottom:6}}>{g.label.replace(/^Tier \d+: /,'')}</div>
-                  <div style={{display:'flex',flexDirection:'column',gap:3,marginBottom:8}}>
-                    {g.items.map(item=>(
-                      <label key={item} style={{display:'flex',gap:6,alignItems:'flex-start',fontSize:11.5,cursor:'pointer',lineHeight:1.5}}>
-                        <input type="checkbox" checked={isChecked(gi,item)} onChange={e=>tickFactor(gi,item,e.target.checked)} style={{marginTop:2,accentColor:tierColors[tl2]}}/>
-                        <span>{item}</span>
-                      </label>
-                    ))}
-                  </div>
-                  {grp.en&&entries.map((e,ei)=>{
-                    if(!(e.ck||[]).length&&!e.desc&&entries.length>1&&ei>0&&!e.strat)return(
-                      <div key={ei} style={{background:'#fff',borderRadius:6,padding:8,marginBottom:6,border:'1px dashed '+tierColors[tl2]}}>
-                        <textarea value={e.desc||''} onChange={ev=>uTE(gi,ei,'desc',ev.target.value)} placeholder="พิมพ์ปัจจัย/รายละเอียดเพิ่มเติม..." style={{width:'100%',minHeight:44,border:'none',fontSize:12,fontFamily:'inherit',resize:'vertical',background:'transparent'}}/>
-                        <div style={{display:'flex',gap:4,justifyContent:'flex-end'}}>
-                          <button className="btn btn-sm btn-o" style={{fontSize:10,padding:'2px 8px'}} onClick={()=>sDtl({gi,ei})}>📝 รายละเอียด</button>
-                          <button className="btn btn-sm btn-d" style={{fontSize:10,padding:'2px 8px'}} onClick={()=>rTE(gi,ei)}>✕</button>
-                        </div>
-                      </div>
-                    );
-                    if(!(e.ck||[]).length&&!e.desc&&!e.strat)return null;
-                    return(
-                      <div key={ei} style={{background:'#fff',borderRadius:6,padding:8,marginBottom:6,border:'1px solid var(--border)'}}>
-                        {(e.ck||[]).length>0&&<div style={{fontSize:10.5,fontWeight:700,color:tierColors[tl2],marginBottom:4}}>{e.ck.join(' • ')}</div>}
-                        <textarea value={e.desc||''} onChange={ev=>uTE(gi,ei,'desc',ev.target.value)} placeholder="พิมพ์ข้อความอธิบายปัจจัยนี้..." style={{width:'100%',minHeight:44,border:'none',fontSize:12,fontFamily:'inherit',resize:'vertical',background:'transparent'}}/>
-                        <div style={{display:'flex',gap:4,justifyContent:'space-between',alignItems:'center'}}>
-                          <span style={{fontSize:9.5,color:'var(--text-light)'}}>{e.linkedTo?'🔗 เชื่อมโยงแล้ว':''}{e.strat?' ✅ มีกลยุทธ์':''}</span>
-                          <div style={{display:'flex',gap:4}}>
-                            <button className="btn btn-sm btn-o" style={{fontSize:10,padding:'2px 8px'}} onClick={()=>sDtl({gi,ei})}>📝 รายละเอียด</button>
-                            {entries.length>1&&<button className="btn btn-sm btn-d" style={{fontSize:10,padding:'2px 8px'}} onClick={()=>rTE(gi,ei)}>✕</button>}
+      <div style={{border:'1px solid #b8c9dd',borderRadius:8,overflow:'hidden',minWidth:720}}>
+        {/* Contributing factors: Tier 5 -> Tier 1 */}
+        {TIER_ROWS.map(row=>(
+          <div key={row.t} style={{display:'flex',borderBottom:'1px solid #b8c9dd',background:'#e8f0fa'}}>
+            <div style={{width:LABEL_W,flexShrink:0,padding:'10px 12px',borderRight:'1px solid #b8c9dd'}}>
+              <div style={{fontWeight:800,fontSize:13,color:'#1f2d3d'}}>{row.name}</div>
+              <div style={{fontSize:11,color:'#2e6fb7',lineHeight:1.4}}>{row.sub}</div>
+            </div>
+            <div style={{flex:1,padding:8,display:'flex',flexWrap:'wrap',gap:6,alignItems:'flex-start',alignContent:'flex-start'}}>
+              {TD.map((g,gi)=>{if(g.tier!==row.t)return null;const grp=fd.ta[gi]||{};const entries=grp.entries||[];
+                return(
+                  <React.Fragment key={g.id}>
+                    {entries.map((e,ei)=>{
+                      if(!(e.ck||[]).length&&!e.desc&&!e.strat&&!e.oc)return null;
+                      return(
+                        <div key={g.id+'-'+ei} style={{background:'#fff',border:'2px solid #1a5fb4',borderRadius:10,padding:'7px 9px',width:215,boxShadow:'0 1px 4px rgba(26,95,180,0.18)'}}>
+                          {(e.ck||[]).length>0
+                            ?<div style={{fontSize:11.5,fontWeight:700,color:'#12325c',marginBottom:3,lineHeight:1.4}}>{e.ck.join(' • ')}</div>
+                            :<input value={e.ot||''} onChange={ev=>uTE(gi,ei,'ot',ev.target.value)} placeholder="หัวข้อปัจจัย (กำหนดเอง)" style={{width:'100%',border:'none',borderBottom:'1px dashed #9db4d0',fontSize:11.5,fontWeight:700,color:'#12325c',fontFamily:'inherit',marginBottom:3,background:'transparent'}}/>}
+                          <textarea value={e.desc||''} onChange={ev=>uTE(gi,ei,'desc',ev.target.value)} placeholder="กรอกรายละเอียด..." style={{width:'100%',minHeight:34,border:'none',fontSize:11.5,fontFamily:'inherit',resize:'vertical',background:'transparent',color:'#1f2d3d'}}/>
+                          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:4}}>
+                            <span style={{fontSize:9,color:'#7f9cbf',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{g.label.replace(/^Tier \d+: /,'')}{e.linkedTo?' · 🔗':''}{e.strat?' · ✅':''}</span>
+                            <div style={{display:'flex',gap:4,flexShrink:0}}>
+                              <button style={btnMini} onClick={()=>sDtl({gi,ei})}>📝 รายละเอียด</button>
+                              <button style={btnMiniRed} onClick={()=>removeBox(gi,ei)}>✕</button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                  {grp.en&&<button className="btn btn-sm btn-p" style={{fontSize:11,width:'100%'}} onClick={()=>aTE(gi)}>＋ เพิ่มกล่องข้อความ</button>}
-                </div>
-              );
-            })}
+                      );
+                    })}
+                    {g.items.map(item=>isChecked(gi,item)?null:(
+                      <div key={item} onClick={()=>tickFactor(gi,item)} title={'คลิกเพื่อเลือกปัจจัยนี้'} style={{border:'1.5px dashed #a9bed6',borderRadius:10,padding:'6px 10px',fontSize:10.5,color:'#6b8299',opacity:0.5,cursor:'pointer',background:'#f4f8fd',maxWidth:165,lineHeight:1.4}}>{item}</div>
+                    ))}
+                  </React.Fragment>
+                );
+              })}
+              <button onClick={()=>addFree(row.t)} title="เพิ่มปัจจัยกำหนดเอง" style={{border:'1.5px dashed #1a5fb4',borderRadius:10,background:'#f0f7ff',color:'#1a5fb4',fontWeight:700,fontSize:14,padding:'4px 12px',cursor:'pointer',fontFamily:'inherit',alignSelf:'center'}}>＋</button>
+            </div>
+          </div>
+        ))}
+        {/* Unsafe act / Potential change (CMPs) */}
+        <div style={{display:'flex',borderBottom:'1px solid #b8c9dd',background:'#e6f4ea'}}>
+          <div style={{width:LABEL_W,flexShrink:0,padding:'10px 12px',borderRight:'1px solid #b8c9dd'}}>
+            <div style={{fontWeight:800,fontSize:12.5,color:'#1f2d3d'}}>Unsafe act/</div>
+            <div style={{fontWeight:800,fontSize:12.5,color:'#1f2d3d'}}>Potential change</div>
+            <div style={{fontSize:11,color:'#27ae60'}}>(CMP)</div>
+          </div>
+          <div style={{flex:1,padding:8,display:'flex',flexWrap:'wrap',gap:6,alignItems:'flex-start'}}>
+            {(fd.cmps||[]).map((c,i)=>(
+              <div key={i} style={{background:'#fff',border:'2px solid #27ae60',borderRadius:10,padding:'7px 9px',width:210}}>
+                <select value={c.step||''} onChange={e=>uC(i,'step',e.target.value)} style={{width:'100%',border:'none',borderBottom:'1px dashed #bfe3cc',fontSize:10.5,color:'#1e8449',fontFamily:'inherit',marginBottom:3,background:'transparent'}}>
+                  <option value="">— เลือกขั้นตอน (Flow) —</option>
+                  {ss.map(s=><option key={s} value={s}>{s}</option>)}
+                </select>
+                <textarea value={c.unsafeAct||''} onChange={e=>uC(i,'unsafeAct',e.target.value)} placeholder="Unsafe act / จุดเปลี่ยน..." style={{width:'100%',minHeight:30,border:'none',fontSize:11.5,fontWeight:600,fontFamily:'inherit',resize:'vertical',background:'transparent',color:'#14532d'}}/>
+                <textarea value={c.problem||''} onChange={e=>uC(i,'problem',e.target.value)} placeholder="ปัญหา (CMP)..." style={{width:'100%',minHeight:26,border:'none',borderTop:'1px dashed #d5eadc',fontSize:11,fontFamily:'inherit',resize:'vertical',background:'transparent',color:'#1f2d3d'}}/>
+                {(fd.cmps||[]).length>1&&<div style={{textAlign:'right'}}><button style={btnMiniRed} onClick={()=>rC(i)}>✕</button></div>}
+              </div>
+            ))}
+            <button onClick={aC} title="เพิ่ม CMP" style={{border:'1.5px dashed #27ae60',borderRadius:10,background:'#f0fbf4',color:'#1e8449',fontWeight:700,fontSize:14,padding:'4px 12px',cursor:'pointer',fontFamily:'inherit',alignSelf:'center'}}>＋</button>
           </div>
         </div>
-      ))}
+        {/* Flow of steps / Care process */}
+        <div style={{display:'flex',background:'#fdebd0'}}>
+          <div style={{width:LABEL_W,flexShrink:0,padding:'10px 12px',borderRight:'1px solid #e8cba3'}}>
+            <div style={{fontWeight:800,fontSize:12.5,color:'#7d3c98'}}>Flow of steps</div>
+            <div style={{fontSize:11,color:'#1f2d3d'}}>Care process / กระบวนการหลัก</div>
+          </div>
+          <div style={{flex:1,padding:8,display:'flex',flexWrap:'wrap',gap:6,alignItems:'center'}}>
+            {(fd.flowSteps||[]).map((s,i)=>(
+              <React.Fragment key={i}>
+                {i>0&&<span style={{color:'#b9770e',fontWeight:700}}>→</span>}
+                <div style={{position:'relative'}}>
+                  <input value={s} onChange={e=>uFS(i,e.target.value)} placeholder={'ขั้นตอนที่ '+(i+1)} style={{width:130,padding:'8px 22px 8px 10px',border:'1.5px solid #1f2d3d',borderRadius:10,fontSize:11.5,fontFamily:'inherit',background:'#fff',textAlign:'center'}}/>
+                  {(fd.flowSteps||[]).length>2&&<span style={{position:'absolute',right:6,top:8,cursor:'pointer',fontSize:11,color:'#999'}} onClick={()=>rFS(i)}>✕</span>}
+                </div>
+              </React.Fragment>
+            ))}
+            <button onClick={aFS} title="เพิ่มขั้นตอน" style={{border:'1.5px dashed #b9770e',borderRadius:10,background:'#fef8ec',color:'#b9770e',fontWeight:700,fontSize:14,padding:'4px 12px',cursor:'pointer',fontFamily:'inherit'}}>＋</button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 

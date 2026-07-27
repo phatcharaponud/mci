@@ -1303,32 +1303,60 @@ function WBoard({fd,sFD,uFS,aFS,rFS,uT,uTE,tTCE,aTE,rTE,uC,aC,rC}){
     return gs.slice().sort((a,b)=>(orderKey(a.gi)-orderKey(b.gi))||(a.gi-b.gi));
   };
 
-  // คำนวณเส้นลูกศรตามการเชื่อมโยง - เส้นวิ่งตามขอบแถวและอ้อมข้างกล่อง ไม่ทับกล่อง
+  // ลากกล่องซ้าย-ขวาภายในแถว (เก็บระยะเลื่อนต่อกล่อง)
+  const[offsets,sOffsets]=useState({});
+  const dragRef=useRef(null);
+  const startDrag=(key,rowKey)=>(ev)=>{
+    const tag=(ev.target.tagName||'').toLowerCase();
+    if(['input','textarea','select','button'].includes(tag))return;
+    const box=boxRefs.current[key],row=boxRefs.current[rowKey];
+    if(!box||!row)return;
+    ev.preventDefault();
+    const base=offsets[key]||0;
+    const bx=box.getBoundingClientRect();
+    const rw=row.getBoundingClientRect();
+    const natLeft=bx.left-base;
+    const minOff=(rw.left+LABEL_W+9)-natLeft;
+    const maxOff=(rw.right-9-bx.width)-natLeft;
+    const startX=ev.clientX;
+    const move=(e)=>{
+      let off=base+(e.clientX-startX);
+      if(off<minOff)off=minOff;
+      if(off>maxOff)off=maxOff;
+      sOffsets(p=>({...p,[key]:off}));
+    };
+    const up=()=>{window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up)};
+    window.addEventListener('pointermove',move);
+    window.addEventListener('pointerup',up);
+  };
+
+  // คำนวณเส้นลูกศร - จุดเริ่ม/จุดจบอยู่นอกกรอบกล่อง เส้นวิ่งตามขอบแถวและอ้อมข้างกล่อง
   useEffect(()=>{
     const compute=()=>{
       const root=boardRef.current;
       if(!root){sLines([]);return}
       const rr=root.getBoundingClientRect();
       const rel=el=>{const r=el.getBoundingClientRect();return{left:r.left-rr.left,right:r.right-rr.left,top:r.top-rr.top,bottom:r.bottom-rr.top,cx:r.left-rr.left+r.width/2}};
-      // เส้นทางฉาก: ลงจากกล่องต้นทาง -> วิ่งตามเส้นขอบล่างของแถว -> อ้อมข้างกล่องปลายทาง -> เข้าด้านบนกล่อง
       const mkPath=(fr,tr2,b1)=>{
-        const x1=fr.cx,y1=fr.bottom+1,x2=tr2.cx,y2=tr2.top-1;
+        const x1=fr.cx,y1=fr.bottom,x2=tr2.cx,y2=tr2.top;
         if(Math.abs(x2-x1)<26)return`M ${x1} ${y1} L ${x2} ${y2}`;
         const xv=x2>x1?tr2.left-10:tr2.right+10;
-        const ym=y2-5;
+        const ym=y2-6;
         return`M ${x1} ${y1} L ${x1} ${b1} L ${xv} ${b1} L ${xv} ${ym} L ${x2} ${ym} L ${x2} ${y2}`;
       };
       const ls=[];
-      // Tier entries -> CMP หรือ Tier ก่อนหน้า
+      // Tier entries -> CMP หรือ Tier ก่อนหน้า (เริ่มจากใต้กรอบน้ำเงินของกล่องใหญ่ จบเหนือกรอบกล่องปลายทาง)
       (fd.ta||[]).forEach((g,gi)=>{(g.entries||[]).forEach((e,ei)=>{
         if(!e.linkedTo)return;
-        const from=boxRefs.current['t-'+gi+'-'+ei];
-        let to=null;
-        if(e.linkedTo.type==='cmp')to=boxRefs.current['c-'+e.linkedTo.index];
-        else{const tgi=TD.findIndex(x=>x.id===e.linkedTo.tierId);to=boxRefs.current['t-'+tgi+'-'+e.linkedTo.entryIndex]}
+        const fromE=boxRefs.current['t-'+gi+'-'+ei];
+        const fromG=boxRefs.current['g-'+gi];
+        let toBox=null,toCx=null;
+        if(e.linkedTo.type==='cmp'){const b=boxRefs.current['c-'+e.linkedTo.index];if(b){toBox=b;toCx=rel(b).cx}}
+        else{const tgi=TD.findIndex(x=>x.id===e.linkedTo.tierId);const tE=boxRefs.current['t-'+tgi+'-'+e.linkedTo.entryIndex];const gB=boxRefs.current['g-'+tgi];if(tE&&gB&&tE.isConnected){toBox=gB;toCx=rel(tE).cx}}
         const rowEl=boxRefs.current['row-'+TD[gi].tier];
-        if(!from||!to||!rowEl||!from.isConnected||!to.isConnected)return;
-        ls.push({d:mkPath(rel(from),rel(to),rel(rowEl).bottom-1),c:'#1f2d3d'});
+        if(!fromE||!fromG||!toBox||!rowEl||!fromE.isConnected||!fromG.isConnected||!toBox.isConnected)return;
+        const fg=rel(fromG),fe=rel(fromE),tb=rel(toBox);
+        ls.push({d:mkPath({cx:fe.cx,bottom:fg.bottom+3},{cx:toCx,top:tb.top-3,left:tb.left,right:tb.right},rel(rowEl).bottom-1),c:'#1f2d3d'});
       })});
       // CMP -> ขั้นตอนใน Flow of Steps
       (fd.cmps||[]).forEach((c,i)=>{
@@ -1339,14 +1367,15 @@ function WBoard({fd,sFD,uFS,aFS,rFS,uT,uTE,tTCE,aTE,rTE,uC,aC,rC}){
         const to=boxRefs.current['f-'+si];
         const rowEl=boxRefs.current['row-cmp'];
         if(!from||!to||!rowEl||!from.isConnected||!to.isConnected)return;
-        ls.push({d:mkPath(rel(from),rel(to),rel(rowEl).bottom-1),c:'#1e8449'});
+        const fb=rel(from),tb=rel(to);
+        ls.push({d:mkPath({cx:fb.cx,bottom:fb.bottom+3},{cx:tb.cx,top:tb.top-3,left:tb.left,right:tb.right},rel(rowEl).bottom-1),c:'#1e8449'});
       });
       sLines(ls);
     };
-    const t=setTimeout(compute,180);
+    const t=setTimeout(compute,60);
     window.addEventListener('resize',compute);
     return()=>{clearTimeout(t);window.removeEventListener('resize',compute)};
-  },[fd,full,autoSort,tick]);
+  },[fd,full,autoSort,tick,offsets]);
 
   const btnMini={fontSize:10,padding:'2px 8px',border:'1px solid var(--primary)',borderRadius:6,background:'#f0f7ff',color:'var(--primary)',cursor:'pointer',fontFamily:'inherit'};
   const btnMiniRed={fontSize:10,padding:'2px 8px',border:'1px solid #e74c3c',borderRadius:6,background:'#fff5f5',color:'#e74c3c',cursor:'pointer',fontFamily:'inherit'};
@@ -1409,10 +1438,10 @@ function WBoard({fd,sFD,uFS,aFS,rFS,uT,uTE,tTCE,aTE,rTE,uC,aC,rC}){
                   <div key={g.id} onClick={()=>{uT(gi,'en',true);sTick(x=>x+1)}} title="คลิกเพื่อเปิดองค์ประกอบนี้" style={{border:'1.5px dashed #a9bed6',borderRadius:10,padding:'10px 16px',fontSize:12.5,fontWeight:700,color:'#6b8299',opacity:0.5,cursor:'pointer',background:'#f4f8fd'}}>{shortName(g)}</div>
                 );
                 return(
-                  <div key={g.id} style={{background:'#fff',border:'2px solid #1a5fb4',borderRadius:10,padding:'8px 10px',width:255,boxShadow:'0 1px 4px rgba(26,95,180,0.18)'}}>
-                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
-                      <strong style={{fontSize:12.5,color:'#12325c'}}>{shortName(g)}</strong>
-                      <span onClick={()=>{if(confirm('ปิดองค์ประกอบ "'+shortName(g)+'"? (ข้อมูลที่กรอกยังอยู่ แต่จะไม่แสดงใน Export)'))uT(gi,'en',false)}} title="ยุบกลับเป็นเงา" style={{cursor:'pointer',color:'#e74c3c',fontWeight:700,fontSize:13}}>✕</span>
+                  <div key={g.id} ref={el=>{boxRefs.current['g-'+gi]=el}} style={{background:'#fff',border:'2px solid #1a5fb4',borderRadius:10,padding:'8px 10px',width:255,boxShadow:'0 1px 4px rgba(26,95,180,0.18)',transform:`translateX(${offsets['g-'+gi]||0}px)`}}>
+                    <div onPointerDown={startDrag('g-'+gi,'row-'+row.t)} title="กดค้างแล้วลากเพื่อเลื่อนซ้าย-ขวา" style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6,cursor:'grab',touchAction:'none',userSelect:'none'}}>
+                      <strong style={{fontSize:12.5,color:'#12325c'}}>⠿ {shortName(g)}</strong>
+                      <span onPointerDown={e=>e.stopPropagation()} onClick={()=>{if(confirm('ปิดองค์ประกอบ "'+shortName(g)+'"? (ข้อมูลที่กรอกยังอยู่ แต่จะไม่แสดงใน Export)'))uT(gi,'en',false)}} title="ยุบกลับเป็นเงา" style={{cursor:'pointer',color:'#e74c3c',fontWeight:700,fontSize:13}}>✕</span>
                     </div>
                     {entries.map((e,ei)=>(
                       <div key={ei} ref={el=>{boxRefs.current['t-'+gi+'-'+ei]=el}} style={{border:'1px solid #cfe0f4',borderRadius:8,padding:6,marginBottom:6,background:'#f8fbff'}}>
@@ -1448,7 +1477,8 @@ function WBoard({fd,sFD,uFS,aFS,rFS,uT,uTE,tTCE,aTE,rTE,uC,aC,rC}){
           </div>
           <div style={{flex:1,padding:8,display:'flex',flexWrap:'wrap',gap:8,justifyContent:'center',alignItems:'center',alignContent:'center'}}>
             {(fd.cmps||[]).map((c,i)=>(
-              <div key={i} ref={el=>{boxRefs.current['c-'+i]=el}} style={{background:'#fff',border:'2px solid #27ae60',borderRadius:10,padding:'7px 9px',width:210}}>
+              <div key={i} ref={el=>{boxRefs.current['c-'+i]=el}} style={{background:'#fff',border:'2px solid #27ae60',borderRadius:10,padding:'7px 9px',width:210,transform:`translateX(${offsets['c-'+i]||0}px)`}}>
+                <div onPointerDown={startDrag('c-'+i,'row-cmp')} title="กดค้างแล้วลากเพื่อเลื่อนซ้าย-ขวา" style={{cursor:'grab',touchAction:'none',userSelect:'none',fontSize:10,color:'#1e8449',fontWeight:700,textAlign:'center',marginBottom:2}}>⠿</div>
                 <select value={c.step||''} onChange={e=>uC(i,'step',e.target.value)} style={{width:'100%',border:'none',borderBottom:'1px dashed #bfe3cc',fontSize:10.5,color:'#1e8449',fontFamily:'inherit',marginBottom:3,background:'transparent'}}>
                   <option value="">— เลือกขั้นตอน (Flow) —</option>
                   {ss.map(s=><option key={s} value={s}>{s}</option>)}
@@ -1483,10 +1513,10 @@ function WBoard({fd,sFD,uFS,aFS,rFS,uT,uTE,tTCE,aTE,rTE,uC,aC,rC}){
         {/* เส้นลูกศรการเชื่อมโยง */}
         <svg style={{position:'absolute',top:0,left:0,width:'100%',height:'100%',pointerEvents:'none'}}>
           <defs>
-            <marker id="wbArrow" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#1f2d3d"/></marker>
-            <marker id="wbArrowG" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#1e8449"/></marker>
+            <marker id="wbArrow" markerWidth="5.5" markerHeight="5.5" refX="4.2" refY="2.25" orient="auto"><path d="M0,0 L4.5,2.25 L0,4.5 Z" fill="#1f2d3d"/></marker>
+            <marker id="wbArrowG" markerWidth="5.5" markerHeight="5.5" refX="4.2" refY="2.25" orient="auto"><path d="M0,0 L4.5,2.25 L0,4.5 Z" fill="#1e8449"/></marker>
           </defs>
-          {lines.map((l,i)=><path key={i} d={l.d} fill="none" stroke={l.c} strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" markerEnd={l.c==='#1e8449'?'url(#wbArrowG)':'url(#wbArrow)'}/>)}
+          {lines.map((l,i)=><path key={i} d={l.d} fill="none" stroke={l.c} strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round" markerEnd={l.c==='#1e8449'?'url(#wbArrowG)':'url(#wbArrow)'}/>)}
         </svg>
       </div>
     </div>

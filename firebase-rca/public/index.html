@@ -1284,7 +1284,7 @@ function WBoard({fd,sFD,uFS,aFS,rFS,uT,uTE,tTCE,aTE,rTE,uC,aC,rC}){
   const blankE={ck:[],oc:false,ot:'',desc:'',strat:'',ind:'',tl:'',resp:'',linkedTo:null};
 
   const clearEntry=(gi,ei)=>sFD(p=>{const ta=[...p.ta];const g={...ta[gi]};const es=[...(g.entries||[])];es[ei]={...blankE};g.entries=es;ta[gi]=g;return{...p,ta}});
-  const removeEntry=(gi,ei)=>{const n=((fd.ta[gi]||{}).entries||[]).length;n>1?rTE(gi,ei):clearEntry(gi,ei)};
+  const removeEntry=(gi,ei)=>{const n=((fd.ta[gi]||{}).entries||[]).length;if(n>1){rTE(gi,ei)}else{clearEntry(gi,ei);uT(gi,'en',false)}};
 
   // จัดเรียงอัตโนมัติ: เรียงกล่องในแถวตามตำแหน่งเป้าหมายที่เชื่อมโยง เพื่อลดเส้นไขว้
   const orderKey=(gi)=>{
@@ -1345,18 +1345,17 @@ function WBoard({fd,sFD,uFS,aFS,rFS,uT,uTE,tTCE,aTE,rTE,uC,aC,rC}){
         return`M ${x1} ${y1} L ${x1} ${b1} L ${xv} ${b1} L ${xv} ${ym} L ${x2} ${ym} L ${x2} ${y2}`;
       };
       const ls=[];
-      // Tier entries -> CMP หรือ Tier ก่อนหน้า (เริ่มจากใต้กรอบน้ำเงินของกล่องใหญ่ จบเหนือกรอบกล่องปลายทาง)
+      // Tier entries -> CMP หรือ Tier ก่อนหน้า (เริ่มใต้กรอบกล่องต้นทาง จบเหนือกรอบกล่องปลายทาง)
       (fd.ta||[]).forEach((g,gi)=>{(g.entries||[]).forEach((e,ei)=>{
         if(!e.linkedTo)return;
         const fromE=boxRefs.current['t-'+gi+'-'+ei];
-        const fromG=boxRefs.current['g-'+gi];
-        let toBox=null,toCx=null;
-        if(e.linkedTo.type==='cmp'){const b=boxRefs.current['c-'+e.linkedTo.index];if(b){toBox=b;toCx=rel(b).cx}}
-        else{const tgi=TD.findIndex(x=>x.id===e.linkedTo.tierId);const tE=boxRefs.current['t-'+tgi+'-'+e.linkedTo.entryIndex];const gB=boxRefs.current['g-'+tgi];if(tE&&gB&&tE.isConnected){toBox=gB;toCx=rel(tE).cx}}
+        let toBox=null;
+        if(e.linkedTo.type==='cmp')toBox=boxRefs.current['c-'+e.linkedTo.index];
+        else{const tgi=TD.findIndex(x=>x.id===e.linkedTo.tierId);toBox=boxRefs.current['t-'+tgi+'-'+e.linkedTo.entryIndex]}
         const rowEl=boxRefs.current['row-'+TD[gi].tier];
-        if(!fromE||!fromG||!toBox||!rowEl||!fromE.isConnected||!fromG.isConnected||!toBox.isConnected)return;
-        const fg=rel(fromG),fe=rel(fromE),tb=rel(toBox);
-        ls.push({d:mkPath({cx:fe.cx,bottom:fg.bottom+3},{cx:toCx,top:tb.top-3,left:tb.left,right:tb.right},rel(rowEl).bottom-1),c:'#1f2d3d'});
+        if(!fromE||!toBox||!rowEl||!fromE.isConnected||!toBox.isConnected)return;
+        const fe=rel(fromE),tb=rel(toBox);
+        ls.push({d:mkPath({cx:fe.cx,bottom:fe.bottom+3},{cx:tb.cx,top:tb.top-3,left:tb.left,right:tb.right},rel(rowEl).bottom-1),c:'#1f2d3d'});
       })});
       // CMP -> ขั้นตอนใน Flow of Steps
       (fd.cmps||[]).forEach((c,i)=>{
@@ -1438,21 +1437,20 @@ function WBoard({fd,sFD,uFS,aFS,rFS,uT,uTE,tTCE,aTE,rTE,uC,aC,rC}){
                   <div key={g.id} onClick={()=>{uT(gi,'en',true);sTick(x=>x+1)}} title="คลิกเพื่อเปิดองค์ประกอบนี้" style={{border:'1.5px dashed #a9bed6',borderRadius:10,padding:'10px 16px',fontSize:12.5,fontWeight:700,color:'#6b8299',opacity:0.5,cursor:'pointer',background:'#f4f8fd'}}>{shortName(g)}</div>
                 );
                 return(
-                  <div key={g.id} ref={el=>{boxRefs.current['g-'+gi]=el}} style={{background:'#fff',border:'2px solid #1a5fb4',borderRadius:10,padding:'8px 10px',width:255,boxShadow:'0 1px 4px rgba(26,95,180,0.18)',transform:`translateX(${offsets['g-'+gi]||0}px)`}}>
-                    <div onPointerDown={startDrag('g-'+gi,'row-'+row.t)} title="กดค้างแล้วลากเพื่อเลื่อนซ้าย-ขวา" style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6,cursor:'grab',touchAction:'none',userSelect:'none'}}>
-                      <strong style={{fontSize:12.5,color:'#12325c'}}>⠿ {shortName(g)}</strong>
-                      <span onPointerDown={e=>e.stopPropagation()} onClick={()=>{if(confirm('ปิดองค์ประกอบ "'+shortName(g)+'"? (ข้อมูลที่กรอกยังอยู่ แต่จะไม่แสดงใน Export)'))uT(gi,'en',false)}} title="ยุบกลับเป็นเงา" style={{cursor:'pointer',color:'#e74c3c',fontWeight:700,fontSize:13}}>✕</span>
-                    </div>
+                  <React.Fragment key={g.id}>
                     {entries.map((e,ei)=>(
-                      <div key={ei} ref={el=>{boxRefs.current['t-'+gi+'-'+ei]=el}} style={{border:'1px solid #cfe0f4',borderRadius:8,padding:6,marginBottom:6,background:'#f8fbff'}}>
+                      <div key={ei} ref={el=>{boxRefs.current['t-'+gi+'-'+ei]=el}} style={{background:'#fff',border:'2px solid #1a5fb4',borderRadius:10,padding:'7px 9px',width:240,boxShadow:'0 1px 4px rgba(26,95,180,0.18)',transform:`translateX(${offsets['t-'+gi+'-'+ei]||0}px)`}}>
+                        <div onPointerDown={startDrag('t-'+gi+'-'+ei,'row-'+row.t)} title="กดค้างแล้วลากเพื่อเลื่อนซ้าย-ขวา" style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4,cursor:'grab',touchAction:'none',userSelect:'none'}}>
+                          <strong style={{fontSize:12,color:'#12325c'}}>⠿ {shortName(g)}{entries.length>1?' #'+(ei+1):''}</strong>
+                          <span onPointerDown={e2=>e2.stopPropagation()} onClick={()=>{const hasData=(e.ck||[]).length>0||e.desc||e.strat;if(hasData&&!confirm('ลบกล่องประเด็นนี้?'))return;removeEntry(gi,ei)}} title="ลบกล่องนี้" style={{cursor:'pointer',color:'#e74c3c',fontWeight:700,fontSize:13}}>✕</span>
+                        </div>
                         {(e.ck||[]).length>0&&<div style={{display:'flex',flexWrap:'wrap',gap:3,marginBottom:3}}>{e.ck.map(c=><span key={c} onClick={()=>tTCE(gi,ei,c)} title="คลิกเพื่อเอาออก" style={{background:'#eaf2fd',border:'1px solid #1a5fb4',borderRadius:10,padding:'1px 8px',fontSize:10,color:'#12325c',cursor:'pointer'}}>{c} ✕</span>)}</div>}
                         <textarea value={e.desc||''} onChange={ev=>uTE(gi,ei,'desc',ev.target.value)} placeholder="พิมพ์ข้อความประเด็น..." style={{width:'100%',minHeight:32,border:'none',fontSize:11.5,fontFamily:'inherit',resize:'vertical',background:'transparent',color:'#1f2d3d'}}/>
                         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:4}}>
                           <span style={{fontSize:9,color:'#7f9cbf'}}>{e.linkedTo?'🔗 เชื่อมโยงแล้ว':''}{e.strat?' ✅':''}</span>
                           <div style={{display:'flex',gap:4,flexShrink:0}}>
                             <button style={btnMini} onClick={()=>sGuide(guide&&guide.gi===gi&&guide.ei===ei?null:{gi,ei})}>🧭 Guide</button>
-                            <button style={btnMini} onClick={()=>sDtl({gi,ei})}>📝</button>
-                            <button style={btnMiniRed} onClick={()=>removeEntry(gi,ei)}>✕</button>
+                            <button style={btnMini} onClick={()=>sDtl({gi,ei})}>📝 รายละเอียด</button>
                           </div>
                         </div>
                         {guide&&guide.gi===gi&&guide.ei===ei&&<div style={{marginTop:4,paddingTop:4,borderTop:'1px dashed #cfe0f4',display:'flex',flexWrap:'wrap',gap:3}}>
@@ -1461,8 +1459,8 @@ function WBoard({fd,sFD,uFS,aFS,rFS,uT,uTE,tTCE,aTE,rTE,uC,aC,rC}){
                         </div>}
                       </div>
                     ))}
-                    <button onClick={()=>aTE(gi)} style={{width:'100%',border:'1.5px dashed #1a5fb4',borderRadius:8,background:'#f0f7ff',color:'#1a5fb4',fontWeight:700,fontSize:11,padding:'3px 0',cursor:'pointer',fontFamily:'inherit'}}>＋ เพิ่มประเด็น</button>
-                  </div>
+                    <button onClick={()=>aTE(gi)} title={'เพิ่มประเด็นใหม่ขององค์ประกอบ "'+shortName(g)+'" (ขึ้นเป็นกล่องแยกด้านข้าง)'} style={{border:'1.5px dashed #1a5fb4',borderRadius:10,background:'#f0f7ff',color:'#1a5fb4',fontWeight:700,fontSize:11,padding:'6px 10px',cursor:'pointer',fontFamily:'inherit',alignSelf:'center',flexShrink:0}}>＋ เพิ่มประเด็น</button>
+                  </React.Fragment>
                 );
               })}
             </div>

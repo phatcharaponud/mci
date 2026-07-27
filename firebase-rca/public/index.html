@@ -1095,7 +1095,7 @@ function FormV({fd,sFD,uf}){
         {TD.map((tier,idx)=>{const td=fd.ta[idx]||{};const hd=td.en&&(td.entries||[]).some(e=>e.desc||(e.ck||[]).length>0||(e.oc&&e.ot));return<TC key={tier.id} tier={tier} idx={idx} td={td} hd={!!hd} fd={fd} uT={uT} uTE={uTE} tTCE={tTCE} aTE={aTE} rTE={rTE}/>})}
 
         <div className="fc" style={{marginTop:16}}><div className="fch"><span>🧩 แผนภาพ Interactive: Care Process × 5 Tiers (ไวท์บอร์ด)</span></div>
-        <div className="fcb" style={{overflowX:'auto'}}><WBoard fd={fd} sFD={sFD} uFS={uFS} aFS={aFS} rFS={rFS} uTE={uTE} aTE={aTE} rTE={rTE} uC={uC} aC={aC} rC={rC}/></div></div>
+        <div className="fcb" style={{overflowX:'auto'}}><WBoard fd={fd} sFD={sFD} uFS={uFS} aFS={aFS} rFS={rFS} uT={uT} uTE={uTE} tTCE={tTCE} aTE={aTE} rTE={rTE} uC={uC} aC={aC} rC={rC}/></div></div>
       </>}
 
       {tab==='sm'&&<SummaryTab fd={fd} uf={uf}/>}
@@ -1263,9 +1263,15 @@ function LinkageDiagram({fd}){
 
 // ===== TIER CARD =====
 // ===== INTERACTIVE WHITEBOARD (2-Axis: Care Process x 5 Tiers) =====
-function WBoard({fd,sFD,uFS,aFS,rFS,uTE,aTE,rTE,uC,aC,rC}){
+function WBoard({fd,sFD,uFS,aFS,rFS,uT,uTE,tTCE,aTE,rTE,uC,aC,rC}){
   const[full,sFull]=useState(false);
-  const[dtl,sDtl]=useState(null); // {gi,ei} = เปิด modal รายละเอียด
+  const[dtl,sDtl]=useState(null); // {gi,ei} modal รายละเอียด
+  const[guide,sGuide]=useState(null); // {gi,ei} เปิดแผง guide
+  const[autoSort,sAutoSort]=useState(true);
+  const[lines,sLines]=useState([]);
+  const[tick,sTick]=useState(0);
+  const boardRef=useRef(null);
+  const boxRefs=useRef({});
   const TIER_ROWS=[
     {t:5,name:'Tier 5',sub:'สังคม / นอกองค์กร'},
     {t:4,name:'Tier 4',sub:'การบริหารจัดการ นโยบาย'},
@@ -1274,23 +1280,52 @@ function WBoard({fd,sFD,uFS,aFS,rFS,uTE,aTE,rTE,uC,aC,rC}){
     {t:1,name:'Tier 1',sub:'ผู้ป่วย บุคลากร'},
   ];
   const ss=(fd.flowSteps||[]).filter(s=>s.trim());
+  const shortName=g=>g.label.replace(/^Tier \d+: /,'');
   const blankE={ck:[],oc:false,ot:'',desc:'',strat:'',ind:'',tl:'',resp:'',linkedTo:null};
 
-  const isChecked=(gi,item)=>((fd.ta[gi]||{}).entries||[]).some(e=>(e.ck||[]).includes(item));
-  const tickFactor=(gi,item)=>sFD(p=>{
-    const ta=[...p.ta];const g={...ta[gi]};let es=[...(g.entries||[])];
-    const bi=es.findIndex(e=>(!e.ck||e.ck.length===0)&&!e.desc&&!e.oc);
-    if(bi>=0)es[bi]={...es[bi],ck:[item]};
-    else es.push({...blankE,ck:[item]});
-    g.en=true;g.entries=es;ta[gi]=g;return{...p,ta};
-  });
   const clearEntry=(gi,ei)=>sFD(p=>{const ta=[...p.ta];const g={...ta[gi]};const es=[...(g.entries||[])];es[ei]={...blankE};g.entries=es;ta[gi]=g;return{...p,ta}});
-  const removeBox=(gi,ei)=>{const n=((fd.ta[gi]||{}).entries||[]).length;n>1?rTE(gi,ei):clearEntry(gi,ei)};
-  const addFree=(tierNum)=>{
-    const gi=TD.findIndex(g=>g.tier===tierNum);
-    if(gi<0)return;
-    sFD(p=>{const ta=[...p.ta];const g={...ta[gi]};g.en=true;g.entries=[...(g.entries||[]),{...blankE,oc:true}];ta[gi]=g;return{...p,ta}});
+  const removeEntry=(gi,ei)=>{const n=((fd.ta[gi]||{}).entries||[]).length;n>1?rTE(gi,ei):clearEntry(gi,ei)};
+
+  // จัดเรียงอัตโนมัติ: เรียงกล่องในแถวตามตำแหน่งเป้าหมายที่เชื่อมโยง เพื่อลดเส้นไขว้
+  const orderKey=(gi)=>{
+    let k=Infinity;
+    (((fd.ta[gi]||{}).entries)||[]).forEach(e=>{
+      if(!e.linkedTo)return;let v=500;
+      if(e.linkedTo.type==='cmp')v=e.linkedTo.index;
+      else{const tgi=TD.findIndex(x=>x.id===e.linkedTo.tierId);const te=(((fd.ta[tgi]||{}).entries)||[])[e.linkedTo.entryIndex];if(te&&te.linkedTo&&te.linkedTo.type==='cmp')v=te.linkedTo.index}
+      if(v<k)k=v;
+    });
+    return k;
   };
+  const rowGroups=(t)=>{
+    const gs=TD.map((g,gi)=>({g,gi})).filter(x=>x.g.tier===t);
+    if(!autoSort)return gs;
+    return gs.slice().sort((a,b)=>(orderKey(a.gi)-orderKey(b.gi))||(a.gi-b.gi));
+  };
+
+  // คำนวณเส้นลูกศรตามการเชื่อมโยง
+  useEffect(()=>{
+    const compute=()=>{
+      const root=boardRef.current;
+      if(!root){sLines([]);return}
+      const rr=root.getBoundingClientRect();
+      const ls=[];
+      (fd.ta||[]).forEach((g,gi)=>{(g.entries||[]).forEach((e,ei)=>{
+        if(!e.linkedTo)return;
+        const from=boxRefs.current['t-'+gi+'-'+ei];
+        let to=null;
+        if(e.linkedTo.type==='cmp')to=boxRefs.current['c-'+e.linkedTo.index];
+        else{const tgi=TD.findIndex(x=>x.id===e.linkedTo.tierId);to=boxRefs.current['t-'+tgi+'-'+e.linkedTo.entryIndex]}
+        if(!from||!to||!from.isConnected||!to.isConnected)return;
+        const fr=from.getBoundingClientRect(),tr2=to.getBoundingClientRect();
+        ls.push({x1:fr.left-rr.left+fr.width/2,y1:fr.bottom-rr.top,x2:tr2.left-rr.left+tr2.width/2,y2:tr2.top-rr.top});
+      })});
+      sLines(ls);
+    };
+    const t=setTimeout(compute,180);
+    window.addEventListener('resize',compute);
+    return()=>{clearTimeout(t);window.removeEventListener('resize',compute)};
+  },[fd,full,autoSort,tick]);
 
   const btnMini={fontSize:10,padding:'2px 8px',border:'1px solid var(--primary)',borderRadius:6,background:'#f0f7ff',color:'var(--primary)',cursor:'pointer',fontFamily:'inherit'};
   const btnMiniRed={fontSize:10,padding:'2px 8px',border:'1px solid #e74c3c',borderRadius:6,background:'#fff5f5',color:'#e74c3c',cursor:'pointer',fontFamily:'inherit'};
@@ -1309,18 +1344,17 @@ function WBoard({fd,sFD,uFS,aFS,rFS,uTE,aTE,rTE,uC,aC,rC}){
       <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.5)',zIndex:1600,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onClick={()=>sDtl(null)}>
         <div style={{background:'#fff',borderRadius:12,padding:20,width:560,maxWidth:'95vw',maxHeight:'85vh',overflowY:'auto'}} onClick={ev=>ev.stopPropagation()}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
-            <strong style={{color:'#1a5fb4'}}>📝 รายละเอียด — {info.label} (รายการที่ {ei+1})</strong>
+            <strong style={{color:'#1a5fb4'}}>📝 รายละเอียด — {info.label} (ประเด็นที่ {ei+1})</strong>
             <span style={{cursor:'pointer',fontWeight:700,fontSize:18}} onClick={()=>sDtl(null)}>✕</span>
           </div>
           {(e.ck||[]).length>0&&<div style={{marginBottom:10,display:'flex',gap:6,flexWrap:'wrap'}}>{e.ck.map(c=><span key={c} style={{background:'#eaf2fd',border:'1px solid #1a5fb4',borderRadius:12,padding:'2px 10px',fontSize:12,color:'#12325c'}}>{c}</span>)}</div>}
-          {e.oc&&<div className="fg"><label className="fl">หัวข้อปัจจัย (กำหนดเอง)</label><input className="fi" value={e.ot||''} onChange={ev=>uTE(gi,ei,'ot',ev.target.value)} placeholder="ระบุหัวข้อปัจจัย"/></div>}
-          <div className="fg"><label className="fl">🔗 เชื่อมโยงกับ (CMP หรือ Tier ก่อนหน้า)</label>
+          <div className="fg"><label className="fl">🔗 เชื่อมโยงกับ (CMP หรือ Tier ก่อนหน้า) — จะแสดงเส้นลูกศรในแผนภาพ</label>
             <select className="fs" value={e.linkedTo?JSON.stringify(e.linkedTo):''} onChange={ev=>uTE(gi,ei,'linkedTo',ev.target.value?JSON.parse(ev.target.value):null)}>
               <option value="">— ไม่เชื่อมโยง —</option>
               {linkOpts.map(o=><option key={o.val} value={o.val}>{o.label}</option>)}
             </select>
           </div>
-          <div className="fg"><label className="fl">รายละเอียดปัจจัย</label><textarea className="ft" style={{minHeight:70}} value={e.desc||''} onChange={ev=>uTE(gi,ei,'desc',ev.target.value)}/></div>
+          <div className="fg"><label className="fl">รายละเอียดประเด็น</label><textarea className="ft" style={{minHeight:70}} value={e.desc||''} onChange={ev=>uTE(gi,ei,'desc',ev.target.value)}/></div>
           <div className="fg"><label className="fl">กลยุทธ์แก้ไข/ป้องกัน</label><textarea className="ft" style={{minHeight:60}} value={e.strat||''} onChange={ev=>uTE(gi,ei,'strat',ev.target.value)}/></div>
           <div className="fr"><div className="fg"><label className="fl">ตัวชี้วัด</label><input className="fi" value={e.ind||''} onChange={ev=>uTE(gi,ei,'ind',ev.target.value)}/></div><div className="fg"><label className="fl">ระยะเวลา</label><input className="fi" value={e.tl||''} onChange={ev=>uTE(gi,ei,'tl',ev.target.value)}/></div></div>
           <div className="fg"><label className="fl">ผู้รับผิดชอบ</label><input className="fi" value={e.resp||''} onChange={ev=>uTE(gi,ei,'resp',ev.target.value)}/></div>
@@ -1333,10 +1367,13 @@ function WBoard({fd,sFD,uFS,aFS,rFS,uTE,aTE,rTE,uC,aC,rC}){
   const board=(
     <div>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8,marginBottom:10}}>
-        <div style={{fontSize:12,color:'var(--text-light)'}}>คลิกที่<b>เงาปัจจัย (จางๆ)</b>ในแต่ละแถว Tier เพื่อเลือก → กล่องจะเข้มขึ้นเป็นกรอบน้ำเงิน พิมพ์รายละเอียดหรือกด 📝 เพื่อกรอกกลยุทธ์/เชื่อมโยง — ข้อมูลซิงก์กับตอนที่ 2-3 ด้านบนอัตโนมัติ</div>
-        <button className="btn btn-sm btn-o" onClick={()=>sFull(!full)}>{full?'✕ ออกจากเต็มจอ':'⛶ ขยายเต็มจอ (ไวท์บอร์ด)'}</button>
+        <div style={{fontSize:12,color:'var(--text-light)'}}>คลิก<b>กล่องเงา (องค์ประกอบหลักของแต่ละ Tier)</b> → กล่องเข้มขึ้นกรอบน้ำเงิน → พิมพ์ประเด็น กด 🧭 Guide เพื่อเลือกปัจจัยแนะนำ กด 📝 เพื่อกรอกกลยุทธ์/เชื่อมโยง — เชื่อมโยงแล้วจะมี<b>เส้นลูกศร</b>ในภาพ</div>
+        <div style={{display:'flex',gap:8,alignItems:'center'}}>
+          <label style={{fontSize:11.5,display:'flex',gap:4,alignItems:'center',cursor:'pointer',color:'var(--primary)'}}><input type="checkbox" checked={autoSort} onChange={e=>sAutoSort(e.target.checked)} style={{accentColor:'var(--primary)'}}/>จัดเรียงอัตโนมัติ</label>
+          <button className="btn btn-sm btn-o" onClick={()=>sFull(!full)}>{full?'✕ ออกจากเต็มจอ':'⛶ ขยายเต็มจอ (ไวท์บอร์ด)'}</button>
+        </div>
       </div>
-      <div style={{border:'1px solid #b8c9dd',borderRadius:8,overflow:'hidden',minWidth:720}}>
+      <div ref={boardRef} style={{position:'relative',border:'1px solid #b8c9dd',borderRadius:8,overflow:'hidden',minWidth:720}}>
         {/* Contributing factors: Tier 5 -> Tier 1 */}
         {TIER_ROWS.map(row=>(
           <div key={row.t} style={{display:'flex',borderBottom:'1px solid #b8c9dd',background:'#e8f0fa'}}>
@@ -1344,35 +1381,40 @@ function WBoard({fd,sFD,uFS,aFS,rFS,uTE,aTE,rTE,uC,aC,rC}){
               <div style={{fontWeight:800,fontSize:13,color:'#1f2d3d'}}>{row.name}</div>
               <div style={{fontSize:11,color:'#2e6fb7',lineHeight:1.4}}>{row.sub}</div>
             </div>
-            <div style={{flex:1,padding:8,display:'flex',flexWrap:'wrap',gap:6,alignItems:'flex-start',alignContent:'flex-start'}}>
-              {TD.map((g,gi)=>{if(g.tier!==row.t)return null;const grp=fd.ta[gi]||{};const entries=grp.entries||[];
+            <div style={{flex:1,padding:8,display:'flex',flexWrap:'wrap',gap:8,alignItems:'flex-start',alignContent:'flex-start'}}>
+              {rowGroups(row.t).map(({g,gi})=>{
+                const grp=fd.ta[gi]||{};const entries=grp.entries||[];
+                if(!grp.en)return(
+                  <div key={g.id} onClick={()=>{uT(gi,'en',true);sTick(x=>x+1)}} title="คลิกเพื่อเปิดองค์ประกอบนี้" style={{border:'1.5px dashed #a9bed6',borderRadius:10,padding:'10px 16px',fontSize:12.5,fontWeight:700,color:'#6b8299',opacity:0.5,cursor:'pointer',background:'#f4f8fd'}}>{shortName(g)}</div>
+                );
                 return(
-                  <React.Fragment key={g.id}>
-                    {entries.map((e,ei)=>{
-                      if(!(e.ck||[]).length&&!e.desc&&!e.strat&&!e.oc)return null;
-                      return(
-                        <div key={g.id+'-'+ei} style={{background:'#fff',border:'2px solid #1a5fb4',borderRadius:10,padding:'7px 9px',width:215,boxShadow:'0 1px 4px rgba(26,95,180,0.18)'}}>
-                          {(e.ck||[]).length>0
-                            ?<div style={{fontSize:11.5,fontWeight:700,color:'#12325c',marginBottom:3,lineHeight:1.4}}>{e.ck.join(' • ')}</div>
-                            :<input value={e.ot||''} onChange={ev=>uTE(gi,ei,'ot',ev.target.value)} placeholder="หัวข้อปัจจัย (กำหนดเอง)" style={{width:'100%',border:'none',borderBottom:'1px dashed #9db4d0',fontSize:11.5,fontWeight:700,color:'#12325c',fontFamily:'inherit',marginBottom:3,background:'transparent'}}/>}
-                          <textarea value={e.desc||''} onChange={ev=>uTE(gi,ei,'desc',ev.target.value)} placeholder="กรอกรายละเอียด..." style={{width:'100%',minHeight:34,border:'none',fontSize:11.5,fontFamily:'inherit',resize:'vertical',background:'transparent',color:'#1f2d3d'}}/>
-                          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:4}}>
-                            <span style={{fontSize:9,color:'#7f9cbf',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{g.label.replace(/^Tier \d+: /,'')}{e.linkedTo?' · 🔗':''}{e.strat?' · ✅':''}</span>
-                            <div style={{display:'flex',gap:4,flexShrink:0}}>
-                              <button style={btnMini} onClick={()=>sDtl({gi,ei})}>📝 รายละเอียด</button>
-                              <button style={btnMiniRed} onClick={()=>removeBox(gi,ei)}>✕</button>
-                            </div>
+                  <div key={g.id} style={{background:'#fff',border:'2px solid #1a5fb4',borderRadius:10,padding:'8px 10px',width:255,boxShadow:'0 1px 4px rgba(26,95,180,0.18)'}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+                      <strong style={{fontSize:12.5,color:'#12325c'}}>{shortName(g)}</strong>
+                      <span onClick={()=>{if(confirm('ปิดองค์ประกอบ "'+shortName(g)+'"? (ข้อมูลที่กรอกยังอยู่ แต่จะไม่แสดงใน Export)'))uT(gi,'en',false)}} title="ยุบกลับเป็นเงา" style={{cursor:'pointer',color:'#e74c3c',fontWeight:700,fontSize:13}}>✕</span>
+                    </div>
+                    {entries.map((e,ei)=>(
+                      <div key={ei} ref={el=>{boxRefs.current['t-'+gi+'-'+ei]=el}} style={{border:'1px solid #cfe0f4',borderRadius:8,padding:6,marginBottom:6,background:'#f8fbff'}}>
+                        {(e.ck||[]).length>0&&<div style={{display:'flex',flexWrap:'wrap',gap:3,marginBottom:3}}>{e.ck.map(c=><span key={c} onClick={()=>tTCE(gi,ei,c)} title="คลิกเพื่อเอาออก" style={{background:'#eaf2fd',border:'1px solid #1a5fb4',borderRadius:10,padding:'1px 8px',fontSize:10,color:'#12325c',cursor:'pointer'}}>{c} ✕</span>)}</div>}
+                        <textarea value={e.desc||''} onChange={ev=>uTE(gi,ei,'desc',ev.target.value)} placeholder="พิมพ์ข้อความประเด็น..." style={{width:'100%',minHeight:32,border:'none',fontSize:11.5,fontFamily:'inherit',resize:'vertical',background:'transparent',color:'#1f2d3d'}}/>
+                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:4}}>
+                          <span style={{fontSize:9,color:'#7f9cbf'}}>{e.linkedTo?'🔗 เชื่อมโยงแล้ว':''}{e.strat?' ✅':''}</span>
+                          <div style={{display:'flex',gap:4,flexShrink:0}}>
+                            <button style={btnMini} onClick={()=>sGuide(guide&&guide.gi===gi&&guide.ei===ei?null:{gi,ei})}>🧭 Guide</button>
+                            <button style={btnMini} onClick={()=>sDtl({gi,ei})}>📝</button>
+                            <button style={btnMiniRed} onClick={()=>removeEntry(gi,ei)}>✕</button>
                           </div>
                         </div>
-                      );
-                    })}
-                    {g.items.map(item=>isChecked(gi,item)?null:(
-                      <div key={item} onClick={()=>tickFactor(gi,item)} title={'คลิกเพื่อเลือกปัจจัยนี้'} style={{border:'1.5px dashed #a9bed6',borderRadius:10,padding:'6px 10px',fontSize:10.5,color:'#6b8299',opacity:0.5,cursor:'pointer',background:'#f4f8fd',maxWidth:165,lineHeight:1.4}}>{item}</div>
+                        {guide&&guide.gi===gi&&guide.ei===ei&&<div style={{marginTop:4,paddingTop:4,borderTop:'1px dashed #cfe0f4',display:'flex',flexWrap:'wrap',gap:3}}>
+                          <div style={{width:'100%',fontSize:9.5,color:'#7f9cbf'}}>🧭 Guide: คลิกเลือกปัจจัยที่เกี่ยวข้อง</div>
+                          {g.items.map(item=>{const on=(e.ck||[]).includes(item);return<span key={item} onClick={()=>tTCE(gi,ei,item)} style={{border:on?'1px solid #1a5fb4':'1px dashed #a9bed6',background:on?'#eaf2fd':'#fff',color:on?'#12325c':'#6b8299',borderRadius:10,padding:'2px 8px',fontSize:10,cursor:'pointer',opacity:on?1:0.7}}>{on?'☑ ':''}{item}</span>})}
+                        </div>}
+                      </div>
                     ))}
-                  </React.Fragment>
+                    <button onClick={()=>aTE(gi)} style={{width:'100%',border:'1.5px dashed #1a5fb4',borderRadius:8,background:'#f0f7ff',color:'#1a5fb4',fontWeight:700,fontSize:11,padding:'3px 0',cursor:'pointer',fontFamily:'inherit'}}>＋ เพิ่มประเด็น</button>
+                  </div>
                 );
               })}
-              <button onClick={()=>addFree(row.t)} title="เพิ่มปัจจัยกำหนดเอง" style={{border:'1.5px dashed #1a5fb4',borderRadius:10,background:'#f0f7ff',color:'#1a5fb4',fontWeight:700,fontSize:14,padding:'4px 12px',cursor:'pointer',fontFamily:'inherit',alignSelf:'center'}}>＋</button>
             </div>
           </div>
         ))}
@@ -1383,9 +1425,9 @@ function WBoard({fd,sFD,uFS,aFS,rFS,uTE,aTE,rTE,uC,aC,rC}){
             <div style={{fontWeight:800,fontSize:12.5,color:'#1f2d3d'}}>Potential change</div>
             <div style={{fontSize:11,color:'#27ae60'}}>(CMP)</div>
           </div>
-          <div style={{flex:1,padding:8,display:'flex',flexWrap:'wrap',gap:6,alignItems:'flex-start'}}>
+          <div style={{flex:1,padding:8,display:'flex',flexWrap:'wrap',gap:8,alignItems:'flex-start'}}>
             {(fd.cmps||[]).map((c,i)=>(
-              <div key={i} style={{background:'#fff',border:'2px solid #27ae60',borderRadius:10,padding:'7px 9px',width:210}}>
+              <div key={i} ref={el=>{boxRefs.current['c-'+i]=el}} style={{background:'#fff',border:'2px solid #27ae60',borderRadius:10,padding:'7px 9px',width:210}}>
                 <select value={c.step||''} onChange={e=>uC(i,'step',e.target.value)} style={{width:'100%',border:'none',borderBottom:'1px dashed #bfe3cc',fontSize:10.5,color:'#1e8449',fontFamily:'inherit',marginBottom:3,background:'transparent'}}>
                   <option value="">— เลือกขั้นตอน (Flow) —</option>
                   {ss.map(s=><option key={s} value={s}>{s}</option>)}
@@ -1417,6 +1459,11 @@ function WBoard({fd,sFD,uFS,aFS,rFS,uTE,aTE,rTE,uC,aC,rC}){
             <button onClick={aFS} title="เพิ่มขั้นตอน" style={{border:'1.5px dashed #b9770e',borderRadius:10,background:'#fef8ec',color:'#b9770e',fontWeight:700,fontSize:14,padding:'4px 12px',cursor:'pointer',fontFamily:'inherit'}}>＋</button>
           </div>
         </div>
+        {/* เส้นลูกศรการเชื่อมโยง */}
+        <svg style={{position:'absolute',top:0,left:0,width:'100%',height:'100%',pointerEvents:'none'}}>
+          <defs><marker id="wbArrow" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#1f2d3d"/></marker></defs>
+          {lines.map((l,i)=><path key={i} d={`M ${l.x1} ${l.y1} C ${l.x1} ${(l.y1+l.y2)/2}, ${l.x2} ${(l.y1+l.y2)/2}, ${l.x2} ${l.y2-2}`} fill="none" stroke="#1f2d3d" strokeWidth="1.6" markerEnd="url(#wbArrow)"/>)}
+        </svg>
       </div>
     </div>
   );

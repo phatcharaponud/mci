@@ -254,6 +254,23 @@ const KS=[
 function mkTD(){return TD.map(t=>({id:t.id,en:false,entries:[{ck:[],oc:false,ot:'',desc:'',strat:'',ind:'',tl:'',resp:'',linkedTo:null}]}))}
 function migTier(t){if(t.entries)return{...t,entries:t.entries.map(e=>e.linkedTo!==undefined?e:{...e,linkedTo:null})};return{id:t.id,en:t.en,entries:[{ck:t.ck||[],oc:t.oc||false,ot:t.ot||'',desc:t.desc||'',strat:t.strat||'',ind:t.ind||'',tl:t.tl||'',resp:t.resp||'',linkedTo:null}]}}
 const DF={department:'',date:'',title:'',incidentCode:'',incidentType:'',sevL:'',sevN:'',whatHappened:'',where:'',when:'',eventDate:'',professions:'',relatedDepts:'',mainFixDept:'',subFixDept:'',rcaParticipants:'',rcaDate:'',rcaTime:'',flowSteps:['','','','',''],fsSaved:false,cmps:[{step:'',problem:'',unsafeAct:''}],cmpsSaved:false,ta:mkTD(),summaryDate:'',daysToSubmit:'',followUpMonth:'',followUpStatus:'',ownerName:'',headName:'',secretaryName:'',chairName:'',hrms:false,attachments:[]};
+// ===== Access log =====
+// บันทึกเวลาเข้า-ออกระบบ เขียนได้ทุกคนที่ล็อกอิน แต่อ่านได้เฉพาะผู้ดูแลระบบ (ดู firestore.rules)
+// ใช้ serverTimestamp เพื่อให้เวลาเชื่อถือได้ ไม่ขึ้นกับนาฬิกาของเครื่องผู้ใช้
+function logAccess(user,userData,action){
+  try{
+    return db.collection('logs').add({
+      uid:user.uid,
+      email:user.email||'',
+      fullName:(userData&&userData.fullName)||'',
+      department:(userData&&userData.department)||'',
+      action:action,
+      at:firebase.firestore.FieldValue.serverTimestamp(),
+      device:String(navigator.userAgent||'').slice(0,180)
+    }).catch(e=>{console.warn('access log failed:',e)});
+  }catch(e){console.warn('access log failed:',e);return Promise.resolve()}
+}
+
 function gid(){return'RCA-'+Date.now().toString(36).toUpperCase()}
 function schId(){return'SCH-'+Date.now().toString(36).toUpperCase()}
 
@@ -517,8 +534,8 @@ function WelcomeNotice({onClose}){
                 ['ใครเข้าถึงได้','ผู้ใช้ที่ได้รับอนุมัติทุกคน “เปิดดู” รายงานได้ แต่แก้ไขได้เฉพาะผู้จัดทำ ผู้ที่ได้รับอนุมัติร่วมแก้ไข และผู้ดูแลระบบ'],
                 ['การใช้ AI','เฉพาะเมื่อคุณใช้เมนูน้องริ้กกี้ ข้อความที่พิมพ์จะถูกส่งไปประมวลผลที่ Google Gemini · การนำเข้า PDF ตามปกติไม่ส่งข้อมูลออกนอกเครื่อง'],
                 ['วัตถุประสงค์','บริหารความเสี่ยงและพัฒนาคุณภาพบริการของโรงพยาบาล'],
+                ['ประวัติการเข้าใช้งาน','ระบบบันทึก วันเวลาที่เข้าและออกจากระบบ ชื่อผู้ใช้ และชนิดอุปกรณ์/เบราว์เซอร์ เพื่อการตรวจสอบความปลอดภัย · อ่านได้เฉพาะผู้ดูแลระบบ · ไม่ได้บันทึกหมายเลข IP และไม่ได้บันทึกว่าคุณเปิดดูรายงานฉบับใด'],
                 ['สิทธิ์ของคุณ','ขอเข้าถึง แก้ไข หรือลบข้อมูลส่วนบุคคลของคุณได้ที่งานบริหารความเสี่ยง'],
-                ['สิ่งที่ระบบไม่ได้เก็บ','ระบบนี้ไม่ได้บันทึกประวัติการเข้าใช้งานรายครั้ง (ไม่มี access log)'],
               ].map((r,i)=>(
                 <tr key={i} style={{borderBottom:'1px solid var(--border)'}}>
                   <td style={{padding:'6px 8px',fontWeight:700,width:160,verticalAlign:'top',color:'var(--primary)'}}>{r[0]}</td>
@@ -535,6 +552,137 @@ function WelcomeNotice({onClose}){
         <div style={{padding:'12px 20px',borderTop:'1px solid var(--border)',textAlign:'right',background:'#fafbfc'}}>
           <button className="btn btn-p" onClick={onClose}>✔ รับทราบ และเริ่มใช้งาน</button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ===== ACCESS LOG (เฉพาะผู้ดูแลระบบ) =====
+function AccessLogV(){
+  const[rows,sRows]=useState(null);
+  const[err,sErr]=useState('');
+  const[srch,sSrch]=useState('');
+  const[from,sFrom]=useState('');
+  const[to,sTo]=useState('');
+  const[act,sAct]=useState('');
+  const LIMIT=500;
+
+  const load=()=>{
+    sErr('');sRows(null);
+    db.collection('logs').orderBy('at','desc').limit(LIMIT).get()
+      .then(s=>sRows(s.docs.map(d=>({id:d.id,...d.data()}))))
+      .catch(e=>{sErr('โหลดประวัติไม่สำเร็จ: '+e.message+' — หากขึ้นว่าไม่มีสิทธิ์ กรุณาอัปเดต Firestore Rules แล้ว deploy ใหม่');sRows([])});
+  };
+  useEffect(load,[]);
+
+  const dOf=r=>r.at&&r.at.toDate?r.at.toDate():null;
+  // จัดรูปแบบเองเพื่อให้เป็นปี ค.ศ. เหมือนทั้งระบบ (toLocaleString('th-TH') จะให้ปี พ.ศ.)
+  const fmt=d=>{if(!d)return'-';const p=n=>String(n).padStart(2,'0');
+    return p(d.getDate())+'/'+p(d.getMonth()+1)+'/'+d.getFullYear()+' '+p(d.getHours())+':'+p(d.getMinutes())};
+  const dev=u=>{const s=String(u||'');
+    const os=/Windows/i.test(s)?'Windows':/Android/i.test(s)?'Android':/iPhone|iPad/i.test(s)?'iOS':/Mac/i.test(s)?'Mac':'อื่นๆ';
+    const br=/Edg\//i.test(s)?'Edge':/Chrome\//i.test(s)?'Chrome':/Firefox\//i.test(s)?'Firefox':/Safari\//i.test(s)?'Safari':'';
+    return (os+(br?' · '+br:''))};
+
+  const shown=(rows||[]).filter(r=>{
+    const q=srch.trim().toLowerCase();
+    if(q&&!((r.fullName||'').toLowerCase().includes(q)||(r.email||'').toLowerCase().includes(q)||(r.department||'').toLowerCase().includes(q)))return false;
+    if(act&&r.action!==act)return false;
+    const d=dOf(r);
+    if(from&&(!d||d<new Date(from+'T00:00:00')))return false;
+    if(to&&(!d||d>new Date(to+'T23:59:59')))return false;
+    return true;
+  });
+
+  const today=new Date();today.setHours(0,0,0,0);
+  const todayLogins=(rows||[]).filter(r=>{const d=dOf(r);return r.action==='login'&&d&&d>=today}).length;
+  const uniqUsers=new Set(shown.map(r=>r.email)).size;
+
+  const csv=()=>{
+    const head=['วันเวลา','ชื่อ-นามสกุล','อีเมล','หน่วยงาน','การกระทำ','อุปกรณ์'];
+    const esc=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+    const body=shown.map(r=>[fmt(dOf(r)),r.fullName,r.email,r.department,r.action==='login'?'เข้าสู่ระบบ':'ออกจากระบบ',dev(r.device)].map(esc).join(','));
+    const blob=new Blob(['﻿'+[head.map(esc).join(','),...body].join('\n')],{type:'text/csv;charset=utf-8'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+    a.download='access-log-'+new Date().toISOString().slice(0,10)+'.csv';a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+  };
+
+  const purge=()=>{
+    const days=parseInt(prompt('ลบประวัติที่เก่ากว่ากี่วัน?\n(แนะนำเก็บไว้ 90-365 วัน ตามนโยบายของโรงพยาบาล)','365')||'',10);
+    if(!days||days<7){if(days)alert('กรุณาระบุอย่างน้อย 7 วัน');return}
+    const cut=new Date(Date.now()-days*86400000);
+    const old=(rows||[]).filter(r=>{const d=dOf(r);return d&&d<cut});
+    if(!old.length){alert('ไม่มีประวัติที่เก่ากว่า '+days+' วัน ในรายการที่โหลดมา');return}
+    if(!confirm('ลบประวัติ '+old.length+' รายการที่เก่ากว่า '+days+' วัน?\nการลบนี้ย้อนกลับไม่ได้'))return;
+    Promise.all(old.map(r=>db.collection('logs').doc(r.id).delete()))
+      .then(()=>{alert('ลบเรียบร้อย '+old.length+' รายการ');load()})
+      .catch(e=>alert('ลบไม่สำเร็จ: '+e.message+' — อาจต้องเพิ่มสิทธิ์ลบใน Firestore Rules'));
+  };
+
+  const ipt={padding:'7px 10px',border:'1.5px solid var(--border)',borderRadius:6,fontSize:13,fontFamily:'inherit'};
+
+  return(
+    <div style={{padding:20}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8,marginBottom:12}}>
+        <h3 style={{fontSize:16,fontWeight:700,color:'var(--primary)'}}>📜 ประวัติการเข้าใช้งาน</h3>
+        <div style={{display:'flex',gap:6}}>
+          <button className="btn btn-sm btn-o" onClick={load}>🔄 โหลดใหม่</button>
+          <button className="btn btn-sm btn-s" onClick={csv} disabled={!shown.length}>⬇ ดาวน์โหลด CSV</button>
+          <button className="btn btn-sm btn-w" onClick={purge} disabled={!rows||!rows.length}>🗑 ลบประวัติเก่า</button>
+        </div>
+      </div>
+
+      {err&&<div style={{background:'#fdecea',border:'1.5px solid #e74c3c',borderRadius:8,padding:12,fontSize:13,color:'#c0392b',marginBottom:12}}>⚠️ {err}</div>}
+
+      <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center',marginBottom:12}}>
+        <input style={{...ipt,minWidth:230}} value={srch} onChange={e=>sSrch(e.target.value)} placeholder="🔍 ค้นหาชื่อ อีเมล หรือหน่วยงาน"/>
+        <select style={ipt} value={act} onChange={e=>sAct(e.target.value)}>
+          <option value="">ทุกการกระทำ</option>
+          <option value="login">เข้าสู่ระบบ</option>
+          <option value="logout">ออกจากระบบ</option>
+        </select>
+        <label style={{fontSize:12,color:'var(--text-light)'}}>ตั้งแต่ <input type="date" style={ipt} value={from} onChange={e=>sFrom(e.target.value)}/></label>
+        <label style={{fontSize:12,color:'var(--text-light)'}}>ถึง <input type="date" style={ipt} value={to} onChange={e=>sTo(e.target.value)}/></label>
+        {(srch||act||from||to)&&<button className="btn btn-sm btn-o" onClick={()=>{sSrch('');sAct('');sFrom('');sTo('')}}>✕ ล้างตัวกรอง</button>}
+      </div>
+
+      <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:12}}>
+        {[['เข้าระบบวันนี้',todayLogins],['รายการที่แสดง',shown.length],['ผู้ใช้ (ไม่ซ้ำ)',uniqUsers]].map(([l,v])=>(
+          <div key={l} style={{background:'#f0f7ff',border:'1px solid var(--primary)',borderRadius:8,padding:'8px 16px',minWidth:120}}>
+            <div style={{fontSize:11,color:'var(--text-light)'}}>{l}</div>
+            <div style={{fontSize:20,fontWeight:800,color:'var(--primary)'}}>{v}</div>
+          </div>
+        ))}
+      </div>
+
+      {rows===null?<div style={{padding:30,textAlign:'center',color:'var(--text-light)'}}>กำลังโหลด...</div>
+      :!shown.length?<div style={{padding:30,textAlign:'center',color:'var(--text-light)',fontSize:14}}>ไม่พบประวัติตามเงื่อนไขที่เลือก</div>
+      :<table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+        <thead><tr style={{background:'var(--primary)',color:'#fff'}}>
+          <th style={{padding:8,textAlign:'left'}}>วันเวลา</th>
+          <th style={{padding:8,textAlign:'left'}}>ชื่อ-นามสกุล</th>
+          <th style={{padding:8,textAlign:'left'}}>อีเมล</th>
+          <th style={{padding:8,textAlign:'left'}}>หน่วยงาน</th>
+          <th style={{padding:8,textAlign:'left'}}>การกระทำ</th>
+          <th style={{padding:8,textAlign:'left'}}>อุปกรณ์</th>
+        </tr></thead>
+        <tbody>{shown.map(r=>(
+          <tr key={r.id} style={{borderBottom:'1px solid var(--border)'}}>
+            <td style={{padding:8,whiteSpace:'nowrap'}}>{fmt(dOf(r))}</td>
+            <td style={{padding:8}}>{r.fullName||'-'}</td>
+            <td style={{padding:8,fontSize:12,color:'var(--text-light)'}}>{r.email||'-'}</td>
+            <td style={{padding:8,fontSize:12}}>{r.department||'-'}</td>
+            <td style={{padding:8}}><span className="stb" style={{background:r.action==='login'?'#e8f8f0':'#fdecea',color:r.action==='login'?'#1e8449':'#c0392b'}}>{r.action==='login'?'เข้าสู่ระบบ':'ออกจากระบบ'}</span></td>
+            <td style={{padding:8,fontSize:11,color:'var(--text-light)'}}>{dev(r.device)}</td>
+          </tr>
+        ))}</tbody>
+      </table>}
+
+      <div style={{fontSize:11,color:'var(--text-light)',marginTop:12,lineHeight:1.7}}>
+        • แสดงได้สูงสุด {LIMIT} รายการล่าสุด · เวลาที่บันทึกมาจากเซิร์ฟเวอร์ ไม่ใช่นาฬิกาเครื่องผู้ใช้<br/>
+        • ระบบบันทึกเฉพาะ <b>เวลาเข้า-ออกระบบ ชื่อผู้ใช้ และชนิดอุปกรณ์</b> · <b>ไม่ได้บันทึกหมายเลข IP</b> (เว็บฝั่งผู้ใช้เข้าถึงไม่ได้) และไม่ได้บันทึกว่าเปิดดูรายงานฉบับใด<br/>
+        • ตามหลัก PDPA ควรเก็บประวัติเท่าที่จำเป็น แนะนำให้กด "🗑 ลบประวัติเก่า" เป็นระยะตามนโยบายของโรงพยาบาล
       </div>
     </div>
   );
@@ -631,6 +779,7 @@ function ManualV({isAdmin,onShowNotice}){
       <Li><B>รีเซ็ต PIN</B> ให้ผู้ใช้ที่ลืม</Li>
       <Li>ตั้งค่า <B>Gemini API Key</B> เพื่อเปิด/ปิดน้องริ้กกี้ AI</Li>
       <Li>ตัวเลขสีแดงที่ "รายการ RCA" = รายการใหม่ที่ยังไม่ได้เปิดดู</Li>
+      <Li><B>📜 ประวัติการเข้าใช้งาน</B>: ดูว่าใครเข้า-ออกระบบเมื่อใด ค้นหา/กรองตามวันที่ได้ ดาวน์โหลดเป็น CSV ได้ และควรกด "🗑 ลบประวัติเก่า" เป็นระยะตามนโยบาย PDPA</Li>
     </ul>}]:[]),
     {icon:'❓',title:(isAdmin?'10':'9')+'. ปัญหาที่พบบ่อย',body:<table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
       <thead><tr style={{background:'var(--primary)',color:'#fff'}}><th style={{padding:8,textAlign:'left'}}>ปัญหา</th><th style={{padding:8,textAlign:'left'}}>วิธีแก้</th></tr></thead>
@@ -2545,8 +2694,10 @@ function App(){
 
   // Logout - ออกเฉพาะระบบ RCA ไม่กระทบบัญชี Google อื่นในเบราว์เซอร์
   const handleLogout=async()=>{
+    // บันทึก log ก่อน sign out เพราะหลัง sign out จะไม่มีสิทธิ์เขียนแล้ว
+    if(user&&userData){try{await logAccess(user,userData,'logout')}catch(e){}}
     try{await auth.signOut()}catch(e){}
-    try{sessionStorage.removeItem('pinOk')}catch(e){}
+    try{sessionStorage.removeItem('pinOk');sessionStorage.removeItem('loggedIn')}catch(e){}
     setUser(null);setUserData(undefined);
     window.location.reload();
   };
@@ -2731,6 +2882,16 @@ function App(){
     return()=>clearInterval(autoSaveRef.current);
   },[nav,user]);
 
+  // บันทึก log การเข้าใช้งาน หนึ่งครั้งต่อการเข้าระบบ (รีเฟรชหน้าไม่นับใหม่)
+  useEffect(()=>{
+    if(!pinOk||!user||!userData||userData.status!=='approved')return;
+    let done=false;
+    try{done=sessionStorage.getItem('loggedIn')===user.uid}catch(e){}
+    if(done)return;
+    try{sessionStorage.setItem('loggedIn',user.uid)}catch(e){}
+    logAccess(user,userData,'login');
+  },[pinOk,user,userData]);
+
   // แสดงป๊อปอัปแจ้งวิธีนำเข้า HRMS + PDPA + Privacy Notice หนึ่งครั้งต่อการเข้าใช้งาน
   useEffect(()=>{
     if(!pinOk||!userData||userData.status!=='approved')return;
@@ -2818,7 +2979,7 @@ function App(){
   }
 
   // Approved - show main app
-  const navTitle={form:'📋 แบบฟอร์มบันทึก RCA',list:'📁 รายการ RCA',cal:'📅 ปฏิทินกำหนดทำ RCA',kb:'📚 ความรู้ RCA',ai:'🤖 น้องริ้กกี้ AI ช่วยวิเคราะห์ RCA',manual:'📖 คู่มือการใช้งาน',db:'📊 Dashboard',admin:'👑 จัดการผู้ใช้',board:'💬 กระดานแลกเปลี่ยน & RM News'};
+  const navTitle={form:'📋 แบบฟอร์มบันทึก RCA',list:'📁 รายการ RCA',cal:'📅 ปฏิทินกำหนดทำ RCA',kb:'📚 ความรู้ RCA',ai:'🤖 น้องริ้กกี้ AI ช่วยวิเคราะห์ RCA',manual:'📖 คู่มือการใช้งาน',db:'📊 Dashboard',logs:'📜 ประวัติการเข้าใช้งาน',admin:'👑 จัดการผู้ใช้',board:'💬 กระดานแลกเปลี่ยน & RM News'};
 
   return(
     <div className="app-with-bar">
@@ -2851,7 +3012,8 @@ function App(){
             <div className="ns">รายงาน</div>
             <div className={`ni ${nav==='db'?'ac':''}`} onClick={()=>sN('db')}><span className="ni-i">📊</span><span>Dashboard</span></div>
             {isAdmin&&<><div className="ns">ผู้ดูแลระบบ</div>
-            <div className={`ni ${nav==='admin'?'ac':''}`} onClick={()=>sN('admin')}><span className="ni-i">👑</span><span>จัดการผู้ใช้</span>{allUsers.filter(u=>u.status==='pending').length>0&&<span className="ni-b">{allUsers.filter(u=>u.status==='pending').length}</span>}</div></>}
+            <div className={`ni ${nav==='admin'?'ac':''}`} onClick={()=>sN('admin')}><span className="ni-i">👑</span><span>จัดการผู้ใช้</span>{allUsers.filter(u=>u.status==='pending').length>0&&<span className="ni-b">{allUsers.filter(u=>u.status==='pending').length}</span>}</div>
+            <div className={`ni ${nav==='logs'?'ac':''}`} onClick={()=>sN('logs')}><span className="ni-i">📜</span><span>ประวัติการเข้าใช้งาน</span></div></>}
             <div className="ns">ระบบภายนอก</div>
             <div className="ni" onClick={()=>window.open('https://hrms59.thai-nrls.org/HRMS41347/Account/Login','_blank')}><span className="ni-i">🔗</span><span>ระบบ HRMS</span></div>
           </div>
@@ -2890,6 +3052,7 @@ function App(){
             {nav==='manual'&&<ManualV isAdmin={isAdmin} onShowNotice={()=>sNotice(true)}/>}
             {nav==='db'&&<DBV stats={stats} rl={rl}/>}
             {nav==='board'&&<BoardV user={user} userData={userData} isAdmin={isAdmin}/>}
+            {nav==='logs'&&isAdmin&&<AccessLogV/>}
             {nav==='admin'&&isAdmin&&<AdminPanel users={allUsers} onApprove={handleApprove} onReject={handleReject} geminiKey={aiKey}/>}
           </div>
         </div>

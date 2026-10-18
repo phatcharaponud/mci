@@ -15,6 +15,7 @@
 | `schedules` | `SCH-<base36>` | ปฏิทินกำหนดทำ RCA | `db.collection('schedules').doc(sid).set(...)` |
 | `posts` (+ subcollection `replies`) | auto-ID | กระดานแลกเปลี่ยน & RM News | `db.collection('posts').add(...)` |
 | `settings` | `ai` (fixed) | Gemini API key | `db.collection('settings').doc('ai').set(...)` |
+| `logs` | auto-ID | ประวัติการเข้า-ออกระบบ — `{uid, email, fullName, department, action:'login'\|'logout', at (serverTimestamp), device}` · เขียนได้ทุกคนที่ล็อกอิน อ่าน/ลบได้เฉพาะ admin แก้ไขไม่ได้ | `logAccess()` → `db.collection('logs').add(...)` |
 
 > ไฟล์แนบไม่ได้เก็บใน Firestore — อัปโหลดขึ้น **Firebase Storage** ที่พาธ `rca-attachments/{rcaId}/{timestamp}_{filename}` แล้วเก็บเฉพาะ URL ลง Firestore
 

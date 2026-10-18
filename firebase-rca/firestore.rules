@@ -66,9 +66,11 @@ service cloud.firestore {
     }
 
     // Access logs
+    // ประวัติการเข้าใช้งาน - ทุกคนที่ล็อกอินเขียนของตัวเองได้ แต่อ่าน/ลบได้เฉพาะผู้ดูแลระบบ
+    // แก้ไขไม่ได้เลย (ไม่มี allow update) เพื่อให้ประวัติย้อนหลังเชื่อถือได้
     match /logs/{logId} {
-      allow create: if request.auth != null;
-      allow read: if request.auth != null && request.auth.token.email == 'phatcharapon.ud@up.ac.th';
+      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
+      allow read, delete: if request.auth != null && request.auth.token.email == 'phatcharapon.ud@up.ac.th';
     }
   }
 }

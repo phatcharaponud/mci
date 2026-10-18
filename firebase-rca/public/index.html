@@ -469,8 +469,79 @@ function PendingPage({user,userData,onSubmitReg,onLogout}){
   );
 }
 
+// ===== ป๊อปอัปแจ้งก่อนใช้งาน: วิธีนำเข้า HRMS + ข้อควรระวัง PDPA + ประกาศความเป็นส่วนตัว =====
+function WelcomeNotice({onClose}){
+  const H=({children})=><div style={{fontWeight:800,fontSize:14,color:'var(--primary)',margin:'16px 0 6px'}}>{children}</div>;
+  const Li=({children})=><li style={{marginBottom:5,lineHeight:1.65}}>{children}</li>;
+  const UL=({children})=><ul style={{paddingLeft:20,fontSize:13,margin:0}}>{children}</ul>;
+  return(
+    <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.55)',zIndex:1800,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+      <div style={{background:'#fff',borderRadius:14,width:760,maxWidth:'96vw',maxHeight:'92vh',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+        <div style={{background:'linear-gradient(135deg,var(--primary),#3498db)',color:'#fff',padding:'14px 20px'}}>
+          <div style={{fontSize:17,fontWeight:800}}>👋 ก่อนเริ่มใช้งาน</div>
+          <div style={{fontSize:12,opacity:0.9,marginTop:2}}>RCA Management System · โรงพยาบาลมหาวิทยาลัยพะเยา</div>
+        </div>
+
+        <div style={{flex:1,overflowY:'auto',padding:'4px 20px 16px'}}>
+          <H>📥 นำเข้าข้อมูลจากระบบ HRMS อัตโนมัติ (ไม่ต้องพิมพ์ซ้ำ)</H>
+          <UL>
+            <Li>เปิดรายงานอุบัติการณ์ในระบบ <b>HRMS</b> แล้วสั่ง <b>Export เป็นไฟล์ PDF</b></Li>
+            <Li>ในระบบนี้ เปิดเมนู <b>📋 แบบฟอร์ม RCA</b> แล้วกดปุ่ม <b>📥 นำเข้า HRMS</b> ที่มุมขวาบน</Li>
+            <Li>เลือก <b>📎 แนบไฟล์ PDF</b> (ไม่เกิน 10 MB) หรือ <b>📋 วางข้อความ</b> หากคัดลอกจากหน้าจอ HRMS มาโดยตรง</Li>
+            <Li>ระบบจะแสดง<b>ตารางข้อมูลที่อ่านได้</b> ให้ตรวจความถูกต้อง แล้วติ๊กเลือกเฉพาะช่องที่ต้องการ → กด <b>✅ นำลงแบบฟอร์ม</b></Li>
+            <Li style={{color:'#c0392b',fontWeight:600}}>ข้อมูลที่นำเข้ายังไม่ถูกบันทึก ต้องกด 💾 บันทึก อีกครั้งเสมอ</Li>
+          </UL>
+          <div style={{background:'#eafaf1',border:'1px solid #27ae60',borderRadius:8,padding:'8px 12px',fontSize:12.5,marginTop:8,color:'#1e8449'}}>
+            ✓ การอ่านไฟล์ PDF ทำใน<b>เครื่องคอมพิวเตอร์ของคุณเอง</b> ไฟล์ไม่ถูกอัปโหลดออกนอกเครื่อง และไม่ใช้ AI
+          </div>
+
+          <H>⚠️ ข้อควรระวังตาม PDPA (พ.ร.บ.คุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562)</H>
+          <div style={{background:'#fdecea',border:'1.5px solid #e74c3c',borderRadius:8,padding:'10px 14px'}}>
+            <UL>
+              <Li>รายงานจาก HRMS <b>อาจมีข้อมูลที่ระบุตัวผู้ป่วยได้</b> กรุณาตรวจและลบออก<b>ก่อนกดบันทึก</b></Li>
+              <Li><b>ห้ามบันทึก:</b> ชื่อ-นามสกุลผู้ป่วย, HN/AN, เลขบัตรประชาชน, เบอร์โทรศัพท์, ที่อยู่, ภาพที่เห็นใบหน้าหรือป้ายข้อมือ</Li>
+              <Li>ให้ใช้คำอธิบายแทน เช่น <b>“ผู้ป่วยชายอายุ 27 ปี”</b> หรือ <b>“ผู้ป่วยรายหนึ่ง”</b></Li>
+              <Li>ตรวจ<b>ไฟล์แนบและภาพหน้าจอ</b> (เช่น ภาพแชท Line) ว่าไม่มีข้อมูลระบุตัวบุคคล หากมีให้ปิดทับก่อนแนบ</Li>
+              <Li><b>ห้ามพิมพ์ข้อมูลผู้ป่วยในแชทน้องริ้กกี้ AI</b> เพราะข้อความจะถูกส่งไปประมวลผลที่ผู้ให้บริการภายนอก</Li>
+              <Li>การทำ RCA มุ่งวิเคราะห์ที่ <b>“ระบบงาน”</b> ไม่ใช่ตัวบุคคล จึงไม่จำเป็นต้องระบุชื่อผู้ป่วยหรือชื่อผู้ปฏิบัติงาน</Li>
+            </UL>
+          </div>
+
+          <H>🔒 ประกาศความเป็นส่วนตัวโดยย่อ (Privacy Notice)</H>
+          <table style={{width:'100%',borderCollapse:'collapse',fontSize:12.5}}>
+            <tbody>
+              {[
+                ['ข้อมูลของคุณที่ระบบเก็บ','ชื่อ-นามสกุล, อีเมล @up.ac.th, หน่วยงาน, บทบาท, วันที่สมัครและอนุมัติ และรหัส PIN (เก็บแบบเข้ารหัส อ่านย้อนกลับไม่ได้ แม้แต่ผู้ดูแลระบบ)'],
+                ['ข้อมูลงานที่บันทึก','เนื้อหารายงาน RCA, ไฟล์แนบ, กำหนดการในปฏิทิน และโพสต์ในกระดานแลกเปลี่ยน'],
+                ['จัดเก็บที่ใด','Google Firebase (Cloud Firestore และ Cloud Storage)'],
+                ['ใครเข้าถึงได้','ผู้ใช้ที่ได้รับอนุมัติทุกคน “เปิดดู” รายงานได้ แต่แก้ไขได้เฉพาะผู้จัดทำ ผู้ที่ได้รับอนุมัติร่วมแก้ไข และผู้ดูแลระบบ'],
+                ['การใช้ AI','เฉพาะเมื่อคุณใช้เมนูน้องริ้กกี้ ข้อความที่พิมพ์จะถูกส่งไปประมวลผลที่ Google Gemini · การนำเข้า PDF ตามปกติไม่ส่งข้อมูลออกนอกเครื่อง'],
+                ['วัตถุประสงค์','บริหารความเสี่ยงและพัฒนาคุณภาพบริการของโรงพยาบาล'],
+                ['สิทธิ์ของคุณ','ขอเข้าถึง แก้ไข หรือลบข้อมูลส่วนบุคคลของคุณได้ที่งานบริหารความเสี่ยง'],
+                ['สิ่งที่ระบบไม่ได้เก็บ','ระบบนี้ไม่ได้บันทึกประวัติการเข้าใช้งานรายครั้ง (ไม่มี access log)'],
+              ].map((r,i)=>(
+                <tr key={i} style={{borderBottom:'1px solid var(--border)'}}>
+                  <td style={{padding:'6px 8px',fontWeight:700,width:160,verticalAlign:'top',color:'var(--primary)'}}>{r[0]}</td>
+                  <td style={{padding:'6px 8px',lineHeight:1.6}}>{r[1]}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div style={{fontSize:11.5,color:'var(--text-light)',marginTop:10}}>
+            การกดปุ่มด้านล่างถือว่าคุณรับทราบข้อควรระวังและประกาศความเป็นส่วนตัวนี้แล้ว · เปิดอ่านซ้ำได้ที่เมนู <b>📖 คู่มือการใช้งาน</b>
+          </div>
+        </div>
+
+        <div style={{padding:'12px 20px',borderTop:'1px solid var(--border)',textAlign:'right',background:'#fafbfc'}}>
+          <button className="btn btn-p" onClick={onClose}>✔ รับทราบ และเริ่มใช้งาน</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ===== USER MANUAL PAGE =====
-function ManualV({isAdmin}){
+function ManualV({isAdmin,onShowNotice}){
   const[openIdx,sOpenIdx]=useState(0);
   const B=({children})=><strong style={{color:'var(--primary)'}}>{children}</strong>;
   const Li=({children})=><li style={{marginBottom:6,lineHeight:1.7}}>{children}</li>;
@@ -581,6 +652,7 @@ function ManualV({isAdmin}){
         <div style={{fontSize:18,fontWeight:800}}>📖 คู่มือการใช้งานระบบ RCA Management System</div>
         <div style={{fontSize:13,opacity:0.9,marginTop:4}}>โรงพยาบาลมหาวิทยาลัยพะเยา — กดที่หัวข้อเพื่อเปิด/ปิดเนื้อหา</div>
       </div>
+      {onShowNotice&&<div style={{marginBottom:12}}><button className="btn btn-o btn-sm" onClick={onShowNotice}>🔒 ดูข้อควรระวัง PDPA และประกาศความเป็นส่วนตัวอีกครั้ง</button></div>}
       {secs.map((s,i)=>(
         <div key={i} style={{border:'1px solid var(--border)',borderRadius:10,marginBottom:10,overflow:'hidden',background:'#fff'}}>
           <div onClick={()=>sOpenIdx(openIdx===i?-1:i)} style={{padding:'12px 16px',cursor:'pointer',display:'flex',justifyContent:'space-between',alignItems:'center',background:openIdx===i?'#f0f7ff':'#fff'}}>
@@ -2302,6 +2374,7 @@ function App(){
   const[loadErr,sLoadErr]=useState('');
   const[dirty,sDirty]=useState(false);
   const[importOpen,sImportOpen]=useState(false);
+  const[notice,sNotice]=useState(false);
 
   // PIN pass persists within the same tab only
   // ต้องแยกระหว่าง "ยังโหลด auth ไม่เสร็จ" (user เป็น null ชั่วคราว) กับ "ออกจากระบบจริง"
@@ -2658,6 +2731,14 @@ function App(){
     return()=>clearInterval(autoSaveRef.current);
   },[nav,user]);
 
+  // แสดงป๊อปอัปแจ้งวิธีนำเข้า HRMS + PDPA + Privacy Notice หนึ่งครั้งต่อการเข้าใช้งาน
+  useEffect(()=>{
+    if(!pinOk||!userData||userData.status!=='approved')return;
+    let ack=false;
+    try{ack=sessionStorage.getItem('noticeAck')==='1'}catch(e){}
+    if(!ack)sNotice(true);
+  },[pinOk,userData]);
+
   // เตือนก่อนปิด/รีเฟรชหน้าเว็บ ถ้ายังมีข้อมูลที่ยังไม่ได้บันทึก
   useEffect(()=>{
     if(!dirty)return;
@@ -2806,13 +2887,14 @@ function App(){
             {nav==='cal'&&<CalV sch={sch} sSch={schSetWrapper} st={st}/>}
             {nav==='kb'&&<KBV/>}
             {nav==='ai'&&<AiChatV geminiKey={aiKey} isAdmin={isAdmin} onApply={hAiApply}/>}
-            {nav==='manual'&&<ManualV isAdmin={isAdmin}/>}
+            {nav==='manual'&&<ManualV isAdmin={isAdmin} onShowNotice={()=>sNotice(true)}/>}
             {nav==='db'&&<DBV stats={stats} rl={rl}/>}
             {nav==='board'&&<BoardV user={user} userData={userData} isAdmin={isAdmin}/>}
             {nav==='admin'&&isAdmin&&<AdminPanel users={allUsers} onApprove={handleApprove} onReject={handleReject} geminiKey={aiKey}/>}
           </div>
         </div>
       </div>
+      {notice&&<WelcomeNotice onClose={()=>{try{sessionStorage.setItem('noticeAck','1')}catch(e){}sNotice(false)}}/>}
       {nav==='form'&&aiKey&&<AiFloat geminiKey={aiKey} fd={fd}/>}
       {importOpen&&<HrmsImport
         onClose={()=>sImportOpen(false)}

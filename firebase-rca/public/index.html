@@ -1307,6 +1307,8 @@ function FormV({fd,sFD,uf}){
       </>}
 
       {tab==='p23'&&<>
+        <div className="fc"><div className="fch"><span>🧩 แผนภาพ Interactive: Care Process × 5 Tiers (ไวท์บอร์ด)</span></div>
+        <div className="fcb" style={{overflowX:'auto'}}><WBoard fd={fd} sFD={sFD} uFS={uFS} aFS={aFS} rFS={rFS} uT={uT} uTE={uTE} tTCE={tTCE} aTE={aTE} rTE={rTE} uC={uC} aC={aC} rC={rC}/></div></div>
         <div className="fc"><div className="fch"><span>🔄 ตอนที่ 2: Care Process / Flow of Steps</span></div>
         <div className="fcb">
           <div style={{fontSize:12,color:'var(--text-light)',marginBottom:10}}>ระบุขั้นตอนกระบวนการดูแล/กระบวนการหลักที่เกี่ยวข้อง (เรียงลำดับ)</div>
@@ -1333,8 +1335,6 @@ function FormV({fd,sFD,uf}){
         <div style={{fontSize:12,color:'var(--text-light)',marginBottom:12}}>เลือก ☑ ที่หัวข้อ Tier ที่เกี่ยวข้อง แล้วกด ▼ เพื่อขยายรายละเอียด เฉพาะ Tier ที่เลือกจะแสดงใน Export</div>
         {TD.map((tier,idx)=>{const td=fd.ta[idx]||{};const hd=td.en&&(td.entries||[]).some(e=>e.desc||(e.ck||[]).length>0||(e.oc&&e.ot));return<TC key={tier.id} tier={tier} idx={idx} td={td} hd={!!hd} fd={fd} uT={uT} uTE={uTE} tTCE={tTCE} aTE={aTE} rTE={rTE}/>})}
 
-        <div className="fc" style={{marginTop:16}}><div className="fch"><span>🧩 แผนภาพ Interactive: Care Process × 5 Tiers (ไวท์บอร์ด)</span></div>
-        <div className="fcb" style={{overflowX:'auto'}}><WBoard fd={fd} sFD={sFD} uFS={uFS} aFS={aFS} rFS={rFS} uT={uT} uTE={uTE} tTCE={tTCE} aTE={aTE} rTE={rTE} uC={uC} aC={aC} rC={rC}/></div></div>
       </>}
 
       {tab==='sm'&&<SummaryTab fd={fd} uf={uf}/>}

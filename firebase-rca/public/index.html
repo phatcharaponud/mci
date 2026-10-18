@@ -706,7 +706,8 @@ function ManualV({isAdmin,onShowNotice}){
       <Li>ใส่ PIN ผิด <B>5 ครั้ง ระบบล็อก 15 นาที</B> (มีตัวนับเวลาถอยหลัง)</Li>
       <Li><B>ลืม PIN</B>: แจ้ง Admin กด "รีเซ็ต PIN" แล้วตั้งใหม่ในการเข้าครั้งถัดไป</Li>
       <Li>ระบบเก็บ PIN แบบเข้ารหัส ไม่มีใครเห็น PIN ของคุณได้ แม้แต่ Admin</Li>
-      <Li>ไม่มีการใช้งาน <B>2 ชั่วโมง</B> ระบบออกจากระบบให้อัตโนมัติ / ปิดเบราว์เซอร์ = ออกจากระบบ</Li>
+      <Li>ไม่มีการใช้งาน <B>24 ชั่วโมง</B> ระบบออกจากระบบให้อัตโนมัติ · <B>ปิดเบราว์เซอร์ = ออกจากระบบทันที</B> และต้องใส่ PIN ใหม่เมื่อเปิดใช้งานครั้งถัดไป</Li>
+      <Li>บนคอมพิวเตอร์ส่วนกลาง ควรกด <B>"ออกจากระบบ"</B> ทุกครั้งเมื่อใช้งานเสร็จ ไม่ควรรอให้ระบบตัดเอง</Li>
     </ul>},
     {icon:'📋',title:'3. การบันทึกแบบฟอร์ม RCA',body:<div style={{fontSize:14}}>
       <p style={{fontWeight:700,marginBottom:4}}>📥 นำเข้าจากรายงาน HRMS (ไม่ต้องพิมพ์ซ้ำ)</p>
@@ -1525,7 +1526,7 @@ function WBoard({fd,sFD,uFS,aFS,rFS,uT,uTE,tTCE,aTE,rTE,uC,aC,rC}){
   const boardRef=useRef(null);
   const boxRefs=useRef({});
 
-  const LABEL_W=150, FIT_W=1680, W_TIER=285, W_CMP=255;
+  const LABEL_W=150, FIT_W=1680, W_TIER=285, W_CMP=255, W_FLOW=175;
   const TIER_ROWS=[
     {t:5,name:'Tier 5',sub:'สังคม / นอกองค์กร'},
     {t:4,name:'Tier 4',sub:'การบริหารจัดการ นโยบาย'},
@@ -1855,10 +1856,13 @@ function WBoard({fd,sFD,uFS,aFS,rFS,uT,uTE,tTCE,aTE,rTE,uC,aC,rC}){
             {(fd.flowSteps||[]).map((s,i)=>(
               <React.Fragment key={i}>
                 {i>0&&<span style={{color:'#b9770e',fontWeight:700,fontSize:18}}>→</span>}
-                <div ref={el=>{boxRefs.current['f-'+i]=el}} style={{position:'relative'}}>
-                  <input value={s} onChange={e=>uFS(i,e.target.value)} placeholder={'ขั้นตอนที่ '+(i+1)}
-                    style={{width:160,padding:'10px 26px 10px 12px',border:'1.5px solid #1f2d3d',borderRadius:10,fontSize:14,fontFamily:'inherit',background:'#fff',textAlign:'center'}}/>
-                  {(fd.flowSteps||[]).length>2&&<span style={{position:'absolute',right:8,top:10,cursor:'pointer',fontSize:13,color:'#999'}} onClick={()=>rFS(i)}>✕</span>}
+                <div ref={el=>{boxRefs.current['f-'+i]=el}}
+                  style={{position:'relative',width:(widths['f-'+i]||W_FLOW),border:'1.5px solid #1f2d3d',borderRadius:10,background:'#fff',padding:'8px 24px 8px 10px'}}>
+                  <AutoTA value={s} dep={widths['f-'+i]||W_FLOW} onChange={e=>uFS(i,e.target.value)} placeholder={'ขั้นตอนที่ '+(i+1)}
+                    style={{fontSize:14,textAlign:'center',lineHeight:1.45,color:'#1f2d3d'}}/>
+                  {(fd.flowSteps||[]).length>2&&<span style={{position:'absolute',right:7,top:6,cursor:'pointer',fontSize:13,color:'#999'}} onClick={()=>rFS(i)}>✕</span>}
+                  <div onPointerDown={startResize('f-'+i,W_FLOW)} title="ลากเพื่อปรับความกว้างกล่อง"
+                    style={{position:'absolute',top:5,right:-4,bottom:5,width:9,cursor:'ew-resize',borderRight:'3px solid #e8cba3',borderRadius:3,zIndex:6}}/>
                 </div>
               </React.Fragment>
             ))}
@@ -2656,8 +2660,8 @@ function App(){
   useEffect(()=>{
     if(!user)return;
     let timer;
-    const TIMEOUT=2*60*60*1000; // 2 hours
-    const resetTimer=()=>{clearTimeout(timer);timer=setTimeout(()=>{alert('ไม่มีการใช้งาน 2 ชั่วโมง ระบบจะออกจากระบบอัตโนมัติ');auth.signOut()},TIMEOUT)};
+    const TIMEOUT=24*60*60*1000; // 24 hours
+    const resetTimer=()=>{clearTimeout(timer);timer=setTimeout(()=>{alert('ไม่มีการใช้งาน 24 ชั่วโมง ระบบจะออกจากระบบอัตโนมัติ');auth.signOut()},TIMEOUT)};
     const events=['mousedown','keydown','scroll','touchstart'];
     events.forEach(e=>document.addEventListener(e,resetTimer));
     resetTimer();

@@ -493,7 +493,8 @@ function ManualV({isAdmin}){
       <p style={{fontWeight:700,marginBottom:4}}>📥 นำเข้าจากรายงาน HRMS (ไม่ต้องพิมพ์ซ้ำ)</p>
       <ul style={{paddingLeft:20,marginBottom:10}}>
         <Li>กดปุ่ม <B>📥 นำเข้า HRMS</B> มุมขวาบนของแบบฟอร์ม แล้วเลือกวิธีใดวิธีหนึ่ง</Li>
-        <Li><B>แนบไฟล์ PDF</B> ที่ Export จาก HRMS (ไม่เกิน 10 MB) — น้องริ้กกี้จะอ่านให้ หรือ <B>วางข้อความ</B> ที่คัดลอกจากหน้าจอ HRMS (วิธีนี้ทำงานในเครื่อง ไม่ต้องใช้ AI)</Li>
+        <Li><B>แนบไฟล์ PDF</B> ที่ Export จาก HRMS (ไม่เกิน 10 MB) หรือ <B>วางข้อความ</B> ที่คัดลอกจากหน้าจอ HRMS</Li>
+        <Li>ทั้งสองวิธี<B>อ่านในเครื่องของคุณเอง ไม่ใช้ AI ไม่เสียค่าใช้จ่าย และไฟล์ไม่ถูกส่งออกนอกเครื่อง</B> (จะใช้ AI ช่วยเฉพาะกรณีไฟล์เป็นรูปสแกนที่อ่านข้อความตรง ๆ ไม่ได้ และต้องตั้งค่า API Key ไว้เท่านั้น)</Li>
         <Li>ระบบจะแสดงตารางให้<B>ตรวจสอบและติ๊กเลือก</B>ว่าจะนำช่องไหนลงแบบฟอร์ม (ช่องที่ไม่ติ๊กจะคงค่าเดิมไว้)</Li>
         <Li>ช่องที่นำเข้าได้: รหัสรายงาน, ประเภทอุบัติการณ์, เรื่อง, หน่วยงาน, ระดับความรุนแรง, วันที่/เวลาเกิดเหตุ, สถานที่, รายละเอียดเหตุการณ์, หน่วยงานที่แก้ไข</Li>
         <Li>⚠️ นำเข้าแล้ว<B>ยังไม่ได้บันทึก</B> ต้องกด 💾 บันทึก อีกครั้งเสมอ</Li>
@@ -537,7 +538,7 @@ function ManualV({isAdmin}){
       <Li>ใช้กล่องค้นหาจากชื่อเรื่อง หน่วยงาน รหัสรายงาน หรือชื่อผู้จัดทำ, กด <B>📄</B> เพื่อดูเป็น PDF</Li>
       <Li>เลือกเดือนแล้วกด <B>"📌 แสดงรายการติดตามในเดือนที่เลือก"</B> เพื่อดูรายการที่ต้องติดตามผลในเดือนนั้น (มีคอลัมน์เดือนติดตามผลในตารางด้วย)</Li>
       <Li><B>ป้าย "ใหม่" สีแดงกระพริบ</B> = รายการที่เพิ่งเข้ามาและยังไม่ได้เปิดดู (เห็นเฉพาะ Admin) กดปุ่ม <B>เปิด</B> หรือ <B>👁 ดู</B> แล้วป้ายจะหายไปเอง หรือกด <B>🔔 อ่านทั้งหมด</B> เพื่อล้างทีเดียว</Li>
-      <Li><B>ตัวเลขข้างเมนู "รายการ RCA"</B> มี 3 แบบ: <B>🔔 สีแดง</B> = รายการใหม่ที่ยังไม่ได้เปิดดู (ลดลงเมื่อเปิดดู) · <B>🙋 สีส้ม</B> = คำขอร่วมแก้ไขที่รออนุมัติ (หายเมื่ออนุมัติ/ปฏิเสธ) · <B>สีเทา</B> = จำนวนรายการทั้งหมดในระบบ (ไม่ใช่การแจ้งเตือน จึงไม่หายไป)</Li>
+      <Li><B>ตัวเลขข้างเมนู "รายการ RCA"</B> มี 2 แบบ: <B>🔔 สีแดง</B> = รายการใหม่ที่ยังไม่ได้เปิดดู (ลดลงเมื่อเปิดดู) · <B>🙋 สีส้ม</B> = คำขอร่วมแก้ไขที่รออนุมัติ (หายเมื่ออนุมัติหรือปฏิเสธ) — ถ้าไม่มีตัวเลขแสดงว่าไม่มีรายการค้าง</Li>
       <Li>ปุ่ม <B>"ลบ"</B> มีเฉพาะ<B>ผู้จัดทำ</B> (ลบได้เฉพาะรายการของตนเอง) และ Admin — ผู้อื่นรวมถึงผู้ร่วมแก้ไขลบไม่ได้</Li>
     </ul>},
     {icon:'📅',title:'6. ปฏิทินกำหนด RCA และแจ้งเตือน Line',body:<ul style={{paddingLeft:20,fontSize:14}}>
@@ -1935,6 +1936,47 @@ function parseHrmsText(text){
   };
 }
 
+// อ่านข้อความจากไฟล์ PDF ด้วย pdf.js - ทำงานในเครื่องผู้ใช้ทั้งหมด ไม่ส่งไฟล์ออกนอกเครื่อง ไม่ใช้ AI
+const PDFJS_VER='3.11.174';
+let _pdfjsP=null;
+function loadPdfJs(){
+  if(window.pdfjsLib)return Promise.resolve(window.pdfjsLib);
+  if(_pdfjsP)return _pdfjsP;
+  _pdfjsP=new Promise((ok,no)=>{
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/'+PDFJS_VER+'/pdf.min.js';
+    s.onload=()=>{
+      try{window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/'+PDFJS_VER+'/pdf.worker.min.js'}catch(e){}
+      ok(window.pdfjsLib);
+    };
+    s.onerror=()=>{_pdfjsP=null;no(new Error('โหลดตัวอ่าน PDF ไม่สำเร็จ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต'))};
+    document.head.appendChild(s);
+  });
+  return _pdfjsP;
+}
+async function pdfToText(file){
+  const lib=await loadPdfJs();
+  const pdf=await lib.getDocument({data:await file.arrayBuffer()}).promise;
+  let out='';
+  for(let i=1;i<=pdf.numPages;i++){
+    const tc=await (await pdf.getPage(i)).getTextContent();
+    const lines={};
+    tc.items.filter(it=>it.str&&it.str.trim()!=='').forEach(it=>{
+      const y=Math.round(it.transform[5]);
+      (lines[y]=lines[y]||[]).push({x:it.transform[4],w:it.width||0,s:it.str});
+    });
+    Object.keys(lines).map(Number).sort((a,b)=>b-a).forEach(y=>{
+      const sorted=lines[y].sort((a,b)=>a.x-b.x);
+      // รายงาน HRMS วาดข้อความซ้อนกันสองชั้นเหลื่อมกันเล็กน้อยเพื่อให้ดูเป็นตัวหนา ต้องตัดตัวซ้ำทิ้ง
+      const row=sorted.filter((o,k)=>{const q=sorted[k-1];return !(q&&q.s===o.s&&Math.abs(o.x-q.x)<2)});
+      let ln='',pe=null;
+      row.forEach(o=>{if(pe!==null&&o.x-pe>1.5)ln+=' ';ln+=o.s;pe=o.x+o.w});
+      out+=ln.trim()+'\n';
+    });
+  }
+  return out;
+}
+
 function HrmsImport({onClose,geminiKey,onApply,existingCodes}){
   const[mode,sMode]=useState('pdf');
   const[txt,sTxt]=useState('');
@@ -1942,6 +1984,7 @@ function HrmsImport({onClose,geminiKey,onApply,existingCodes}){
   const[err,sErr]=useState('');
   const[res,sRes]=useState(null);
   const[sel,sSel]=useState({});
+  const[method,sMethod]=useState('');
   const fileRef=useRef(null);
 
   const showResult=(data)=>{
@@ -1958,10 +2001,23 @@ function HrmsImport({onClose,geminiKey,onApply,existingCodes}){
   };
 
   const runPdf=async(file)=>{
-    if(!geminiKey){sErr('การอ่านไฟล์ PDF ต้องใช้ AI (น้องริ้กกี้) กรุณาให้ผู้ดูแลระบบตั้งค่า Gemini API Key ก่อน หรือใช้วิธี "วางข้อความ" แทน');return}
     if(file.type!=='application/pdf'){sErr('รองรับเฉพาะไฟล์ PDF');return}
     if(file.size>10*1024*1024){sErr('ไฟล์ต้องไม่เกิน 10 MB');return}
     sBusy(true);sErr('');
+    // ขั้นที่ 1: อ่านข้อความจาก PDF ในเครื่องก่อน (ไม่ใช้ AI ไม่เสียค่าใช้จ่าย ไฟล์ไม่ออกนอกเครื่อง)
+    try{
+      const text=await pdfToText(file);
+      if(text.replace(/\s/g,'').length>80){
+        const d=parseHrmsText(text);
+        if(d.incidentCode||d.whatHappened){sMethod('อ่านจากไฟล์ในเครื่อง (ไม่ใช้ AI)');showResult(d);sBusy(false);return}
+      }
+    }catch(e){console.warn('local pdf read failed:',e)}
+    // ขั้นที่ 2: อ่านตรงไม่ได้ (เช่น ไฟล์สแกนเป็นรูปภาพ) จึงให้ AI ช่วยอ่าน
+    if(!geminiKey){
+      sBusy(false);
+      sErr('ไฟล์นี้อ่านข้อความโดยตรงไม่ได้ (น่าจะเป็นไฟล์สแกนเป็นรูปภาพ) หากต้องการให้ AI ช่วยอ่าน กรุณาให้ผู้ดูแลระบบตั้งค่า Gemini API Key หรือใช้วิธี "วางข้อความ" แทน');
+      return;
+    }
     try{
       const b64=await new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(String(r.result).split(',')[1]);r.onerror=no;r.readAsDataURL(file)});
       const spec=HRMS_FIELDS.map(f=>'"'+f.k+'": "'+f.from+'"').join(', ');
@@ -1979,6 +2035,7 @@ function HrmsImport({onClose,geminiKey,onApply,existingCodes}){
       const contents=[{role:'user',parts:[{inline_data:{mime_type:'application/pdf',data:b64}},{text:prompt}]}];
       const raw=await gemCall(geminiKey,contents,{temperature:0.1,maxOutputTokens:8192,responseMimeType:'application/json',thinkingConfig:{thinkingBudget:0}},HRMS_SYS);
       let d;try{d=JSON.parse(raw)}catch(_){const mm=raw.match(/\{[\s\S]*\}/);if(!mm)throw new Error('AI ไม่ได้ส่งข้อมูลรูปแบบ JSON');d=JSON.parse(mm[0])}
+      sMethod('อ่านด้วย AI น้องริ้กกี้');
       showResult(d);
     }catch(e){sErr('อ่านไฟล์ไม่สำเร็จ: '+e.message)}
     sBusy(false);
@@ -1986,7 +2043,7 @@ function HrmsImport({onClose,geminiKey,onApply,existingCodes}){
 
   const runText=()=>{
     if(!txt.trim()){sErr('กรุณาวางข้อความจากระบบ HRMS ก่อน');return}
-    sErr('');
+    sErr('');sMethod('อ่านจากข้อความที่วาง (ไม่ใช้ AI)');
     const d=parseHrmsText(txt);
     if(!d.incidentCode&&!d.whatHappened){sErr('ไม่พบรูปแบบข้อมูล HRMS ในข้อความนี้ กรุณาคัดลอกทั้งหน้ารายงานมาวาง หรือใช้วิธีแนบไฟล์ PDF');return}
     showResult(d);
@@ -2011,7 +2068,7 @@ function HrmsImport({onClose,geminiKey,onApply,existingCodes}){
           {mode==='pdf'?(
             <div style={{border:'2px dashed var(--primary)',borderRadius:10,padding:24,textAlign:'center',background:'#f8fbff'}}>
               <div style={{fontSize:40,marginBottom:8}}>📄</div>
-              <div style={{fontSize:13,marginBottom:12,color:'var(--text-light)'}}>เลือกไฟล์ PDF ที่ Export มาจากระบบ HRMS (ไม่เกิน 10 MB)<br/>ระบบจะอ่านและกรอกลงแบบฟอร์มให้อัตโนมัติ</div>
+              <div style={{fontSize:13,marginBottom:12,color:'var(--text-light)'}}>เลือกไฟล์ PDF ที่ Export มาจากระบบ HRMS (ไม่เกิน 10 MB)<br/>ระบบจะอ่านและกรอกลงแบบฟอร์มให้อัตโนมัติ<br/><span style={{color:'var(--success)',fontWeight:600}}>✓ อ่านในเครื่องของคุณเอง ไม่ใช้ AI ไม่ส่งไฟล์ออกนอกเครื่อง</span></div>
               <input type="file" accept="application/pdf" ref={fileRef} style={{display:'none'}} onChange={e=>{const f=e.target.files[0];e.target.value='';if(f)runPdf(f)}}/>
               <button className="btn btn-p" disabled={busy} onClick={()=>fileRef.current&&fileRef.current.click()}>{busy?'⏳ กำลังอ่านไฟล์...':'📁 เลือกไฟล์ PDF'}</button>
             </div>
@@ -2027,7 +2084,7 @@ function HrmsImport({onClose,geminiKey,onApply,existingCodes}){
         {err&&<div style={{marginTop:12,background:'#fdecea',border:'1px solid #e74c3c',borderRadius:8,padding:10,fontSize:13,color:'#c0392b'}}>⚠️ {err}</div>}
 
         {res&&<>
-          <div style={{fontSize:13,color:'var(--text-light)',marginBottom:8}}>ตรวจสอบข้อมูลที่อ่านได้ แล้วติ๊กเลือกเฉพาะช่องที่ต้องการนำลงแบบฟอร์ม (ช่องที่ไม่ติ๊กจะคงค่าเดิมในฟอร์มไว้)</div>
+          <div style={{fontSize:13,color:'var(--text-light)',marginBottom:8}}>ตรวจสอบข้อมูลที่อ่านได้ แล้วติ๊กเลือกเฉพาะช่องที่ต้องการนำลงแบบฟอร์ม (ช่องที่ไม่ติ๊กจะคงค่าเดิมในฟอร์มไว้){method&&<span style={{marginLeft:6,color:'var(--success)',fontWeight:600}}>· วิธีที่ใช้: {method}</span>}</div>
           {dup&&<div style={{background:'#fff8e1',border:'1px solid #ffc107',borderRadius:8,padding:10,fontSize:13,marginBottom:10,color:'#e67e22',fontWeight:600}}>⚠️ รหัสรายงาน {res.incidentCode} นี้มีอยู่ในระบบแล้ว หากบันทึกซ้ำระบบจะเตือนและต่อท้ายด้วยวงเล็บอักษรให้</div>}
           <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
             <thead><tr style={{background:'var(--primary)',color:'#fff'}}><th style={{padding:'6px 8px',width:34}}></th><th style={{padding:'6px 8px',textAlign:'left',width:170}}>ช่องในแบบฟอร์ม</th><th style={{padding:'6px 8px',textAlign:'left'}}>ค่าที่อ่านได้</th></tr></thead>
@@ -2703,7 +2760,7 @@ function App(){
           <div className="sb-n">
             <div className="ns">แบบฟอร์ม</div>
             <div className={`ni ${nav==='form'?'ac':''}`} onClick={()=>sN('form')}><span className="ni-i">📋</span><span>แบบฟอร์ม RCA</span></div>
-            <div className={`ni ${nav==='list'?'ac':''}`} onClick={()=>sN('list')}><span className="ni-i">📁</span><span>รายการ RCA</span>{isAdmin&&unreadCount>0&&<span className="ni-b" style={{background:'#e74c3c'}} title={'มีรายการใหม่ที่ยังไม่ได้เปิดดู '+unreadCount+' รายการ (เปิดดูรายการแล้วตัวเลขนี้จะลดลงเอง)'}>🔔{unreadCount}</span>}{editReqs.filter(q=>q.status==='pending'&&(q.ownerUid===user.uid||isAdmin)).length>0&&<span className="ni-b" style={{background:'#e67e22'}} title="คำขอร่วมแก้ไขที่รออนุมัติ (กดอนุมัติ/ปฏิเสธในหน้ารายการ RCA เพื่อให้หายไป)">🙋{editReqs.filter(q=>q.status==='pending'&&(q.ownerUid===user.uid||isAdmin)).length}</span>}{rl.length>0&&<span className="ni-b" style={{background:'#95a5a6'}} title={'จำนวนรายการ RCA ทั้งหมดในระบบ '+rl.length+' รายการ (ไม่ใช่การแจ้งเตือน จึงไม่หายไป)'}>{rl.length}</span>}</div>
+            <div className={`ni ${nav==='list'?'ac':''}`} onClick={()=>sN('list')}><span className="ni-i">📁</span><span>รายการ RCA</span>{isAdmin&&unreadCount>0&&<span className="ni-b" style={{background:'#e74c3c'}} title={'มีรายการใหม่ที่ยังไม่ได้เปิดดู '+unreadCount+' รายการ (เปิดดูรายการแล้วตัวเลขนี้จะลดลงเอง)'}>🔔{unreadCount}</span>}{editReqs.filter(q=>q.status==='pending'&&(q.ownerUid===user.uid||isAdmin)).length>0&&<span className="ni-b" style={{background:'#e67e22'}} title="คำขอร่วมแก้ไขที่รออนุมัติ (กดอนุมัติ/ปฏิเสธในหน้ารายการ RCA เพื่อให้หายไป)">🙋{editReqs.filter(q=>q.status==='pending'&&(q.ownerUid===user.uid||isAdmin)).length}</span>}</div>
             <div className="ns">เครื่องมือ</div>
             <div className={`ni ${nav==='cal'?'ac':''}`} onClick={()=>sN('cal')}><span className="ni-i">📅</span><span>ปฏิทินกำหนด RCA</span></div>
             <div className={`ni ${nav==='kb'?'ac':''}`} onClick={()=>sN('kb')}><span className="ni-i">📚</span><span>ความรู้ RCA</span></div>

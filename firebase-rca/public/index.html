@@ -2998,6 +2998,22 @@ function App(){
     return()=>clearInterval(autoSaveRef.current);
   },[nav,user]);
 
+  // เปิดลิงก์ตรงไปยังเมนูที่ต้องการได้ เช่น .../#ai จะเข้าหน้าน้องริ้กกี้ทันทีหลังล็อกอิน
+  // ใช้กับลิงก์จาก Line OA หรือ QR code ที่ต้องการพาไปหน้าใดหน้าหนึ่งโดยตรง
+  const NAV_KEYS=['form','list','cal','kb','ai','manual','db','board','logs','admin'];
+  useEffect(()=>{
+    if(!pinOk||!userData||userData.status!=='approved')return;
+    const go=()=>{
+      const k=String(window.location.hash||'').replace('#','').trim();
+      if(!k||!NAV_KEYS.includes(k))return;
+      if((k==='admin'||k==='logs')&&!isAdmin)return;
+      sN(k);
+    };
+    go();
+    window.addEventListener('hashchange',go);
+    return()=>window.removeEventListener('hashchange',go);
+  },[pinOk,userData,isAdmin]);
+
   // บันทึก log การเข้าใช้งาน หนึ่งครั้งต่อการเข้าระบบ (รีเฟรชหน้าไม่นับใหม่)
   useEffect(()=>{
     if(!pinOk||!user||!userData||userData.status!=='approved')return;

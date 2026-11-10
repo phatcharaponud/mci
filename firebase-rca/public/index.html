@@ -197,6 +197,9 @@ const auth = firebase.auth();
 auth.setPersistence(firebase.auth.Auth.Persistence.SESSION);
 const db = firebase.firestore();
 const storage = firebase.storage();
+// ค่าเริ่มต้นของ Firebase Storage จะลองอัปโหลดซ้ำนานถึง 10 นาทีเมื่อเน็ตไม่ดี
+// ทำให้วงล้อ "กำลังบันทึก" ค้างยาว จึงลดเหลือ 90 วินาที เพื่อให้ล้มเหลวเร็วและแจ้งผู้ใช้ได้
+try{storage.setMaxUploadRetryTime(90000);storage.setMaxOperationRetryTime(60000)}catch(e){}
 const googleProvider = new firebase.auth.GoogleAuthProvider();
 googleProvider.setCustomParameters({hd: 'up.ac.th'});
 
@@ -225,6 +228,9 @@ const SEV_N_TIP={
   '5':'เกิดความผิดพลาดขึ้นแล้ว และมีผลให้การดำเนินงานไม่บรรลุผลสำเร็จตามเป้าหมาย (ดำเนินงานสำเร็จตามแผนได้น้อยกว่า 60%) ทำให้ภารกิจขององค์กรเสียหายอย่างร้ายแรง หรือ ทำให้เกิดความล่าช้าของโครงการ มากกว่า 6 เดือน หรือ ผลกระทบด้านการเงินมีมูลค่ามากกว่า 10,000,000 บาท'
 };
 const DAYS=[{v:'3',l:'3 วัน'},{v:'7',l:'7 วัน'},{v:'14',l:'14 วัน'},{v:'30',l:'1 เดือน'},{v:'30+',l:'มากกว่า 1 เดือน'}];
+// ออกจากระบบอัตโนมัติเมื่อไม่มีการใช้งานกี่ชั่วโมง (มีผลกับผู้ใช้ทุกคน) - แก้ที่เดียว
+const IDLE_LOGOUT_HOURS=24;
+
 // รายชื่อหน่วยงาน ใช้ร่วมกันทั้งหน้าลงทะเบียนและหน้าจัดการผู้ใช้ (แก้ที่เดียว)
 const DEPTS=['งานพยาบาลแผนก ER','งานการพยาบาลผู้ป่วยนอก (OPD)','งานพยาบาลแผนก IPD 1/1 (ผู้ป่วยในสามัญ)','งานพยาบาลแผนก IPD3 (ผู้ป่วยในพิเศษ)','งานพยาบาลแผนก ICU','งานการพยาบาลห้องผ่าตัด','งานการพยาบาลห้องคลอด','งานการพยาบาลคลินิกพิเศษ','งานพยาบาลแผนกไตเทียม','งานวิสัญญี','งานธาลัสซีเมีย','งานปฐมภูมิและเสริมสร้างสุขภาพ','งานเภสัชกรรม','งานเทคนิคการแพทย์','งานธนาคารเลือด','งานรังสี','งานกายภาพบำบัด','งานเทคโนโลยีสารสนเทศและนวัตกรรมดิจิทัลทางการแพทย์','งานเวชระเบียนและเวชสถิติ','งานการเงินและบัญชี','งานประกันสุขภาพ','งานบริหารบุคคล','งานพัสดุ','งานโครงสร้างพื้นฐานและวิศวกรรมทางการแพทย์','งาน ENV','งานควบคุมและป้องกันการติดเชื้อ (IC)','งานวิชาการ','องค์กรแพทย์','QMC (ทีมนำบริหารงานคุณภาพ)','RM (ทีมนำบริหารความเสี่ยง)','PCT sx (ทีมนำการดูแลผู้ป่วยศัลยกรรม)','PCT med (ทีมนำการดูแลผู้ป่วยอายุรกรรม)','PCT ObsGynPed (ทีมนำการดูแลผู้ป่วยสูติ-นรีเวชกรรมและกุมารเวชกรรม)','PTC (ทีมนำเภสัชกรรมและการบำบัด)','IC (ทีมนำป้องกันและควบคุมการติดเชื้อ)','ENV (ทีมนำสิ่งแวดล้อมและความปลอดภัย)','IM (ทีมนำบริหารระบบสารสนเทศ)','HRD (ทีมนำพัฒนาทรัพยากรบุคคล)','HPH (ทีมนำสร้างเสริมสุขภาพ)'];
 
@@ -915,7 +921,16 @@ function AdminPanel({users,onApprove,onReject,geminiKey}){
   };
   return(
     <div style={{padding:20}}>
-      <h3 style={{fontSize:16,fontWeight:700,color:'var(--primary)',marginBottom:16}}>👑 จัดการผู้ใช้ ({users.length} คน)</h3>
+      <h3 style={{fontSize:16,fontWeight:700,color:'var(--primary)',marginBottom:10}}>👑 จัดการผู้ใช้ ({users.length} คน)</h3>
+
+      <div style={{background:'#eafaf1',border:'1.5px solid #27ae60',borderRadius:10,padding:'10px 14px',marginBottom:16,fontSize:13,color:'#1e8449',lineHeight:1.75}}>
+        🔒 <b>ระบบตั้งออกจากระบบอัตโนมัติไว้แล้ว</b> — มีผลกับ<b>ผู้ใช้ทุกคนรวมถึงผู้ดูแลระบบ</b> ไม่ต้องตั้งรายคน
+        <div style={{marginTop:4,color:'var(--text)'}}>
+          • ไม่มีการใช้งาน (ไม่ขยับเมาส์ ไม่พิมพ์ ไม่เลื่อนจอ) ครบ <b>{IDLE_LOGOUT_HOURS} ชั่วโมง</b> → ออกจากระบบอัตโนมัติ<br/>
+          • <b>ปิดเบราว์เซอร์หรือปิดแท็บ = ออกจากระบบทันที</b> และต้องใส่ PIN ใหม่เมื่อเข้าใช้งานครั้งถัดไป<br/>
+          • ตรวจสอบเวลาเข้า-ออกของแต่ละคนได้ที่เมนู <b>📜 ประวัติการเข้าใช้งาน</b>
+        </div>
+      </div>
 
       {pending.length>0&&<div style={{marginBottom:20}}>
         <h4 style={{fontSize:14,color:'var(--accent-warm)',marginBottom:8}}>รอการอนุมัติ ({pending.length})</h4>
@@ -2640,6 +2655,7 @@ function App(){
   const[dirty,sDirty]=useState(false);
   const[importOpen,sImportOpen]=useState(false);
   const[notice,sNotice]=useState(false);
+  const[saveMsg,sSaveMsg]=useState('');
 
   // PIN pass persists within the same tab only
   // ต้องแยกระหว่าง "ยังโหลด auth ไม่เสร็จ" (user เป็น null ชั่วคราว) กับ "ออกจากระบบจริง"
@@ -2656,12 +2672,12 @@ function App(){
   const uf=(f,v)=>{sDirty(true);sFD(p=>({...p,[f]:v}))};
   const isAdmin=user&&user.email===ADMIN_EMAIL;
 
-  // Auto logout after 2 hours of inactivity
+  // ออกจากระบบอัตโนมัติเมื่อไม่มีการใช้งาน - มีผลกับผู้ใช้ทุกคนรวมถึงผู้ดูแลระบบ
   useEffect(()=>{
     if(!user)return;
     let timer;
-    const TIMEOUT=24*60*60*1000; // 24 hours
-    const resetTimer=()=>{clearTimeout(timer);timer=setTimeout(()=>{alert('ไม่มีการใช้งาน 24 ชั่วโมง ระบบจะออกจากระบบอัตโนมัติ');auth.signOut()},TIMEOUT)};
+    const TIMEOUT=IDLE_LOGOUT_HOURS*60*60*1000;
+    const resetTimer=()=>{clearTimeout(timer);timer=setTimeout(()=>{alert('ไม่มีการใช้งาน '+IDLE_LOGOUT_HOURS+' ชั่วโมง ระบบจะออกจากระบบอัตโนมัติ');auth.signOut()},TIMEOUT)};
     const events=['mousedown','keydown','scroll','touchstart'];
     events.forEach(e=>document.addEventListener(e,resetTimer));
     resetTimer();
@@ -2894,7 +2910,11 @@ function App(){
         uf('incidentCode',newCode);
       }
     }
-    sSaving(true);
+    sSaving(true);sSaveMsg('กำลังเตรียมข้อมูล...');
+    // กันวงล้อค้าง: Firestore จะคืนค่า promise ก็ต่อเมื่อเซิร์ฟเวอร์ตอบรับเท่านั้น
+    // ถ้าเน็ตหลุด promise จะไม่คืนค่าเลย (ข้อมูลถูกพักไว้ในคิวและส่งเองเมื่อกลับมาออนไลน์)
+    // จึงต้องกำหนดเวลาสูงสุดไว้ เพื่อปลดวงล้อและอธิบายให้ผู้ใช้เข้าใจ
+    const withTimeout=(p,ms,label)=>Promise.race([p,new Promise((_,rej)=>setTimeout(()=>rej(new Error('__TIMEOUT__|'+label)),ms))]);
     // Deep clean: remove undefined values recursively for Firestore compatibility
     const cleanForFirestore=(obj)=>{
       if(obj===undefined)return null;
@@ -2909,25 +2929,29 @@ function App(){
     const rawAttachments=fd.attachments||[];
     if(rawAttachments.length>0){
       const rcaId=ci||'temp-'+Date.now();
+      let failedUploads=0;
       for(let i=0;i<rawAttachments.length;i++){
         const a=rawAttachments[i];
         if(a.url){uploadedAttachments.push({name:a.name,type:a.type,size:a.size,url:a.url});continue}
         if(!a.data)continue;
+        sSaveMsg('กำลังอัปโหลดไฟล์แนบ '+(i+1)+'/'+rawAttachments.length+' ('+a.name+')');
         try{
           const ref=storage.ref('rca-attachments/'+rcaId+'/'+Date.now()+'_'+a.name);
-          await ref.putString(a.data,'data_url');
-          const url=await ref.getDownloadURL();
+          await withTimeout(ref.putString(a.data,'data_url'),120000,'อัปโหลดไฟล์แนบ');
+          const url=await withTimeout(ref.getDownloadURL(),60000,'อ่านลิงก์ไฟล์แนบ');
           uploadedAttachments.push({name:a.name,type:a.type,size:a.size,url:url});
-        }catch(e){console.error('Upload error:',e);uploadedAttachments.push({name:a.name,type:a.type,size:a.size,url:''})}
+        }catch(e){console.error('Upload error:',e);failedUploads++;uploadedAttachments.push({name:a.name,type:a.type,size:a.size,url:''})}
       }
+      if(failedUploads>0&&silent!==true)alert('⚠️ อัปโหลดไฟล์แนบไม่สำเร็จ '+failedUploads+' ไฟล์ (อาจเป็นเพราะอินเทอร์เน็ตช้า)\nระบบจะบันทึกข้อมูลส่วนอื่นต่อ แล้วค่อยแนบไฟล์ใหม่อีกครั้งได้');
     }
     // กำหนดเจ้าของเฉพาะตอนสร้างใหม่ - การบันทึกโดยผู้ร่วมแก้ไขต้องไม่เปลี่ยนเจ้าของเดิม
     const base={...fd,incidentCode:icode,attachments:uploadedAttachments,savedAt:new Date().toISOString(),status:'draft'};
     if(!ci){base.ownerUid=user.uid;base.ownerEmail=user.email;base.ownerName=userData.fullName}
     const docData=cleanForFirestore(base);
     try{
+      sSaveMsg('กำลังบันทึกข้อมูลขึ้นระบบ...');
       if(ci){
-        await db.collection('rca').doc(ci).set(docData,{merge:true});
+        await withTimeout(db.collection('rca').doc(ci).set(docData,{merge:true}),45000,'บันทึกข้อมูล');
       }else{
         // สร้างรหัสเอกสารใหม่แบบไล่ลำดับ RCA-001, RCA-002, ...
         let maxNum=0;
@@ -2962,13 +2986,18 @@ function App(){
         if(!newId)throw new Error('ไม่สามารถจองรหัสเอกสารใหม่ได้ กรุณาลองบันทึกอีกครั้ง');
         sCI(newId);
       }
-      sSaving(false);sDirty(false);st(silent===true?'💾 บันทึกอัตโนมัติแล้ว':'✅ บันทึก RCA เรียบร้อยแล้ว');
+      sSaving(false);sSaveMsg('');sDirty(false);st(silent===true?'💾 บันทึกอัตโนมัติแล้ว':'✅ บันทึก RCA เรียบร้อยแล้ว');
     }catch(e){
-      sSaving(false);
+      sSaving(false);sSaveMsg('');
       console.error('RCA save failed:',e);
-      // ของเดิมแจ้งด้วย toast ที่หายไปใน 3 วินาที ผู้ใช้จึงมักไม่เห็นและเข้าใจว่าบันทึกสำเร็จ
-      if(silent===true){st('⚠️ บันทึกอัตโนมัติไม่สำเร็จ: '+e.message)}
-      else{alert('❌ บันทึกไม่สำเร็จ\n\n'+e.message+'\n\n⚠️ ข้อมูลในหน้าจอยังอยู่ครบ กรุณาอย่าปิดหน้าเว็บ\nให้คัดลอกข้อความสำคัญเก็บไว้ก่อน แล้วลองกดบันทึกอีกครั้ง\nหากยังไม่สำเร็จ กรุณาแจ้งผู้ดูแลระบบ')}
+      const msg=String(e&&e.message||e);
+      if(msg.indexOf('__TIMEOUT__')===0){
+        // หมดเวลารอเซิร์ฟเวอร์ตอบรับ - ข้อมูลยังอยู่ในคิวของ Firestore และจะส่งเองเมื่อเน็ตกลับมา
+        const step=msg.split('|')[1]||'บันทึกข้อมูล';
+        if(silent!==true)alert('⏳ ระบบรอเซิร์ฟเวอร์นานผิดปกติ (ขั้นตอน: '+step+')\n\nสาเหตุที่พบบ่อยคืออินเทอร์เน็ตช้าหรือหลุดชั่วคราว\n\n✅ ข้อมูลของคุณยังอยู่ครบและถูกพักไว้ในคิวแล้ว ระบบจะส่งขึ้นเซิร์ฟเวอร์เองเมื่อเน็ตกลับมา\n\n⚠️ กรุณา "อย่าเพิ่งปิดหน้าเว็บ" จนกว่าจะเห็นรายการนี้ในเมนู "รายการ RCA"\nหากปิดไปก่อน ข้อมูลที่ยังไม่ถูกส่งจะหาย');
+        else st('⏳ บันทึกอัตโนมัติ: เน็ตช้า ข้อมูลอยู่ในคิว จะส่งเมื่อเน็ตกลับมา');
+      }else if(silent===true){st('⚠️ บันทึกอัตโนมัติไม่สำเร็จ: '+msg)}
+      else{alert('❌ บันทึกไม่สำเร็จ\n\n'+msg+'\n\n⚠️ ข้อมูลในหน้าจอยังอยู่ครบ กรุณาอย่าปิดหน้าเว็บ\nให้คัดลอกข้อความสำคัญเก็บไว้ก่อน แล้วลองกดบันทึกอีกครั้ง\nหากยังไม่สำเร็จ กรุณาแจ้งผู้ดูแลระบบ')}
     }
   };
   const hLoad=r=>{
@@ -3205,7 +3234,9 @@ function App(){
         <div style={{background:'#fff',borderRadius:16,padding:'32px 48px',textAlign:'center',boxShadow:'0 8px 32px rgba(0,0,0,0.3)'}}>
           <div style={{width:48,height:48,border:'4px solid #dce1e8',borderTopColor:'var(--primary)',borderRadius:'50%',animation:'sp 0.8s linear infinite',margin:'0 auto 16px'}}></div>
           <div style={{fontSize:16,fontWeight:700,color:'var(--primary)'}}>ระบบกำลังบันทึก...</div>
-          <div style={{fontSize:13,color:'var(--text-light)',marginTop:4}}>กรุณารอสักครู่</div>
+          <div style={{fontSize:13,color:'var(--text-light)',marginTop:4,maxWidth:360}}>{saveMsg||'กรุณารอสักครู่'}</div>
+          <div style={{fontSize:11.5,color:'var(--text-light)',marginTop:10,maxWidth:360,lineHeight:1.6}}>หากขึ้นค้างนานเกิน 1 นาที มักเกิดจากอินเทอร์เน็ตช้า<br/>ข้อมูลในหน้าจอยังอยู่ครบ ปิดหน้าต่างนี้แล้วลองบันทึกใหม่ได้</div>
+          <button className="btn btn-o btn-sm" style={{marginTop:12}} onClick={()=>{sSaving(false);sSaveMsg('')}}>ปิดหน้าต่างนี้</button>
         </div>
       </div>}
       {toast&&<div className="toast">{toast}</div>}

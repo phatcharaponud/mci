@@ -774,7 +774,8 @@ function ManualV({isAdmin,onShowNotice}){
     </ul>},
     {icon:'📅',title:'6. ปฏิทินกำหนด RCA และแจ้งเตือน Line',body:<ul style={{paddingLeft:20,fontSize:14}}>
       <Li>คลิกวันที่ในปฏิทิน หรือกด <B>"+ เพิ่มกำหนดการ RCA"</B> กรอกเรื่อง หน่วยงาน วันที่ (ปี ค.ศ.) เวลา สถานที่</Li>
-      <Li>Line OA แจ้งเตือนอัตโนมัติ: <B>3 วันก่อน</B>ถึงกำหนด และ <B>7 วันหลัง</B>ทำ RCA (เตือนบันทึกรายงานและลง HRMS)</Li>
+      <Li>เลือก <B>"กำหนดส่งรายงานภายใน"</B> ได้ว่าหลังประชุมแล้วต้องส่งรายงานภายในกี่วัน (ค่าเริ่มต้น 7 วัน)</Li>
+      <Li>Line OA แจ้งเตือนอัตโนมัติ 3 ครั้ง: <B>3 วันก่อนประชุม</B> · <B>3 วันก่อนครบกำหนดส่งรายงาน</B> (ระบุชื่อหน่วยงาน) · <B>วันครบกำหนดส่งรายงาน</B></Li>
     </ul>},
     {icon:'💬',title:'7. กระดานแลกเปลี่ยน & RM News',body:<ul style={{paddingLeft:20,fontSize:14}}>
       <Li><B>RM News</B> แสดงบนสุดเสมอ</Li>
@@ -2041,7 +2042,7 @@ function CalV({sch,sSch,st}){
   const[cM,sCM]=useState(()=>{const n=new Date();return{y:n.getFullYear(),m:n.getMonth()}});
   const[showForm,sSF]=useState(false);
   const[editId,sEI]=useState(null);
-  const[f,sF]=useState({title:'',department:'',rcaDate:'',rcaTime:'',location:''});
+  const[f,sF]=useState({title:'',department:'',rcaDate:'',rcaTime:'',location:'',dueDays:'7'});
   // Date picker state (ค.ศ.)
   const[dpDay,sDpDay]=useState('');
   const[dpMon,sDpMon]=useState('');
@@ -2062,8 +2063,8 @@ function CalV({sch,sSch,st}){
   const dpToDate=()=>{if(!dpDay||!dpMon||!dpYear)return'';return pad(parseInt(dpDay))+'/'+pad(parseInt(dpMon))+'/'+dpYear};
   // Parse rcaDate DD/MM/YYYY to dp fields
   const dateToDp=(ds)=>{const nd=normDate(ds);if(!nd)return;const p=nd.split('/');if(p.length===3){sDpDay(String(parseInt(p[0])));sDpMon(String(parseInt(p[1])));sDpYear(p[2])}};
-  const openNew=(d)=>{const ds=d?makeDateStr(d,cM.m+1,cM.y):'';sEI(null);sF({title:'',department:'',rcaDate:ds,rcaTime:'',location:''});if(d){sDpDay(String(d));sDpMon(String(cM.m+1));sDpYear(String(cM.y))}else{sDpDay('');sDpMon('');sDpYear('')}sSF(true)};
-  const openEdit=(s)=>{sEI(s.id);sF({title:s.title,department:s.department,rcaDate:s.rcaDate,rcaTime:s.rcaTime,location:s.location});dateToDp(s.rcaDate);sSF(true)};
+  const openNew=(d)=>{const ds=d?makeDateStr(d,cM.m+1,cM.y):'';sEI(null);sF({title:'',department:'',rcaDate:ds,rcaTime:'',location:'',dueDays:'7'});if(d){sDpDay(String(d));sDpMon(String(cM.m+1));sDpYear(String(cM.y))}else{sDpDay('');sDpMon('');sDpYear('')}sSF(true)};
+  const openEdit=(s)=>{sEI(s.id);sF({title:s.title,department:s.department,rcaDate:s.rcaDate,rcaTime:s.rcaTime,location:s.location,dueDays:s.dueDays||'7'});dateToDp(s.rcaDate);sSF(true)};
   const hSave=()=>{const dateVal=dpToDate();if(!f.title||!dateVal)return st('กรุณาระบุเรื่องและวันที่');const saveData={...f,rcaDate:dateVal};if(editId){sSch(p=>p.map(s=>s.id===editId?{...s,...saveData}:s))}else{sSch(p=>[...p,{id:schId(),...saveData,createdAt:new Date().toISOString()}])}sSF(false);st('บันทึกกำหนดการ RCA เรียบร้อย')};
   const hDel=(id)=>{if(confirm('ลบกำหนดการนี้?'))sSch(p=>p.filter(s=>s.id!==id))};
   const today=new Date();const todayStr=makeDateStr(today.getDate(),today.getMonth()+1,today.getFullYear());
@@ -2106,8 +2107,10 @@ function CalV({sch,sSch,st}){
         <p>ระบบแจ้งเตือนอัตโนมัติผ่าน Line OA ทำงานผ่าน Google Apps Script:</p>
         <ul style={{paddingLeft:20,margin:'8px 0'}}>
           <li><strong>3 วันก่อน</strong>ทำ RCA → แจ้งเรื่อง, หน่วยงาน, วัน/เวลา, สถานที่</li>
-          <li><strong>7 วันหลัง</strong>ทำ RCA → แจ้งให้บันทึกรายงาน RCA ฉบับสมบูรณ์ และลง HRMS</li>
+          <li><strong>3 วันก่อนครบกำหนดส่งรายงาน</strong> → แจ้งชื่อหน่วยงานที่ต้องส่ง พร้อมวันครบกำหนด</li>
+          <li><strong>วันครบกำหนดส่งรายงาน</strong> → แจ้งเตือนให้ส่งรายงานฉบับสมบูรณ์และลง HRMS</li>
         </ul>
+        <p style={{fontSize:12,color:'var(--text-light)'}}>วันครบกำหนด = วันประชุม RCA + จำนวนวันที่เลือกไว้ในช่อง "กำหนดส่งรายงานภายใน" (ค่าเริ่มต้น 7 วัน)</p>
         <p style={{fontSize:12,color:'var(--text-light)'}}>* ต้องตั้งค่า Line Messaging API Token ใน Google Apps Script (ดูไฟล์ google_apps_script.js)</p>
       </div>
     </div></div>
@@ -2127,6 +2130,12 @@ function CalV({sch,sSch,st}){
           <div className="fg"><label className="fl">เวลา</label><input className="fi" type="time" value={f.rcaTime} onChange={e=>sF(p=>({...p,rcaTime:e.target.value}))}/></div>
         </div>
         <div className="fg"><label className="fl">สถานที่</label><input className="fi" value={f.location} onChange={e=>sF(p=>({...p,location:e.target.value}))} placeholder="ระบุสถานที่"/></div>
+        <div className="fg"><label className="fl">กำหนดส่งรายงานภายใน (นับจากวันประชุม)</label>
+          <select className="fs" value={f.dueDays||'7'} onChange={e=>sF(p=>({...p,dueDays:e.target.value}))}>
+            {DAYS.map(d=><option key={d.v} value={d.v}>{d.l}</option>)}
+          </select>
+          <div style={{fontSize:11.5,color:'var(--text-light)',marginTop:4}}>ระบบจะแจ้งเตือนทาง Line <b>ล่วงหน้า 3 วัน</b> ก่อนครบกำหนด และแจ้งอีกครั้งในวันครบกำหนด</div>
+        </div>
         <div style={{display:'flex',gap:8,marginTop:16,justifyContent:'flex-end'}}>
           <button className="btn btn-o" onClick={()=>sSF(false)}>ยกเลิก</button>
           <button className="btn btn-p" onClick={hSave}>💾 บันทึก</button>

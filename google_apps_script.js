@@ -256,6 +256,9 @@ function testSetup() {
 
 var LINE_TOKEN = ''; // ← ใส่ Line Messaging API Channel Access Token
 var LINE_GROUP_ID = ''; // ← ใส่ Group ID หรือ User ID ที่ต้องการแจ้งเตือน
+
+// จำนวนวันหลังประชุม RCA ที่ต้องส่งรายงาน ใช้เมื่อกำหนดการไม่ได้ระบุไว้
+var DEFAULT_DUE_DAYS = 7;
 var SCHEDULE_SHEET = 'RCA_Schedule';
 
 function getOrCreateScheduleSheet() {
@@ -263,9 +266,16 @@ function getOrCreateScheduleSheet() {
   var sheet = ss.getSheetByName(SCHEDULE_SHEET);
   if (!sheet) {
     sheet = ss.insertSheet(SCHEDULE_SHEET);
-    sheet.getRange('A1:G1').setValues([['ID', 'เรื่อง', 'หน่วยงาน', 'วันที่', 'เวลา', 'สถานที่', 'แจ้งเตือนแล้ว']]);
-    sheet.getRange('A1:G1').setFontWeight('bold').setBackground('#e67e22').setFontColor('#fff');
+    sheet.getRange('A1:H1').setValues([['ID', 'เรื่อง', 'หน่วยงาน', 'วันที่', 'เวลา', 'สถานที่', 'ส่งรายงานภายใน(วัน)', 'แจ้งเตือนแล้ว']]);
+    sheet.getRange('A1:H1').setFontWeight('bold').setBackground('#e67e22').setFontColor('#fff');
     sheet.setFrozenRows(1);
+  } else if (String(sheet.getRange('G1').getValue()).indexOf('ส่งรายงาน') < 0) {
+    // อัปเกรดชีตเดิมที่มี 7 คอลัมน์ ให้มีคอลัมน์ "ส่งรายงานภายใน(วัน)" แทรกก่อน "แจ้งเตือนแล้ว"
+    sheet.insertColumnBefore(7);
+    sheet.getRange('G1').setValue('ส่งรายงานภายใน(วัน)')
+      .setFontWeight('bold').setBackground('#e67e22').setFontColor('#fff');
+    var n = sheet.getLastRow() - 1;
+    if (n > 0) sheet.getRange(2, 7, n, 1).setValue(DEFAULT_DUE_DAYS);
   }
   return sheet;
 }
@@ -308,7 +318,7 @@ function checkAndNotify() {
   var lastRow = sheet.getLastRow();
   if (lastRow < 2) return;
 
-  var data = sheet.getRange(2, 1, lastRow - 1, 7).getValues();
+  var data = sheet.getRange(2, 1, lastRow - 1, 8).getValues();
   var today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -319,7 +329,9 @@ function checkAndNotify() {
     var dateStr = data[i][3];
     var time = data[i][4];
     var location = data[i][5];
-    var notified = data[i][6] || '';
+    var dueDays = parseInt(data[i][6], 10);
+    if (!dueDays || dueDays < 1) dueDays = DEFAULT_DUE_DAYS;
+    var notified = data[i][7] || '';
 
     if (!dateStr) continue;
     var rcaDate = parseDateBE(dateStr);
@@ -338,33 +350,72 @@ function checkAndNotify() {
         + (location ? '📍 สถานที่: ' + location + '\n' : '')
         + '\nกรุณาเตรียมข้อมูลและผู้เข้าร่วมให้พร้อม';
       sendLineMessage(msg);
-      sheet.getRange(i + 2, 7).setValue(notified + '3d,');
+      sheet.getRange(i + 2, 8).setValue(notified + '3d,');
+      notified += '3d,';
     }
 
-    // แจ้งเตือน 7 วันหลังทำ RCA
-    if (diffDays === -7 && notified.indexOf('7d') < 0) {
-      var msg2 = '📝 แจ้งเตือน: ครบ 7 วันหลังทำ RCA\n\n'
+    // กำหนดส่งรายงาน = วันประชุม RCA + จำนวนวันที่กำหนดไว้
+    // daysLeft > 0 คือยังเหลืออีกกี่วันจึงจะครบกำหนด
+    var daysLeft = diffDays + dueDays;
+
+    // แจ้งเตือนหน่วยงาน ล่วงหน้า 3 วันก่อนครบกำหนดส่งรายงาน
+    if (daysLeft === 3 && notified.indexOf('due3', 0) < 0) {
+      var due = new Date(rcaDate.getTime());
+      due.setDate(due.getDate() + dueDays);
+      var msg2 = '⏳ แจ้งเตือนหน่วยงาน: อีก 3 วันครบกำหนดส่งรายงาน RCA\n\n'
+        + '🏥 หน่วยงาน: ' + dept + '\n'
         + '📋 เรื่อง: ' + title + '\n'
-        + '🏥 หน่วยงาน: ' + dept + '\n\n'
-        + '✅ กรุณาดำเนินการ:\n'
-        + '1. บันทึกรายงาน RCA ฉบับสมบูรณ์\n'
+        + '📆 ประชุม RCA เมื่อ: ' + dateStr + '\n'
+        + '🗓 ครบกำหนดส่งรายงาน: ' + formatDate(due) + ' (ภายใน ' + dueDays + ' วันหลังประชุม)\n\n'
+        + '✅ กรุณาดำเนินการให้แล้วเสร็จ:\n'
+        + '1. บันทึกรายงาน RCA ฉบับสมบูรณ์ในระบบ\n'
         + '2. บันทึกการแก้ไขในระบบ HRMS';
       sendLineMessage(msg2);
-      sheet.getRange(i + 2, 7).setValue(notified + '7d,');
+      sheet.getRange(i + 2, 8).setValue(notified + 'due3,');
+      notified += 'due3,';
+    }
+
+    // แจ้งเตือนในวันครบกำหนดส่งรายงาน
+    if (daysLeft === 0 && notified.indexOf('due0', 0) < 0) {
+      var msg3 = '🔔 แจ้งเตือนหน่วยงาน: วันนี้ครบกำหนดส่งรายงาน RCA\n\n'
+        + '🏥 หน่วยงาน: ' + dept + '\n'
+        + '📋 เรื่อง: ' + title + '\n'
+        + '📆 ประชุม RCA เมื่อ: ' + dateStr + '\n\n'
+        + '⚠️ กรุณาส่งรายงานฉบับสมบูรณ์และบันทึกในระบบ HRMS วันนี้';
+      sendLineMessage(msg3);
+      sheet.getRange(i + 2, 8).setValue(notified + 'due0,');
     }
   }
+}
+
+// แปลง Date เป็น DD/MM/YYYY (ปี ค.ศ.) ให้ตรงกับรูปแบบที่ใช้ทั้งระบบ
+function formatDate(d) {
+  var p = function(n) { return (n < 10 ? '0' : '') + n; };
+  return p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear();
 }
 
 // บันทึกกำหนดการจากหน้าเว็บ (เรียกผ่าน POST ?action=schedule)
 function saveSchedule(schedules) {
   var sheet = getOrCreateScheduleSheet();
   var lastRow = sheet.getLastRow();
-  if (lastRow > 1) sheet.getRange(2, 1, lastRow - 1, 7).clearContent();
+
+  // เก็บสถานะ "แจ้งเตือนแล้ว" ของเดิมไว้ก่อน แล้วนำกลับมาใส่ตาม ID
+  // ไม่เช่นนั้นทุกครั้งที่หน้าเว็บ sync สถานะจะถูกล้าง และ Line จะแจ้งซ้ำ
+  var prevNotified = {};
+  if (lastRow > 1) {
+    var old = sheet.getRange(2, 1, lastRow - 1, 8).getValues();
+    for (var j = 0; j < old.length; j++) {
+      if (old[j][0]) prevNotified[old[j][0]] = old[j][7] || '';
+    }
+    sheet.getRange(2, 1, lastRow - 1, 8).clearContent();
+  }
+
   if (schedules.length > 0) {
     var rows = schedules.map(function(s) {
-      return [s.id || '', s.title || '', s.department || '', s.rcaDate || '', s.rcaTime || '', s.location || '', ''];
+      return [s.id || '', s.title || '', s.department || '', s.rcaDate || '', s.rcaTime || '',
+              s.location || '', s.dueDays || DEFAULT_DUE_DAYS, prevNotified[s.id] || ''];
     });
-    sheet.getRange(2, 1, rows.length, 7).setValues(rows);
+    sheet.getRange(2, 1, rows.length, 8).setValues(rows);
     // กำหนดรูปแบบคอลัมน์วันที่และเวลาเป็น text เพื่อไม่ให้ Sheets แปลงเป็น Date object
     sheet.getRange(2, 4, rows.length, 2).setNumberFormat('@');
   }

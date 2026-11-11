@@ -43,6 +43,7 @@ const newId = 'RCA-' + String(maxNum+1).padStart(3,'0');   // RCA-001, RCA-002, 
 | `ownerUid` | string | `user.uid` จาก Firebase Auth | **เฉพาะตอนสร้างใหม่** — ใช้ตัดสินสิทธิ์แก้ไข/ลบใน Firestore Rules |
 | `ownerEmail` | string | `user.email` (บังคับ `@up.ac.th`) | เฉพาะตอนสร้างใหม่ |
 | `ownerName` | string | `userData.fullName` | เฉพาะตอนสร้างใหม่ — ⚠️ ชนกับ field ในฟอร์ม ดูข้อ 6 |
+| `ownerDept` | string | หน่วยงานของผู้สร้างจากโปรไฟล์ (`userData.department`) | เฉพาะตอนสร้างใหม่ และเติมย้อนหลังเมื่อเจ้าของกดบันทึกเอกสารเก่า — **ใช้กำหนดว่าใครในหน่วยงานเห็นรายการนี้ได้** · คนละค่ากับ `department` ซึ่งเป็นช่องพิมพ์อิสระในฟอร์ม |
 | `adminViewed` | boolean | `false` ตอนสร้าง → `true` เมื่อ admin กดเปิดดู | สร้าง + ตอน admin เปิด (`hLoad`) |
 | `collaborators` | array&lt;string&gt; | UID ผู้ได้รับอนุมัติร่วมแก้ไข (`FieldValue.arrayUnion`) | **ไม่มี field นี้เลย**จนกว่าเจ้าของจะอนุมัติคำขอครั้งแรก |
 

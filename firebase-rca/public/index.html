@@ -761,7 +761,8 @@ function ManualV({isAdmin,onShowNotice}){
       <Li>น้องริ้กกี้ตอบเฉพาะเรื่องการบริหารความเสี่ยงและ RCA เท่านั้น</Li>
     </ul>},
     {icon:'📁',title:'5. รายการ RCA และการขอร่วมแก้ไข',body:<ul style={{paddingLeft:20,fontSize:14}}>
-      <Li>ทุกคนเห็นรายการทั้งหมด แต่<B>แก้ไข/บันทึกได้เฉพาะผู้จัดทำ</B> (และผู้ที่ได้รับอนุมัติร่วมแก้ไข)</Li>
+      <Li>คุณเห็นเฉพาะ <B>รายการของหน่วยงานตนเอง</B> + รายการที่ตนเองสร้าง + รายการที่ได้รับอนุมัติให้ร่วมแก้ไข (ผู้ดูแลระบบเห็นทั้งหมด)</Li>
+      <Li><B>แก้ไข/บันทึกได้เฉพาะผู้จัดทำ</B> และผู้ที่ได้รับอนุมัติร่วมแก้ไขเท่านั้น</Li>
       <Li>รายการของตนเอง: กด <B>"เปิด"</B> เพื่อแก้ไข / รายการของผู้อื่น: กด <B>"👁 ดู"</B> ได้อย่างเดียว</Li>
       <Li>ต้องการแก้ไขรายการของผู้อื่น: กด <B>"🙋 ขอร่วมแก้ไข"</B> ระบุหน่วยงานที่ขอ แล้วรอ<B>ผู้จัดทำอนุมัติ</B></Li>
       <Li>เมื่อมีคนขอร่วมแก้ไขรายการของคุณ จะมี<B>กล่องสีเหลือง</B>ด้านบนรายการ RCA ให้กดอนุมัติ/ปฏิเสธ (มี badge 🙋 ที่เมนูด้วย)</Li>
@@ -899,7 +900,7 @@ function PinPage({user,userData,onOk,onLogout}){
   );
 }
 
-function AdminPanel({users,onApprove,onReject,geminiKey}){
+function AdminPanel({users,onApprove,onReject,geminiKey,missingDeptCount,onBackfillDept}){
   const[editDepts,sED]=useState({});
   const[gk,sGk]=useState(geminiKey||'');
   useEffect(()=>{sGk(geminiKey||'')},[geminiKey]);
@@ -930,6 +931,19 @@ function AdminPanel({users,onApprove,onReject,geminiKey}){
           • <b>ปิดเบราว์เซอร์หรือปิดแท็บ = ออกจากระบบทันที</b> และต้องใส่ PIN ใหม่เมื่อเข้าใช้งานครั้งถัดไป<br/>
           • ตรวจสอบเวลาเข้า-ออกของแต่ละคนได้ที่เมนู <b>📜 ประวัติการเข้าใช้งาน</b>
         </div>
+      </div>
+
+      <div style={{background:'#f0f7ff',border:'1.5px solid var(--primary)',borderRadius:10,padding:'10px 14px',marginBottom:16,fontSize:13,lineHeight:1.75}}>
+        👁 <b>การมองเห็นรายการ RCA</b> — ผู้ใช้ทั่วไปเห็นเฉพาะ<b>รายการของหน่วยงานตนเอง</b> บวกกับรายการที่ตนเองสร้าง และรายการที่ได้รับอนุมัติให้ร่วมแก้ไข · ผู้ดูแลระบบเห็นทั้งหมด
+        {missingDeptCount>0?(
+          <div style={{marginTop:8,background:'#fff8e1',border:'1px solid #ffc107',borderRadius:8,padding:'8px 12px'}}>
+            <div style={{color:'#e67e22',fontWeight:700,marginBottom:6}}>⚠️ มี {missingDeptCount} รายการที่สร้างไว้ก่อนเปิดระบบนี้ และยังไม่มีข้อมูลหน่วยงานผู้จัดทำ</div>
+            <div style={{color:'var(--text)',marginBottom:8}}>รายการเหล่านี้จะมองเห็นได้เฉพาะผู้จัดทำและผู้ดูแลระบบ จนกว่าจะเติมหน่วยงานให้</div>
+            <button className="btn btn-sm btn-p" onClick={onBackfillDept}>🔧 เติมหน่วยงานให้รายการเก่า ({missingDeptCount})</button>
+          </div>
+        ):(
+          <div style={{marginTop:4,color:'var(--success)',fontWeight:600}}>✅ ทุกรายการมีข้อมูลหน่วยงานผู้จัดทำครบแล้ว</div>
+        )}
       </div>
 
       {pending.length>0&&<div style={{marginBottom:20}}>
@@ -2720,32 +2734,41 @@ function App(){
   },[user]);
 
   // Load RCA records from Firestore
+  // ผู้ใช้ทั่วไปเห็นเฉพาะ: รายการของหน่วยงานตัวเอง + รายการที่ตัวเองสร้าง + รายการที่ได้รับอนุมัติให้ร่วมแก้ไข
+  // ต้องแยกเป็นหลาย query เพราะ Firestore ต้องพิสูจน์ได้ว่าทุกผลลัพธ์ผ่านกติกาใน firestore.rules
+  // (ไม่ใส่ orderBy เพื่อไม่ต้องสร้าง composite index แล้วเรียงลำดับฝั่งเว็บแทน)
   useEffect(()=>{
     if(!user||!userData||userData.status!=='approved')return;
-    // ทุกคนเห็นรายการทั้งหมด (แก้ไขได้เฉพาะผู้จัดทำ/ผู้ร่วมแก้ไข/admin)
-    const q=db.collection('rca').orderBy('savedAt','desc');
-    const unsub=q.onSnapshot(snap=>{
-      sLoadErr('');
-      sRL(snap.docs.map(d=>({id:d.id,...d.data()})));
-    },err=>{
-      console.error('RCA load error:',err);
-      // สำรองชั้นที่ 1: ไม่เรียงลำดับ (เผื่อเอกสารเก่าไม่มี savedAt)
-      db.collection('rca').get().then(snap=>{
-        sLoadErr('');
-        sRL(snap.docs.map(d=>({id:d.id,...d.data()})));
-      }).catch(()=>{
-        // สำรองชั้นที่ 2: อ่านเฉพาะรายการของตัวเอง (กรณี Firestore Rules ยังไม่อนุญาตให้อ่านทั้งหมด)
-        db.collection('rca').where('ownerUid','==',user.uid).get().then(snap=>{
-          sRL(snap.docs.map(d=>({id:d.id,...d.data()})));
-          sLoadErr('ขณะนี้แสดงได้เฉพาะรายการของคุณเอง เนื่องจากสิทธิ์การอ่านข้อมูล (Firestore Rules) ยังไม่ถูกอัปเดต — กรุณาแจ้งผู้ดูแลระบบ ข้อมูลของทุกคนยังอยู่ครบ ไม่ได้สูญหาย');
-        }).catch(e2=>{
-          sRL([]);
-          sLoadErr('โหลดรายการ RCA ไม่สำเร็จ: '+e2.message+' — ข้อมูลยังอยู่ในระบบ กรุณาแจ้งผู้ดูแลระบบตรวจสอบ Firestore Rules');
-        });
+    const col=db.collection('rca');
+    const sortDesc=a=>a.sort((x,y)=>String(y.savedAt||'').localeCompare(String(x.savedAt||'')));
+    const toRows=snap=>snap.docs.map(d=>({id:d.id,...d.data()}));
+
+    if(isAdmin){
+      const unsub=col.onSnapshot(snap=>{sLoadErr('');sRL(sortDesc(toRows(snap)))},err=>{
+        console.error('RCA load error:',err);
+        sRL([]);sLoadErr('โหลดรายการ RCA ไม่สำเร็จ: '+err.message+' — ข้อมูลยังอยู่ในระบบ กรุณาตรวจสอบ Firestore Rules');
       });
-    });
-    return()=>unsub();
-  },[user,userData]);
+      return()=>unsub();
+    }
+
+    const myDept=String(userData.department||'').trim();
+    const buckets={dept:[],own:[],collab:[]};
+    const emit=()=>{
+      const map={};
+      [...buckets.dept,...buckets.own,...buckets.collab].forEach(r=>{map[r.id]=r});
+      sRL(sortDesc(Object.values(map)));
+    };
+    const unsubs=[];
+    const sub=(q,key)=>unsubs.push(q.onSnapshot(snap=>{buckets[key]=toRows(snap);sLoadErr('');emit()},err=>{
+      console.error('RCA load error ['+key+']:',err);
+      buckets[key]=[];emit();
+      sLoadErr('โหลดรายการบางส่วนไม่สำเร็จ: '+err.message+' — ข้อมูลยังอยู่ในระบบ กรุณาแจ้งผู้ดูแลระบบตรวจสอบ Firestore Rules');
+    }));
+    if(myDept)sub(col.where('ownerDept','==',myDept),'dept');
+    sub(col.where('ownerUid','==',user.uid),'own');
+    sub(col.where('collaborators','array-contains',user.uid),'collab');
+    return()=>unsubs.forEach(u=>{try{u()}catch(e){}});
+  },[user,userData,isAdmin]);
 
   // Edit-collaboration requests
   const[editReqs,sEditReqs]=useState([]);
@@ -2832,6 +2855,27 @@ function App(){
     try{sessionStorage.removeItem('pinOk');sessionStorage.removeItem('loggedIn')}catch(e){}
     setUser(null);setUserData(undefined);
     window.location.reload();
+  };
+
+  // เติมหน่วยงานผู้จัดทำให้รายการเก่าที่สร้างไว้ก่อนเปิดระบบมองเห็นตามหน่วยงาน
+  const hBackfillDept=async()=>{
+    const need=rl.filter(r=>!r.ownerDept);
+    if(!need.length){alert('ทุกรายการมีข้อมูลหน่วยงานครบแล้ว');return}
+    const byUid={};allUsers.forEach(u=>{byUid[u.id]=u});
+    const canFix=need.filter(r=>r.ownerUid&&byUid[r.ownerUid]&&String(byUid[r.ownerUid].department||'').trim());
+    const cannot=need.length-canFix.length;
+    if(!confirm('พบ '+need.length+' รายการที่ยังไม่มีหน่วยงานผู้จัดทำ\n\n'
+      +'• เติมได้จากโปรไฟล์ผู้จัดทำ: '+canFix.length+' รายการ\n'
+      +(cannot?'• หาผู้จัดทำไม่พบ: '+cannot+' รายการ (ต้องให้เจ้าของเปิดแล้วกดบันทึกเอง)\n':'')
+      +'\nดำเนินการต่อหรือไม่?'))return;
+    let ok=0,fail=0;
+    for(const r of canFix){
+      try{await db.collection('rca').doc(r.id).update({ownerDept:String(byUid[r.ownerUid].department).trim()});ok++}
+      catch(e){console.error('backfill failed',r.id,e);fail++}
+    }
+    alert('เติมหน่วยงานสำเร็จ '+ok+' รายการ'
+      +(fail?'\nไม่สำเร็จ '+fail+' รายการ':'')
+      +(cannot?'\n\nเหลือ '+cannot+' รายการที่หาผู้จัดทำไม่พบ ให้เจ้าของเปิดรายการแล้วกดบันทึกหนึ่งครั้ง ระบบจะเติมให้เอง':''));
   };
 
   // Apply AI analysis to RCA form
@@ -2946,7 +2990,15 @@ function App(){
     }
     // กำหนดเจ้าของเฉพาะตอนสร้างใหม่ - การบันทึกโดยผู้ร่วมแก้ไขต้องไม่เปลี่ยนเจ้าของเดิม
     const base={...fd,incidentCode:icode,attachments:uploadedAttachments,savedAt:new Date().toISOString(),status:'draft'};
-    if(!ci){base.ownerUid=user.uid;base.ownerEmail=user.email;base.ownerName=userData.fullName}
+    // ownerDept = หน่วยงานของผู้สร้างตามโปรไฟล์ ใช้กำหนดว่าใครในหน่วยงานเห็นรายการนี้ได้
+    // ตั้งตอนสร้างใหม่เท่านั้น การบันทึกโดยผู้ร่วมแก้ไขต่างหน่วยงานต้องไม่เปลี่ยนค่านี้
+    if(!ci){
+      base.ownerUid=user.uid;base.ownerEmail=user.email;base.ownerName=userData.fullName;
+      base.ownerDept=String(userData.department||'').trim();
+    }else if(curRec&&!curRec.ownerDept&&curRec.ownerUid===user.uid){
+      // รายการเก่าที่ยังไม่มี ownerDept - เติมให้อัตโนมัติเมื่อเจ้าของกดบันทึก
+      base.ownerDept=String(userData.department||'').trim();
+    }
     const docData=cleanForFirestore(base);
     try{
       sSaveMsg('กำลังบันทึกข้อมูลขึ้นระบบ...');
@@ -3214,7 +3266,8 @@ function App(){
             {nav==='db'&&<DBV stats={stats} rl={rl}/>}
             {nav==='board'&&<BoardV user={user} userData={userData} isAdmin={isAdmin}/>}
             {nav==='logs'&&isAdmin&&<AccessLogV/>}
-            {nav==='admin'&&isAdmin&&<AdminPanel users={allUsers} onApprove={handleApprove} onReject={handleReject} geminiKey={aiKey}/>}
+            {nav==='admin'&&isAdmin&&<AdminPanel users={allUsers} onApprove={handleApprove} onReject={handleReject} geminiKey={aiKey}
+              missingDeptCount={rl.filter(r=>!r.ownerDept).length} onBackfillDept={hBackfillDept}/>}
           </div>
         </div>
       </div>

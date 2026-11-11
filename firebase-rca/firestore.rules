@@ -2,6 +2,14 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    function isAdmin() {
+      return request.auth != null && request.auth.token.email == 'phatcharapon.ud@up.ac.th';
+    }
+    // หน่วยงานของผู้ใช้ที่กำลังเรียก อ่านจากโปรไฟล์ของตัวเอง
+    function myDept() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.department;
+    }
+
     // Users collection - ผู้ใช้อ่านข้อมูลตัวเอง, admin อ่านทั้งหมด
     match /users/{userId} {
       allow read: if request.auth != null && (request.auth.uid == userId || request.auth.token.email == 'phatcharapon.ud@up.ac.th');
@@ -9,9 +17,18 @@ service cloud.firestore {
       allow update: if request.auth != null && (request.auth.uid == userId || request.auth.token.email == 'phatcharapon.ud@up.ac.th');
     }
 
-    // RCA records - ทุกคนที่ login เปิดดูได้, แก้ไขได้เฉพาะเจ้าของ/ผู้ร่วมแก้ไข/admin
+    // RCA records
+    // อ่านได้เฉพาะ: รายการของหน่วยงานตัวเอง (ownerDept) / รายการที่ตัวเองสร้าง /
+    //              รายการที่ได้รับอนุมัติให้ร่วมแก้ไข / ผู้ดูแลระบบเห็นทั้งหมด
+    // หมายเหตุ: ฝั่งเว็บต้อง query ด้วยเงื่อนไขที่ตรงกับกติกานี้ (where ownerDept / ownerUid /
+    //          collaborators) มิฉะนั้น Firestore จะปฏิเสธทั้ง query
     match /rca/{rcaId} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null && (
+        isAdmin() ||
+        resource.data.ownerUid == request.auth.uid ||
+        request.auth.uid in resource.data.collaborators ||
+        resource.data.ownerDept == myDept()
+      );
       allow create: if request.auth != null;
       allow update: if request.auth != null && (
         resource.data.ownerUid == request.auth.uid ||
